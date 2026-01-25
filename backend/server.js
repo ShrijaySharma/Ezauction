@@ -40,13 +40,22 @@ app.use(express.urlencoded({ extended: true }));
 // Serve uploaded images
 app.use('/uploads', express.static(join(__dirname, 'uploads')));
 
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.json({ message: 'Cricket Auction Server is running!' });
+});
+
+// Trust proxy (required for Render/Heroku SSL)
+app.set('trust proxy', 1);
+
 // Session configuration
 app.use(session({
-  secret: 'cricket-auction-secret-key-2024',
+  secret: process.env.SESSION_SECRET || 'cricket-auction-secret-key-2024',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false,
+    secure: true, // Required for SameSite: 'none'
+    sameSite: 'none', // Required for cross-site (Vercel -> Render)
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }

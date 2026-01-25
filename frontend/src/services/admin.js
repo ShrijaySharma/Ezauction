@@ -1,13 +1,7 @@
 import api from './auth';
+import { getApiUrl } from '../config';
 
-// Get API base URL (same as auth.js)
-const getApiBaseUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  const host = window.location.hostname;
-  return `http://${host}:4000/api`;
-};
+const getApiBaseUrl = getApiUrl;
 
 export const getAuctionState = async () => {
   const response = await api.get('/admin/auction-state');

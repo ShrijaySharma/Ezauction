@@ -1,17 +1,6 @@
 import axios from 'axios';
 
-// Auto-detect API URL based on current host
-const getApiUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  const host = window.location.hostname;
-  const apiUrl = `http://${host}:4000/api`;
-  console.log('API URL:', apiUrl);
-  return apiUrl;
-};
-
-const API_URL = getApiUrl();
+import { API_URL } from '../config';
 
 const api = axios.create({
   baseURL: API_URL,
