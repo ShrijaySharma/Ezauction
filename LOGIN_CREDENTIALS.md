@@ -1,37 +1,33 @@
-# 🔐 Login Credentials
+# Auction App Credentials - 19 Teams
+Generated on: 2/2/2026, 11:41:12 am
 
-## Admin Account
-- **Username**: `admin`
-- **Password**: `admin123`
-- **Access**: Full admin dashboard with all controls
+## Admin
+Username: admin
+Password: admin123
 
-## Host/Audience Account (Read-Only)
-- **Username**: `host`
-- **Password**: `host123`
-- **Access**: View-only dashboard for audience to watch the auction
-- **Features**: Can see current player, bids, team balances, and auction status but cannot bid or modify anything
+## Host
+Username: host
+Password: host123
 
-## Team Owner Accounts
-
-All team owners use the same password: **`owner123`**
-
-| Team Name | Username |
-|-----------|----------|
-| Mahavir Group | `mahavir_group` |
-| Naveen Jewellers | `naveen_jewellers` |
-| Gurudev Rice Mill | `gurudev_rice` |
-| Nandani Construction | `nandani_construction` |
-| Senior Citizen Group | `senior_citizen` |
-| Manju Sales | `manju_sales` |
-| Mahesh Eleven | `mahesh_eleven` |
-| Satyam Furniture | `satyam_furniture` |
-
-### Example Login
-- **Team**: Mahavir Group
-- **Username**: `mahavir_group`
-- **Password**: `owner123`
-
----
-
-**Note**: These credentials are created when you run `npm run seed` in the backend directory. If you need to reset the database, delete `backend/auction.db` and run `npm run seed` again.
-
+## Teams
+| Team Name | Username | Password |
+|-----------|----------|----------|
+| Aarth warriors | aarth | owner123 |
+| Abraham 11 | abraham | owner123 |
+| AVM warriors | avm | owner123 |
+| Basantpur 11 | basantpur | owner123 |
+| CG brothers | cg_brothers | owner123 |
+| Chitransh 11 | chitransh | owner123 |
+| CRS ISHWAR SONKAR | crs_ishwar | owner123 |
+| Elite 11 | elite | owner123 |
+| Good Morning cricket club | good_morning | owner123 |
+| Krishna 11 | krishna | owner123 |
+| Mahadev 11 | mahadev | owner123 |
+| Manan superkings | manan | owner123 |
+| Nartaj 11 | nartaj | owner123 |
+| RV kings | rv_kings | owner123 |
+| South indian kings | south_indian | owner123 |
+| WInter cricket club | winter | owner123 |
+| yashoda group | yashoda | owner123 |
+| Team VSR PTS | vsr_pts | owner123 |
+| Team Anandam | anandam | owner123 |

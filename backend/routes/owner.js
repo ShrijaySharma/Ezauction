@@ -48,8 +48,9 @@ router.get('/current-info', (req, res) => {
 
                             const playersBought = result ? result.count : 0;
                             const remainingPlayers = maxPlayersPerTeam - playersBought;
-                            const minimumAmountToKeep = remainingPlayers * 1000;
-                            const maxBidAllowed = Math.max(0, totalBudget - minimumAmountToKeep);
+                            const enforceMaxBid = state?.enforce_max_bid === 1;
+                            const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * 1000) : 0;
+                            const maxBidAllowed = enforceMaxBid ? Math.max(0, totalBudget - minimumAmountToKeep) : totalBudget;
 
                             return res.json({
                                 player: null,
@@ -71,7 +72,8 @@ router.get('/current-info', (req, res) => {
                                 playersBought: playersBought,
                                 remainingPlayers: remainingPlayers,
                                 minimumAmountToKeep: minimumAmountToKeep,
-                                maxBidAllowed: maxBidAllowed
+                                maxBidAllowed: maxBidAllowed,
+                                enforceMaxBid: enforceMaxBid
                             });
                         });
                 });
@@ -142,8 +144,9 @@ router.get('/current-info', (req, res) => {
 
                                     const playersBought = result ? result.count : 0;
                                     const remainingPlayers = maxPlayersPerTeam - playersBought;
-                                    const minimumAmountToKeep = remainingPlayers * 1000; // Base price per player = ₹1000
-                                    const maxBidAllowed = Math.max(0, totalBudget - minimumAmountToKeep);
+                                    const enforceMaxBid = state.enforce_max_bid === 1;
+                                    const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * 1000) : 0;
+                                    const maxBidAllowed = enforceMaxBid ? Math.max(0, totalBudget - minimumAmountToKeep) : totalBudget;
 
                                     res.json({
                                         player,
@@ -166,7 +169,8 @@ router.get('/current-info', (req, res) => {
                                         playersBought: playersBought,
                                         remainingPlayers: remainingPlayers,
                                         minimumAmountToKeep: minimumAmountToKeep,
-                                        maxBidAllowed: maxBidAllowed
+                                        maxBidAllowed: maxBidAllowed,
+                                        enforceMaxBid: enforceMaxBid
                                     });
                                 });
                         });
@@ -272,17 +276,25 @@ router.post('/bid', (req, res) => {
                                     });
                                 }
 
-                                const minimumAmountToKeep = remainingPlayers * 1000; // Base price = ₹1000
-                                const maxBidAllowed = Math.max(0, team.budget - minimumAmountToKeep);
+                                const enforceMaxBid = state.enforce_max_bid === 1;
+                                const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * 1000) : 0;
+                                const maxBidAllowed = enforceMaxBid ? Math.max(0, team.budget - minimumAmountToKeep) : team.budget;
 
                                 // Check if bid exceeds maximum allowed
                                 if (amount > maxBidAllowed) {
-                                    return res.status(400).json({
-                                        error: `Bid exceeds maximum allowed. You need to keep ₹${minimumAmountToKeep.toLocaleString()} for ${remainingPlayers} remaining player(s). Maximum bid allowed: ₹${maxBidAllowed.toLocaleString()}`,
-                                        maxBidAllowed: maxBidAllowed,
-                                        minimumAmountToKeep: minimumAmountToKeep,
-                                        remainingPlayers: remainingPlayers
-                                    });
+                                    if (enforceMaxBid) {
+                                        return res.status(400).json({
+                                            error: `Bid exceeds maximum allowed. You need to keep ₹${minimumAmountToKeep.toLocaleString()} for ${remainingPlayers} remaining player(s). Maximum bid allowed: ₹${maxBidAllowed.toLocaleString()}`,
+                                            maxBidAllowed: maxBidAllowed,
+                                            minimumAmountToKeep: minimumAmountToKeep,
+                                            remainingPlayers: remainingPlayers
+                                        });
+                                    } else {
+                                        return res.status(400).json({
+                                            error: `Bid exceeds maximum allowed purse: ₹${maxBidAllowed.toLocaleString()}`,
+                                            maxBidAllowed: maxBidAllowed
+                                        });
+                                    }
                                 }
 
                                 // Place bid

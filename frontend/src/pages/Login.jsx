@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../services/auth';
 
-function Login() {
+function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -17,12 +17,15 @@ function Login() {
     try {
       const response = await login(username, password);
       if (response && response.success) {
-        const redirectPath = 
-          response.user.role === 'admin' ? '/admin' : 
-          response.user.role === 'owner' ? '/owner' : 
-          response.user.role === 'host' ? '/host' : '/login';
+        // Update global auth state first
+        onLogin(response.user);
+
+        // Then navigate based on role
+        const redirectPath =
+          response.user.role === 'admin' ? '/admin' :
+            response.user.role === 'owner' ? '/owner' :
+              response.user.role === 'host' ? '/host' : '/login';
         navigate(redirectPath);
-        window.location.reload(); // Reload to update context
       } else {
         setError('Invalid response from server');
       }
@@ -89,7 +92,7 @@ function Login() {
           </form>
 
           <div className="mt-6 pt-6 border-t border-gray-700">
-            
+
           </div>
         </div>
       </div>

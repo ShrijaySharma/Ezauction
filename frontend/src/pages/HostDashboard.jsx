@@ -92,13 +92,13 @@ function HostDashboard({ user }) {
     newSocket.on('bid-placed', (data) => {
       setBidFlash(true);
       setTimeout(() => setBidFlash(false), 500);
-      
+
       if (data.bid) {
         const newBid = data.bid.amount;
-        
+
         // Use previous bid from server if available, otherwise use ref
         const prevBid = data.previousBid !== undefined ? data.previousBid : previousBidRef.current;
-        
+
         // Calculate increment using server-provided previous bid or fallback
         let increment = 0;
         if (prevBid > 0 && prevBid < newBid) {
@@ -111,25 +111,27 @@ function HostDashboard({ user }) {
           // Fallback: use ref if server didn't provide previous bid
           increment = newBid - previousBidRef.current;
         }
-        
+
         // Update previous bid ref BEFORE showing notification to prevent race conditions
         previousBidRef.current = newBid;
         setPreviousBid(newBid);
-        
+
         // Show notification immediately if there's a valid increment and team name
         if (increment > 0 && data.bid.team_name) {
-          // Use a more unique key to force re-render
           const newKey = `${Date.now()}-${Math.random()}`;
           setNotificationKey(newKey);
-          // Set notification immediately with unique ID
           setNotification({
             id: newKey,
             teamName: data.bid.team_name,
             increment: increment
           });
         }
+
+        // Update bid state immediately
+        setHighestBid(data.bid);
+        setCurrentBid(data.bid.amount);
       }
-      
+
       // Load info after a small delay to ensure notification is set first
       setTimeout(() => {
         loadCurrentInfo();
@@ -140,13 +142,13 @@ function HostDashboard({ user }) {
     newSocket.on('bid-updated', (data) => {
       setBidFlash(true);
       setTimeout(() => setBidFlash(false), 500);
-      
+
       if (data.highestBid) {
         const newBid = data.highestBid.amount;
-        
+
         // Use previous bid from server if available, otherwise use ref
         const prevBid = data.previousBid !== undefined ? data.previousBid : previousBidRef.current;
-        
+
         // Calculate increment using server-provided previous bid or fallback
         let increment = 0;
         if (prevBid > 0 && prevBid < newBid) {
@@ -159,25 +161,31 @@ function HostDashboard({ user }) {
           // Fallback: use ref if server didn't provide previous bid
           increment = newBid - previousBidRef.current;
         }
-        
+
         // Update previous bid ref BEFORE showing notification to prevent race conditions
         previousBidRef.current = newBid;
         setPreviousBid(newBid);
-        
+
         // Show notification immediately if there's a valid increment and team name
         if (increment > 0 && data.highestBid.team_name) {
-          // Use a more unique key to force re-render
           const newKey = `${Date.now()}-${Math.random()}`;
           setNotificationKey(newKey);
-          // Set notification immediately with unique ID
           setNotification({
             id: newKey,
             teamName: data.highestBid.team_name,
             increment: increment
           });
         }
+
+        // Update bid state immediately
+        setHighestBid(data.highestBid);
+        setCurrentBid(data.highestBid.amount);
+      } else if (!data.highestBid) {
+        // Handle undo to zero bids
+        setHighestBid(null);
+        setCurrentBid(currentPlayerRef.current?.base_price || 0);
       }
-      
+
       // Load info after a small delay to ensure notification is set first
       setTimeout(() => {
         loadCurrentInfo();
@@ -238,7 +246,7 @@ function HostDashboard({ user }) {
       if (data.stats) {
         setStats(data.stats);
       }
-      
+
       // Update previous bid if player changed
       if (data.player && (!currentPlayerRef.current || currentPlayerRef.current.id !== data.player.id)) {
         const basePrice = data.player.base_price || 0;
@@ -307,9 +315,9 @@ function HostDashboard({ user }) {
           onClose={() => setNotification(null)}
         />
       )}
-      
+
       {/* Stadium Background Image */}
-      <div 
+      <div
         className="fixed inset-0 z-0"
         style={{
           backgroundImage: `url('/stadium_img.webp')`,
@@ -351,90 +359,59 @@ function HostDashboard({ user }) {
         </div>
 
         {/* Main Content - Mobile Responsive */}
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-3 pb-2 sm:pb-3 flex flex-col h-[calc(100vh-70px)] overflow-hidden">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-3 pb-2 sm:pb-3 flex flex-col min-h-[calc(100vh-70px)]">
           {currentPlayer ? (
-            <div className="flex flex-col gap-1.5 sm:gap-2 h-full">
-              {/* Player Section */}
-              <div className={`bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-2 sm:p-3 border-2 transition-all flex-shrink-0 ${
-                bidFlash ? 'border-yellow-400 shadow-2xl shadow-yellow-400/50' : 
-                'border-yellow-400/50'
-              }`}>
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-center">
-                  {/* Circular Player Image */}
-                  <div className="relative flex-shrink-0">
-                    <div className="w-32 h-32 sm:w-44 sm:h-44 md:w-52 md:h-52 lg:w-60 lg:h-60 rounded-full border-4 border-yellow-400 p-1 bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-2xl">
-                      <img
-                        src={getImageUrl(currentPlayer.image)}
-                        alt={currentPlayer.name}
-                        className="w-full h-full rounded-full object-cover"
-                        onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/300x300?text=Player';
-                        }}
-                      />
-                    </div>
-                    {currentPlayer.serial_number && (
-                      <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-yellow-400 text-blue-900 font-bold text-xl sm:text-2xl md:text-3xl px-2 sm:px-3 py-0.5 sm:py-1 rounded-full shadow-lg">
-                        {currentPlayer.serial_number}
-                      </div>
-                    )}
+            <div className="flex flex-col lg:flex-row gap-4 h-full">
+              {/* Left: Player Image */}
+              <div className={`lg:w-1/3 bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border-2 transition-all flex flex-col items-center justify-center ${bidFlash ? 'border-yellow-400 shadow-2xl shadow-yellow-400/50' : 'border-yellow-400/50'}`}>
+                <div className="relative w-full aspect-[3/4] max-w-[400px]">
+                  <div className="w-full h-full rounded-2xl border-4 sm:border-8 border-yellow-400 p-1 sm:p-2 bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-2xl overflow-hidden">
+                    <img
+                      src={getImageUrl(currentPlayer.image)}
+                      alt={currentPlayer.name}
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        e.target.src = 'https://via.placeholder.com/600x800?text=Player';
+                      }}
+                    />
                   </div>
-
-                  {/* Player Info - Compact */}
-                  <div className="flex-1 w-full text-center sm:text-left">
-                    {/* Yellow Info Bars - Compact */}
-                    <div className="space-y-1 sm:space-y-1.5">
-                      <div className="bg-yellow-400 text-blue-900 px-2 sm:px-3 py-1 rounded-lg font-bold text-lg sm:text-xl md:text-2xl lg:text-3xl shadow-lg">
-                        {currentPlayer.name}
-                      </div>
-                      <div className="bg-yellow-400 text-blue-900 px-2 sm:px-3 py-1 rounded-lg font-bold text-base sm:text-lg md:text-xl lg:text-2xl shadow-lg">
-                        {currentPlayer.role}
-                      </div>
-                      <div className="bg-yellow-400 text-blue-900 px-2 sm:px-3 py-1 rounded-lg font-bold text-sm sm:text-base md:text-lg lg:text-xl shadow-lg">
-                        {currentPlayer.base_price ? `Base: ₹${formatIndianNumber(currentPlayer.base_price)}` : 'Base Price'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Current Bid Display - Separate Section, Centered */}
-              <div className={`bg-yellow-400 rounded-xl p-2 sm:p-3 md:p-4 shadow-2xl border-2 border-blue-900/30 flex-shrink-0 transition-all ${
-                bidFlash ? 'scale-105 shadow-yellow-400/50' : ''
-              }`}>
-                <div className="flex flex-col items-center justify-center text-center">
-                  <div className="text-blue-900 text-sm sm:text-base md:text-lg font-bold mb-1">CURRENT BID</div>
-                  <div className={`text-blue-900 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold transition-all ${
-                    bidFlash ? 'scale-110' : ''
-                  }`}>
-                    ₹{formatIndianNumber(currentBid)}
-                  </div>
-                  {highestBid && (
-                    <div className="text-blue-700 text-sm sm:text-base md:text-lg lg:text-xl mt-1.5 font-bold">
-                      Leading: <span className="font-bold text-blue-900">
-                        {highestBid.team_name}
-                      </span>
+                  {currentPlayer.serial_number && (
+                    <div className="absolute -top-2 -right-2 sm:-top-4 sm:-right-4 bg-yellow-400 text-blue-900 font-bold text-2xl sm:text-4xl md:text-5xl lg:text-6xl px-3 sm:px-5 py-0.5 sm:py-1.5 rounded-xl shadow-lg border-2 sm:border-4 border-blue-900">
+                      {currentPlayer.serial_number}
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Teams Balance Panel - 2x4 Grid Layout */}
-              <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-2 sm:p-3 border-2 border-yellow-400/50 shadow-xl flex-1 overflow-hidden flex flex-col min-h-0">
-                <h3 className="text-white font-bold text-base sm:text-lg md:text-xl mb-1.5 sm:mb-2 text-center">Team Balances</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 flex-1 auto-rows-fr min-h-0">
-                  {teams.length > 0 ? (
-                    teams.map((team) => (
-                      <div key={team.id} className="bg-white/20 rounded-lg p-2 sm:p-3 flex flex-col items-center justify-center border border-yellow-400/30">
-                        <div className="text-white font-bold text-base sm:text-lg md:text-xl lg:text-2xl text-center mb-1 truncate w-full">
-                          {team.name}
-                        </div>
-                        <div className="text-yellow-400 font-bold text-lg sm:text-xl md:text-2xl lg:text-3xl text-center whitespace-nowrap">
-                          ₹{formatIndianNumber(team.budget || 0)}
-                        </div>
+              {/* Right: Player Info and Current Bid */}
+              <div className="lg:w-2/3 flex flex-col gap-4">
+                {/* Player Info Card */}
+                <div className="bg-white/10 backdrop-blur-md rounded-xl sm:rounded-2xl p-4 sm:p-6 border-2 border-yellow-400/50 flex-1 flex flex-col justify-center">
+                  <div className="space-y-4">
+                    <div className="bg-yellow-400 text-blue-900 px-4 sm:px-8 py-2 sm:py-4 rounded-xl font-black text-2xl sm:text-4xl md:text-5xl lg:text-7xl shadow-2xl uppercase tracking-tighter text-center lg:text-left">
+                      {currentPlayer.name}
+                    </div>
+                    <div className="flex flex-wrap gap-4 items-center justify-center lg:justify-start">
+                      <div className="bg-white/90 text-blue-900 px-4 sm:px-6 py-1 sm:py-3 rounded-lg font-bold text-xl sm:text-2xl md:text-3xl shadow-xl">
+                        {currentPlayer.role}
                       </div>
-                    ))
-                  ) : (
-                    <div className="col-span-2 sm:col-span-4 text-center text-gray-300 py-8 text-base sm:text-lg font-bold">Loading teams...</div>
+                      <div className="bg-blue-600 text-white px-4 sm:px-6 py-1 sm:py-3 rounded-lg font-bold text-lg sm:text-xl md:text-2xl shadow-xl border-2 border-white/20">
+                        BASE: ₹{formatIndianNumber(currentPlayer.base_price || 0)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Current Bid Card */}
+                <div className={`bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(234,179,8,0.4)] border-4 border-white/50 flex flex-col items-center justify-center transition-all ${bidFlash ? 'scale-[1.02] shadow-yellow-400/80' : ''}`}>
+                  <div className="text-blue-900 text-lg sm:text-2xl font-extrabold mb-2 tracking-widest uppercase">CURRENT BID</div>
+                  <div className={`text-blue-900 text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-black leading-none drop-shadow-2xl transition-all ${bidFlash ? 'scale-110' : ''}`}>
+                    ₹{formatIndianNumber(currentBid)}
+                  </div>
+                  {highestBid && (
+                    <div className="mt-6 bg-blue-900 text-yellow-400 px-6 sm:px-10 py-2 sm:py-4 rounded-full text-xl sm:text-3xl md:text-4xl lg:text-5xl font-black shadow-2xl border-4 border-yellow-400 animate-pulse">
+                      LEADING: {highestBid.team_name}
+                    </div>
                   )}
                 </div>
               </div>

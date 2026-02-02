@@ -37,9 +37,48 @@ router.get('/auction-state', (req, res) => {
           increment2: state.bid_increment_2,
           increment3: state.bid_increment_3
         },
-        maxPlayersPerTeam: state.max_players_per_team || 10
+        maxPlayersPerTeam: state.max_players_per_team || 10,
+        enforceMaxBid: state.enforce_max_bid === 1
       });
     }
+  });
+});
+
+// Update enforce max bid setting
+router.post('/enforce-max-bid', (req, res) => {
+  const { enforceMaxBid } = req.body;
+  const db = req.app.locals.db;
+  const io = req.app.locals.io;
+
+  db.run(
+    'UPDATE auction_state SET enforce_max_bid = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1',
+    [enforceMaxBid ? 1 : 0],
+    function (err) {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      io.emit('enforce-max-bid-changed', { enforceMaxBid });
+      res.json({ success: true, enforceMaxBid });
+    }
+  );
+});
+
+// Delete all players and bids permanently
+router.delete('/players-all', (req, res) => {
+  const db = req.app.locals.db;
+  const io = req.app.locals.io;
+
+  db.serialize(() => {
+    db.run('DELETE FROM bids');
+    db.run('DELETE FROM players');
+    db.run('UPDATE auction_state SET current_player_id = NULL, status = "STOPPED"', (err) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error clearing players' });
+      }
+      io.emit('all-players-deleted');
+      res.json({ success: true, message: 'All players and bids deleted permanently' });
+    });
   });
 });
 
@@ -378,7 +417,7 @@ router.post('/mark-player', (req, res) => {
                     db.get(
                       `SELECT * FROM players 
                        WHERE status = 'AVAILABLE' 
-                       ORDER BY was_unsold DESC, id 
+                       ORDER BY was_unsold ASC, RANDOM() 
                        LIMIT 1`,
                       (err, nextPlayer) => {
                         if (err) {
@@ -445,7 +484,7 @@ router.post('/mark-player', (req, res) => {
         db.get(
           `SELECT * FROM players 
            WHERE status = 'AVAILABLE' 
-           ORDER BY was_unsold DESC, id 
+           ORDER BY was_unsold ASC, RANDOM() 
            LIMIT 1`,
           (err, nextPlayer) => {
             if (err) {

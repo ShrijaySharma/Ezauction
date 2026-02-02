@@ -44,6 +44,7 @@ function OwnerDashboard({ user }) {
   const [remainingPlayers, setRemainingPlayers] = useState(0);
   const [minimumAmountToKeep, setMinimumAmountToKeep] = useState(0);
   const [maxBidAllowed, setMaxBidAllowed] = useState(0);
+  const [bidLockout, setBidLockout] = useState(false);
 
   useEffect(() => {
     // Initialize socket
@@ -79,6 +80,10 @@ function OwnerDashboard({ user }) {
       setBidFlash(true);
       setTimeout(() => setBidFlash(false), 500);
 
+      // 3-second bid lockout
+      setBidLockout(true);
+      setTimeout(() => setBidLockout(false), 3000);
+
       setPreviousBid(data.bid ? data.bid.amount : currentBid);
       loadCurrentInfo();
     });
@@ -86,6 +91,10 @@ function OwnerDashboard({ user }) {
     newSocket.on('bid-updated', (data) => {
       setBidFlash(true);
       setTimeout(() => setBidFlash(false), 500);
+
+      // 3-second bid lockout
+      setBidLockout(true);
+      setTimeout(() => setBidLockout(false), 3000);
 
       setPreviousBid(data.highestBid ? data.highestBid.amount : currentBid);
       loadCurrentInfo();
@@ -308,7 +317,7 @@ function OwnerDashboard({ user }) {
     }
   };
 
-  const canBid = status === 'LIVE' && !biddingLocked && !teamBiddingLocked && highestBid?.team_id !== user.teamId;
+  const canBid = status === 'LIVE' && !biddingLocked && !teamBiddingLocked && highestBid?.team_id !== user.teamId && !bidLockout;
   const isLeading = highestBid?.team_id === user.teamId;
 
   // Format number in Indian style (1,00,000)
@@ -445,16 +454,11 @@ function OwnerDashboard({ user }) {
 
                 {/* Financial Constraints Info */}
                 <div className="mt-2 bg-gray-800/80 rounded-xl p-3 sm:p-4 border border-blue-500/30">
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="bg-blue-900/40 p-2 rounded border border-blue-500/20">
+                  <div className="flex justify-center text-sm">
+                    <div className="bg-blue-900/40 p-2 rounded border border-blue-500/20 w-full sm:w-1/2">
                       <div className="text-blue-200 text-xs text-center">Squad Size Limit</div>
                       <div className="text-white font-bold text-center text-lg">{playersBought}/{totalAllowedPlayers} Players</div>
                       <div className="text-gray-400 text-xs text-center">Needed: {remainingPlayers}</div>
-                    </div>
-                    <div className="bg-green-900/40 p-2 rounded border border-green-500/20">
-                      <div className="text-green-200 text-xs text-center">Max Bid Allowed</div>
-                      <div className="text-white font-bold text-center text-lg">₹{formatIndianNumber(maxBidAllowed)}</div>
-                      <div className="text-gray-400 text-xs text-center">Reserved: ₹{formatIndianNumber(minimumAmountToKeep)}</div>
                     </div>
                   </div>
                 </div>
@@ -493,64 +497,47 @@ function OwnerDashboard({ user }) {
 
               {/* Bottom Control Panel - Mobile Responsive */}
               <div className="bg-gradient-to-r from-blue-900/95 to-green-900/95 rounded-xl p-4 sm:p-6 border-2 border-blue-700 shadow-xl">
-                {/* Center: Bid Buttons - 2 Layers */}
-                <div className="flex flex-col items-center justify-center gap-4">
-                  {/* Top Layer: Base Price Button with Managed By */}
-                  <div className="w-full flex items-center justify-between gap-4">
-                    {/* Managed By - Extreme Left */}
-                    {/* Managed By - Removed */}
-                    {/* Base Price Button - Center */}
-                    <div className="flex-1 flex justify-center">
-                      <button
-                        onClick={handleBasePriceBid}
-                        disabled={!canBid || bidding['base'] || !currentPlayer}
-                        className={`px-4 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-sm sm:text-xl transition-all shadow-lg ${canBid && !bidding['base'] && currentPlayer
-                          ? 'bg-green-600 hover:bg-green-700 text-white transform hover:scale-105 active:scale-95'
-                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                          }`}
-                      >
-                        Base Price
-                      </button>
-                    </div>
-                    {/* Spacer for balance */}
-                    <div className="w-0 sm:w-auto"></div>
-                  </div>
+                {/* Bid Buttons Container */}
+                <div className="flex flex-row items-center justify-center gap-4 sm:gap-8 mt-2">
+                  {/* Base Price Button */}
+                  <button
+                    onClick={handleBasePriceBid}
+                    disabled={!canBid || bidding['base'] || !currentPlayer}
+                    className={`flex-1 sm:flex-none px-4 sm:px-12 py-3 sm:py-5 rounded-lg font-bold text-sm sm:text-2xl transition-all shadow-lg ${canBid && !bidding['base'] && currentPlayer
+                      ? 'bg-green-600 hover:bg-green-700 text-white transform hover:scale-105 active:scale-95'
+                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      }`}
+                  >
+                    Base Price
+                  </button>
 
-                  {/* Bottom Layer: Increment Buttons */}
-                  <div className="flex items-center justify-center gap-2 sm:gap-4 w-full">
-                    <div className="grid grid-cols-3 gap-2 sm:gap-4 w-full sm:w-auto">
-                      <button
-                        onClick={() => handleBid(bidIncrements.increment1)}
-                        disabled={!canBid || bidding[bidIncrements.increment1]}
-                        className={`px-4 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-sm sm:text-xl transition-all shadow-lg ${canBid && !bidding[bidIncrements.increment1]
-                          ? 'bg-green-600 hover:bg-green-700 text-white transform hover:scale-105 active:scale-95'
-                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                          }`}
-                      >
-                        +₹{formatIndianNumber(bidIncrements.increment1)}
-                      </button>
-                      <button
-                        onClick={() => handleBid(bidIncrements.increment2)}
-                        disabled={!canBid || bidding[bidIncrements.increment2]}
-                        className={`px-4 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-sm sm:text-xl transition-all shadow-lg ${canBid && !bidding[bidIncrements.increment2]
-                          ? 'bg-green-600 hover:bg-green-700 text-white transform hover:scale-105 active:scale-95'
-                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                          }`}
-                      >
-                        +₹{formatIndianNumber(bidIncrements.increment2)}
-                      </button>
-                      <button
-                        onClick={() => handleBid(bidIncrements.increment3)}
-                        disabled={!canBid || bidding[bidIncrements.increment3]}
-                        className={`px-4 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-sm sm:text-xl transition-all shadow-lg ${canBid && !bidding[bidIncrements.increment3]
-                          ? 'bg-green-600 hover:bg-green-700 text-white transform hover:scale-105 active:scale-95'
-                          : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                          }`}
-                      >
-                        +₹{formatIndianNumber(bidIncrements.increment3)}
-                      </button>
-                    </div>
-                  </div>
+                </div>
+
+                {/* Increment Buttons Row */}
+                <div className="flex flex-row items-center justify-center gap-4 sm:gap-8 mt-4">
+                  {/* +2000 Button */}
+                  <button
+                    onClick={() => handleBid(2000)}
+                    disabled={!canBid || bidding[2000]}
+                    className={`flex-1 sm:flex-none px-4 sm:px-12 py-3 sm:py-5 rounded-lg font-bold text-sm sm:text-2xl transition-all shadow-lg ${canBid && !bidding[2000]
+                      ? 'bg-green-600 hover:bg-green-700 text-white transform hover:scale-105 active:scale-95'
+                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      }`}
+                  >
+                    +₹{formatIndianNumber(2000)}
+                  </button>
+
+                  {/* Standard Increment Button */}
+                  <button
+                    onClick={() => handleBid(bidIncrements.increment2)}
+                    disabled={!canBid || bidding[bidIncrements.increment2]}
+                    className={`flex-1 sm:flex-none px-4 sm:px-12 py-3 sm:py-5 rounded-lg font-bold text-sm sm:text-2xl transition-all shadow-lg ${canBid && !bidding[bidIncrements.increment2]
+                      ? 'bg-green-600 hover:bg-green-700 text-white transform hover:scale-105 active:scale-95'
+                      : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      }`}
+                  >
+                    +₹{formatIndianNumber(bidIncrements.increment2)}
+                  </button>
                 </div>
 
                 {/* Right: Team Info */}
@@ -566,6 +553,7 @@ function OwnerDashboard({ user }) {
                       {biddingLocked && '🔒 Bidding is locked by admin'}
                       {teamBiddingLocked && '🔒 Your team is locked from bidding by admin'}
                       {isLeading && '🏆 You are already the highest bidder'}
+                      {bidLockout && '⏳ Please wait... (Lockout active)'}
                     </p>
                   </div>
                 )}

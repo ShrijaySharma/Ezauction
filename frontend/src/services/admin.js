@@ -232,3 +232,13 @@ export const updateMaxPlayersPerTeam = async (maxPlayersPerTeam) => {
   return response.data;
 };
 
+export const updateEnforceMaxBid = async (enforceMaxBid) => {
+  const response = await api.post('/admin/enforce-max-bid', { enforceMaxBid });
+  return response.data;
+};
+
+export const deleteAllPlayers = async () => {
+  const response = await api.delete('/admin/players-all');
+  return response.data;
+};
+

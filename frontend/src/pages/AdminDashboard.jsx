@@ -61,6 +61,9 @@ function AdminDashboard({ user }) {
   const [teamLogoPreview, setTeamLogoPreview] = useState(null);
   const [showTeamSquads, setShowTeamSquads] = useState(false);
   const [teamSquads, setTeamSquads] = useState([]);
+  const [enforceMaxBid, setEnforceMaxBid] = useState(false);
+  const [showPurseMonitoring, setShowPurseMonitoring] = useState(false);
+  const [showBiddingLogicModal, setShowBiddingLogicModal] = useState(false);
 
   useEffect(() => {
     // Initialize socket
@@ -193,6 +196,18 @@ function AdminDashboard({ user }) {
       loadTeams();
     });
 
+    newSocket.on('enforce-max-bid-changed', (data) => {
+      setEnforceMaxBid(data.enforceMaxBid);
+    });
+
+    newSocket.on('all-players-deleted', () => {
+      loadPlayers();
+      setCurrentPlayer(null);
+      setHighestBid(null);
+      setAllBids([]);
+      alert('All players and bids have been cleared by an admin');
+    });
+
     return () => newSocket.close();
   }, []);
 
@@ -226,6 +241,9 @@ function AdminDashboard({ user }) {
       if (data.currentPlayerId) {
         const playerData = await adminService.getCurrentBid();
         setCurrentPlayer(playerData.player);
+      }
+      if (data.enforceMaxBid !== undefined) {
+        setEnforceMaxBid(data.enforceMaxBid);
       }
     } catch (error) {
       console.error('Error loading auction state:', error);
@@ -316,6 +334,31 @@ function AdminDashboard({ user }) {
       alert('Team size updated!');
     } catch (error) {
       alert('Error updating team size: ' + error.response?.data?.error);
+    }
+  };
+
+  const handleUpdateEnforceMaxBid = async (val) => {
+    try {
+      await adminService.updateEnforceMaxBid(val);
+      alert(`Bidding logic ${val ? 'enabled' : 'disabled'}!`);
+    } catch (error) {
+      alert('Error updating bidding logic: ' + error.response?.data?.error);
+    }
+  };
+
+  const handleDeleteAllPlayers = async () => {
+    if (!confirm('CRITICAL: Are you sure you want to delete ALL players and bids permanently? This action cannot be undone.')) {
+      return;
+    }
+    const doubleCheck = prompt('Type "DELETE" to confirm permanent deletion:');
+    if (doubleCheck !== 'DELETE') return;
+
+    try {
+      await adminService.deleteAllPlayers();
+      alert('All players and bids deleted successfully');
+      loadData();
+    } catch (error) {
+      alert('Error deleting all players: ' + error.response?.data?.error);
     }
   };
 
@@ -750,6 +793,35 @@ function AdminDashboard({ user }) {
                   <div className="font-semibold">Team Squads</div>
                   <div className="text-sm text-purple-200">View players sold to each team</div>
                 </button>
+                <button
+                  onClick={() => {
+                    setShowPurseMonitoring(true);
+                    setShowSidebar(false);
+                  }}
+                  className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-left"
+                >
+                  <div className="font-semibold">Team Purses</div>
+                  <div className="text-sm text-green-200">Monitor all team remaining amounts</div>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowBiddingLogicModal(true);
+                    setShowSidebar(false);
+                  }}
+                  className="w-full px-4 py-3 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-left"
+                >
+                  <div className="font-semibold">Bidding Logic</div>
+                  <div className="text-sm text-yellow-100">Manage max bid constraints</div>
+                </button>
+                <div className="pt-4 border-t border-gray-700 mt-4">
+                  <button
+                    onClick={handleDeleteAllPlayers}
+                    className="w-full px-4 py-3 bg-red-900/50 hover:bg-red-800 text-red-200 rounded-lg transition-colors text-left border border-red-700"
+                  >
+                    <div className="font-semibold text-red-100">Clear All Data</div>
+                    <div className="text-sm text-red-400">Permanently delete all players & bids</div>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1575,6 +1647,98 @@ function AdminDashboard({ user }) {
                     No teams found
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Purse Monitoring Modal */}
+        {showPurseMonitoring && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="bg-gray-800 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border-2 border-green-500">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-white">Team Purse Monitoring</h2>
+                <button
+                  onClick={() => setShowPurseMonitoring(false)}
+                  className="text-white hover:text-gray-400 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {teams.map((team) => (
+                  <div key={team.id} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                    <div className="flex items-center gap-3 mb-3">
+                      {team.logo ? (
+                        <img
+                          src={getImageUrl(team.logo)}
+                          alt={team.name}
+                          className="w-12 h-12 object-cover rounded-full"
+                          onError={(e) => {
+                            e.target.src = 'https://via.placeholder.com/48?text=Team';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center text-white font-bold">
+                          {team.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <div className="text-white font-bold truncate">{team.name}</div>
+                        <div className="text-gray-400 text-sm">Owner: {team.owner_name || 'N/A'}</div>
+                      </div>
+                    </div>
+                    <div className="bg-gray-800 p-3 rounded-lg border border-gray-600">
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">REMAINING PURSE</div>
+                      <div className="text-2xl font-bold text-green-400">₹{team.budget?.toLocaleString() || '0'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bidding Logic Modal */}
+        {showBiddingLogicModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="bg-gray-800 rounded-xl p-6 max-w-lg w-full border-2 border-yellow-500">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold text-white">Bidding Logic Settings</h2>
+                <button
+                  onClick={() => setShowBiddingLogicModal(false)}
+                  className="text-white hover:text-gray-400 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="space-y-6">
+                <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-white font-semibold">Enforce Max Bid Logic</label>
+                    <button
+                      onClick={() => handleUpdateEnforceMaxBid(!enforceMaxBid)}
+                      className={`px-4 py-2 rounded-lg font-bold transition-colors ${enforceMaxBid ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-400'}`}
+                    >
+                      {enforceMaxBid ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    If <strong>ON</strong>, owners MUST keep enough money for their remaining player slots (₹1000 per player).<br />
+                    If <strong>OFF</strong>, owners can bid their entire purse on any single player.
+                  </p>
+                </div>
+
+                <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-500/30">
+                  <h4 className="text-blue-200 font-bold text-sm uppercase tracking-wider mb-2">Theoretical Team Limits</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                    {teams.map(team => (
+                      <div key={team.id} className="flex justify-between text-xs border-b border-gray-700 pb-1">
+                        <span className="text-white truncate mr-2">{team.name}</span>
+                        <span className="text-blue-300 font-mono">Max: ₹{team.budget?.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>

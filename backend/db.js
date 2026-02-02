@@ -105,6 +105,10 @@ export function initDatabase() {
         db.run(`ALTER TABLE auction_state ADD COLUMN max_players_per_team INTEGER DEFAULT 10`, (err) => {
           // Ignore error if column already exists
         });
+        // Add enforce_max_bid column if it doesn't exist
+        db.run(`ALTER TABLE auction_state ADD COLUMN enforce_max_bid INTEGER DEFAULT 0`, (err) => {
+          // Ignore error
+        });
         // Initialize auction state if not exists
         db.run(`INSERT OR IGNORE INTO auction_state (id, status) VALUES (1, 'STOPPED')`);
         resolve(db);
