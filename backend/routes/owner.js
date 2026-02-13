@@ -18,35 +18,38 @@ router.get('/current-info', (req, res) => {
 
         if (!state || !state.current_player_id) {
             // Get stats
-            db.all('SELECT status FROM players', (err, players) => {
-                if (err) {
-                    return res.status(500).json({ error: 'Database error' });
-                }
-                const stats = {
-                    sold: players.filter(p => p.status === 'SOLD').length,
-                    unsold: players.filter(p => p.status === 'UNSOLD').length,
-                    available: players.filter(p => p.status === 'AVAILABLE').length
-                };
-                // Get team wallet balance
-                const teamId = req.session.teamId;
-                db.get('SELECT budget FROM teams WHERE id = ?', [teamId], (err, team) => {
+            const teamId = req.session.teamId;
+
+            // Get team-specific sold count and global available/unsold counts
+            db.get('SELECT COUNT(*) as count FROM players WHERE sold_to_team = ? AND status = ?',
+                [teamId, 'SOLD'], (err, teamSoldResult) => {
                     if (err) {
                         return res.status(500).json({ error: 'Database error' });
                     }
 
-                    const totalBudget = team ? team.budget : 0;
+                    db.all('SELECT status FROM players WHERE status IN (?, ?)', ['UNSOLD', 'AVAILABLE'], (err, otherPlayers) => {
+                        if (err) {
+                            return res.status(500).json({ error: 'Database error' });
+                        }
 
-                    // Get max players per team from auction state
-                    const maxPlayersPerTeam = state?.max_players_per_team || 10;
+                        const stats = {
+                            sold: teamSoldResult ? teamSoldResult.count : 0, // Only this team's sold players
+                            unsold: otherPlayers.filter(p => p.status === 'UNSOLD').length,
+                            available: otherPlayers.filter(p => p.status === 'AVAILABLE').length
+                        };
 
-                    // Count players bought by this team
-                    db.get('SELECT COUNT(*) as count FROM players WHERE sold_to_team = ? AND STATUS = ?',
-                        [teamId, 'SOLD'], (err, result) => {
+                        // Get team wallet balance
+                        db.get('SELECT budget FROM teams WHERE id = ?', [teamId], (err, team) => {
                             if (err) {
                                 return res.status(500).json({ error: 'Database error' });
                             }
 
-                            const playersBought = result ? result.count : 0;
+                            const totalBudget = team ? team.budget : 0;
+
+                            // Get max players per team from auction state
+                            const maxPlayersPerTeam = state?.max_players_per_team || 10;
+
+                            const playersBought = stats.sold; // Use the count we just calculated
                             const remainingPlayers = maxPlayersPerTeam - playersBought;
                             const enforceMaxBid = state?.enforce_max_bid === 1;
                             const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * 1000) : 0;
@@ -76,8 +79,8 @@ router.get('/current-info', (req, res) => {
                                 enforceMaxBid: enforceMaxBid
                             });
                         });
+                    });
                 });
-            });
             return;
         }
 
@@ -103,46 +106,48 @@ router.get('/current-info', (req, res) => {
 
                     const currentBid = highestBid ? highestBid.amount : (player ? player.base_price : 0);
 
-                    // Get stats
-                    db.all('SELECT status FROM players', (err, allPlayers) => {
-                        if (err) {
-                            return res.status(500).json({ error: 'Database error' });
-                        }
-                        const stats = {
-                            sold: allPlayers.filter(p => p.status === 'SOLD').length,
-                            unsold: allPlayers.filter(p => p.status === 'UNSOLD').length,
-                            available: allPlayers.filter(p => p.status === 'AVAILABLE').length
-                        };
+                    // Get team wallet balance and committed amount
+                    const teamId = req.session.teamId;
 
-                        // Get team wallet balance and committed amount
-                        const teamId = req.session.teamId;
-                        db.get('SELECT budget, bidding_locked FROM teams WHERE id = ?', [teamId], (err, team) => {
+                    // Get team-specific sold count
+                    db.get('SELECT COUNT(*) as count FROM players WHERE sold_to_team = ? AND status = ?',
+                        [teamId, 'SOLD'], (err, teamSoldResult) => {
                             if (err) {
                                 return res.status(500).json({ error: 'Database error' });
                             }
 
-                            // Calculate committed amount (if this team is the highest bidder)
-                            let committedAmount = 0;
-                            if (highestBid && highestBid.team_id === teamId) {
-                                committedAmount = highestBid.amount;
-                            }
+                            // Get global unsold and available counts
+                            db.all('SELECT status FROM players WHERE status IN (?, ?)', ['UNSOLD', 'AVAILABLE'], (err, otherPlayers) => {
+                                if (err) {
+                                    return res.status(500).json({ error: 'Database error' });
+                                }
 
-                            // Available balance = total budget - committed amount
-                            const totalBudget = team ? team.budget : 0;
-                            const availableBalance = totalBudget - committedAmount;
-                            const teamBiddingLocked = team ? (team.bidding_locked === 1) : false;
+                                const stats = {
+                                    sold: teamSoldResult ? teamSoldResult.count : 0, // Only this team's sold players
+                                    unsold: otherPlayers.filter(p => p.status === 'UNSOLD').length,
+                                    available: otherPlayers.filter(p => p.status === 'AVAILABLE').length
+                                };
 
-                            // Get max players per team from auction state
-                            const maxPlayersPerTeam = state.max_players_per_team || 10;
-
-                            // Count players bought by this team
-                            db.get('SELECT COUNT(*) as count FROM players WHERE sold_to_team = ? AND status = ?',
-                                [teamId, 'SOLD'], (err, result) => {
+                                db.get('SELECT budget, bidding_locked FROM teams WHERE id = ?', [teamId], (err, team) => {
                                     if (err) {
                                         return res.status(500).json({ error: 'Database error' });
                                     }
 
-                                    const playersBought = result ? result.count : 0;
+                                    // Calculate committed amount (if this team is the highest bidder)
+                                    let committedAmount = 0;
+                                    if (highestBid && highestBid.team_id === teamId) {
+                                        committedAmount = highestBid.amount;
+                                    }
+
+                                    // Available balance = total budget - committed amount
+                                    const totalBudget = team ? team.budget : 0;
+                                    const availableBalance = totalBudget - committedAmount;
+                                    const teamBiddingLocked = team ? (team.bidding_locked === 1) : false;
+
+                                    // Get max players per team from auction state
+                                    const maxPlayersPerTeam = state.max_players_per_team || 10;
+
+                                    const playersBought = stats.sold; // Use the count we just calculated
                                     const remainingPlayers = maxPlayersPerTeam - playersBought;
                                     const enforceMaxBid = state.enforce_max_bid === 1;
                                     const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * 1000) : 0;
@@ -173,8 +178,8 @@ router.get('/current-info', (req, res) => {
                                         enforceMaxBid: enforceMaxBid
                                     });
                                 });
+                            });
                         });
-                    });
                 }
             );
         });
@@ -374,7 +379,9 @@ router.get('/players-by-status/:status', (req, res) => {
     const db = req.app.locals.db;
     const teamId = req.session.teamId; // Get teamId from session
 
-    if (!['SOLD', 'AVAILABLE'].includes(status)) {
+    console.log(`[players-by-status] Status: ${status}, TeamId: ${teamId}, Session:`, req.session);
+
+    if (!['SOLD', 'AVAILABLE', 'UNSOLD'].includes(status)) {
         return res.status(400).json({ error: 'Invalid status' });
     }
 
@@ -390,16 +397,54 @@ router.get('/players-by-status/:status', (req, res) => {
     if (status === 'SOLD') {
         query += ` AND p.sold_to_team = ?`;
         params.push(teamId);
+        console.log(`[players-by-status] Filtering SOLD players for teamId: ${teamId}`);
     }
 
     query += ` ORDER BY p.serial_number ASC, p.id ASC`;
 
+    console.log(`[players-by-status] Query:`, query);
+    console.log(`[players-by-status] Params:`, params);
+
     db.all(query, params, (err, players) => {
+        if (err) {
+            console.error(`[players-by-status] Database error:`, err);
+            return res.status(500).json({ error: 'Database error' });
+        }
+        console.log(`[players-by-status] Returned ${players.length} players for status ${status}`);
+        res.json(players);
+    });
+});
+
+// Get all teams
+router.get('/teams', (req, res) => {
+    const db = req.app.locals.db;
+
+    db.all('SELECT id, name FROM teams ORDER BY name ASC', (err, teams) => {
         if (err) {
             return res.status(500).json({ error: 'Database error' });
         }
-        res.json(players);
+        res.json(teams);
     });
+});
+
+// Get players purchased by a specific team
+router.get('/teams/:teamId/players', (req, res) => {
+    const { teamId } = req.params;
+    const db = req.app.locals.db;
+
+    db.all(
+        `SELECT name, sold_price, serial_number 
+         FROM players 
+         WHERE sold_to_team = ? AND status = 'SOLD' 
+         ORDER BY serial_number ASC, name ASC`,
+        [teamId],
+        (err, players) => {
+            if (err) {
+                return res.status(500).json({ error: 'Database error' });
+            }
+            res.json(players);
+        }
+    );
 });
 
 export default router;

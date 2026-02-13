@@ -15,3 +15,12 @@ export const getPlayersByStatus = async (status) => {
   return response.data;
 };
 
+export const getTeams = async () => {
+  const response = await api.get('/owner/teams');
+  return response.data;
+};
+
+export const getTeamPlayers = async (teamId) => {
+  const response = await api.get(`/owner/teams/${teamId}/players`);
+  return response.data;
+};

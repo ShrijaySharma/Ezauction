@@ -35,8 +35,14 @@ function OwnerDashboard({ user }) {
   const [teamBiddingLocked, setTeamBiddingLocked] = useState(false);
   const [showSoldModal, setShowSoldModal] = useState(false);
   const [showAvailableModal, setShowAvailableModal] = useState(false);
+  const [showUnsoldModal, setShowUnsoldModal] = useState(false);
+  const [showTeamBrowserModal, setShowTeamBrowserModal] = useState(false);
   const [soldPlayers, setSoldPlayers] = useState([]);
   const [availablePlayers, setAvailablePlayers] = useState([]);
+  const [unsoldPlayers, setUnsoldPlayers] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [teamPlayers, setTeamPlayers] = useState([]);
 
   // Financial constraints state
   const [totalAllowedPlayers, setTotalAllowedPlayers] = useState(10);
@@ -208,6 +214,45 @@ function OwnerDashboard({ user }) {
     }
   };
 
+  const loadUnsoldPlayers = async () => {
+    try {
+      const players = await ownerService.getPlayersByStatus('UNSOLD');
+      setUnsoldPlayers(players);
+      setShowUnsoldModal(true);
+    } catch (error) {
+      console.error('Error loading unsold players:', error);
+    }
+  };
+
+  const loadTeams = async () => {
+    try {
+      console.log('Loading teams...');
+      const teamsData = await ownerService.getTeams();
+      console.log('Teams loaded:', teamsData);
+      setTeams(teamsData);
+      setSelectedTeam(null);
+      setTeamPlayers([]);
+      setShowTeamBrowserModal(true);
+    } catch (error) {
+      console.error('Error loading teams:', error);
+      alert('Failed to load teams: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const loadTeamPlayers = async (team) => {
+    try {
+      console.log('Loading players for team:', team);
+      const players = await ownerService.getTeamPlayers(team.id);
+      console.log('Team players loaded:', players);
+      setTeamPlayers(players);
+      setSelectedTeam(team);
+    } catch (error) {
+      console.error('Error loading team players:', error);
+      alert('Failed to load team players: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+
   const handleBid = async (increment) => {
     if (bidding[increment]) return; // Prevent double clicks
 
@@ -347,6 +392,16 @@ function OwnerDashboard({ user }) {
           <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-3">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-6">
               <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-6 w-full sm:w-auto">
+                {/* Menu Button */}
+                <button
+                  onClick={loadTeams}
+                  className="bg-yellow-400 hover:bg-yellow-500 text-blue-900 p-2 rounded-lg font-bold transition-colors shadow-lg"
+                  title="View Teams"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
                 <div className="text-yellow-400 font-bold text-lg sm:text-2xl">CricAuction™</div>
               </div>
               <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
@@ -469,13 +524,19 @@ function OwnerDashboard({ user }) {
                     onClick={loadSoldPlayers}
                     className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-bold text-xs sm:text-sm shadow-lg transition-colors"
                   >
-                    My Squad ({stats.sold || 0})
+                    My Players ({stats.sold || 0})
+                  </button>
+                  <button
+                    onClick={loadUnsoldPlayers}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-bold text-xs sm:text-sm shadow-lg transition-colors"
+                  >
+                    Unsold Players ({stats.unsold || 0})
                   </button>
                   <button
                     onClick={loadAvailablePlayers}
                     className="bg-yellow-400 hover:bg-yellow-500 text-blue-900 px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-bold text-xs sm:text-sm shadow-lg transition-colors"
                   >
-                    Available ({stats.available || 0})
+                    Remaining Players ({stats.available || 0})
                   </button>
                   {status === 'LIVE' && (
                     <div className="bg-green-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg font-bold text-xs sm:text-sm shadow-lg animate-pulse">
@@ -630,7 +691,7 @@ function OwnerDashboard({ user }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="bg-gradient-to-br from-blue-900 to-green-900 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border-2 border-yellow-400">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-yellow-400">Available Players</h2>
+              <h2 className="text-2xl font-bold text-yellow-400">Remaining Players</h2>
               <button
                 onClick={() => setShowAvailableModal(false)}
                 className="text-white hover:text-yellow-400 text-2xl font-bold"
@@ -669,10 +730,150 @@ function OwnerDashboard({ user }) {
                 ))}
               {availablePlayers.length === 0 && (
                 <div className="col-span-full text-center text-gray-400 py-8">
-                  No available players
+                  No remaining players
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unsold Players Modal */}
+      {showUnsoldModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-gradient-to-br from-blue-900 to-green-900 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border-2 border-yellow-400">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-yellow-400">Unsold Players</h2>
+              <button
+                onClick={() => setShowUnsoldModal(false)}
+                className="text-white hover:text-yellow-400 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {unsoldPlayers
+                .sort((a, b) => {
+                  // Sort by serial_number in ascending order
+                  const serialA = a.serial_number || 999;
+                  const serialB = b.serial_number || 999;
+                  return serialA - serialB;
+                })
+                .map((player) => (
+                  <div key={player.id} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <div className="flex items-center justify-between mb-2">
+                      {player.serial_number && (
+                        <span className="bg-yellow-400 text-blue-900 font-bold text-lg px-3 py-1 rounded-full">
+                          #{player.serial_number}
+                        </span>
+                      )}
+                    </div>
+                    <img
+                      src={getImageUrl(player.image)}
+                      alt={player.name}
+                      className="w-full h-32 object-cover rounded mb-2"
+                      onError={(e) => {
+                        e.target.src = 'https://via.placeholder.com/300x300?text=Player';
+                      }}
+                    />
+                    <h3 className="text-white font-bold text-lg">{player.name}</h3>
+                    <p className="text-gray-400 text-sm">{player.role}</p>
+                  </div>
+                ))}
+              {unsoldPlayers.length === 0 && (
+                <div className="col-span-full text-center text-gray-400 py-8">
+                  No unsold players
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Team Browser Modal */}
+      {showTeamBrowserModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-gradient-to-br from-blue-900 to-green-900 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto border-2 border-yellow-400">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                {selectedTeam && (
+                  <button
+                    onClick={() => {
+                      setSelectedTeam(null);
+                      setTeamPlayers([]);
+                    }}
+                    className="bg-yellow-400 hover:bg-yellow-500 text-blue-900 px-4 py-2 rounded-lg font-bold transition-colors"
+                  >
+                    ← Back
+                  </button>
+                )}
+                <h2 className="text-2xl font-bold text-yellow-400">
+                  {selectedTeam ? `${selectedTeam.name} - Players` : 'XYZ'}
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowTeamBrowserModal(false);
+                  setSelectedTeam(null);
+                  setTeamPlayers([]);
+                }}
+                className="text-white hover:text-yellow-400 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Team List View */}
+            {!selectedTeam && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {teams.map((team) => (
+                  <button
+                    key={team.id}
+                    onClick={() => loadTeamPlayers(team)}
+                    className="bg-gray-800 hover:bg-gray-700 rounded-lg p-6 border border-gray-700 transition-colors text-left"
+                  >
+                    <h3 className="text-white font-bold text-xl">{team.name}</h3>
+                    <p className="text-gray-400 text-sm mt-2">Click to view players →</p>
+                  </button>
+                ))}
+                {teams.length === 0 && (
+                  <div className="col-span-full text-center text-gray-400 py-8">
+                    No teams available
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Team Players View */}
+            {selectedTeam && (
+              <div className="space-y-3">
+                {teamPlayers
+                  .sort((a, b) => {
+                    // Sort by serial_number in ascending order
+                    const serialA = a.serial_number || 999;
+                    const serialB = b.serial_number || 999;
+                    return serialA - serialB;
+                  })
+                  .map((player, index) => (
+                    <div key={index} className="bg-gray-800 rounded-lg p-4 border border-gray-700 flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        {player.serial_number && (
+                          <span className="bg-yellow-400 text-blue-900 font-bold text-sm px-2 py-1 rounded">
+                            #{player.serial_number}
+                          </span>
+                        )}
+                        <h3 className="text-white font-bold text-lg">{player.name}</h3>
+                      </div>
+                      <p className="text-green-400 font-semibold text-lg">₹{formatIndianNumber(player.sold_price || 0)}</p>
+                    </div>
+                  ))}
+                {teamPlayers.length === 0 && (
+                  <div className="text-center text-gray-400 py-8">
+                    No players purchased by this team yet
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

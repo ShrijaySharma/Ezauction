@@ -1,4 +1,5 @@
 import express from 'express';
+import bcrypt from 'bcrypt';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 
@@ -416,7 +417,7 @@ router.post('/mark-player', (req, res) => {
                     // Automatically load next available player (prioritize previously unsold players)
                     db.get(
                       `SELECT * FROM players 
-                       WHERE status = 'AVAILABLE' 
+                       WHERE status IN ('AVAILABLE', 'UNSOLD') 
                        ORDER BY was_unsold ASC, RANDOM() 
                        LIMIT 1`,
                       (err, nextPlayer) => {
@@ -467,10 +468,10 @@ router.post('/mark-player', (req, res) => {
     );
     return; // Exit early since we're handling SOLD in the callback
   } else {
-    // Mark as UNSOLD - set back to AVAILABLE and mark as previously unsold
+    // Mark as UNSOLD - set status to UNSOLD and mark as previously unsold
     db.run(
       `UPDATE players 
-       SET status = 'AVAILABLE', sold_price = ?, sold_to_team = ?, was_unsold = 1
+       SET status = 'UNSOLD', sold_price = ?, sold_to_team = ?, was_unsold = 1
        WHERE id = ?`,
       [null, null, playerId],
       function (err) {
@@ -483,7 +484,7 @@ router.post('/mark-player', (req, res) => {
         // Automatically load next available player (including previously unsold ones)
         db.get(
           `SELECT * FROM players 
-           WHERE status = 'AVAILABLE' 
+           WHERE status IN ('AVAILABLE', 'UNSOLD') 
            ORDER BY was_unsold ASC, RANDOM() 
            LIMIT 1`,
           (err, nextPlayer) => {
@@ -954,7 +955,7 @@ router.post('/teams', upload.single('logo'), (req, res) => {
     db.run(
       `INSERT INTO teams (name, owner_name, logo, budget) VALUES (?, ?, ?, ?)`,
       [name.trim(), ownerName, logoPath, teamBudget],
-      function (err) {
+      async function (err) {
         if (err) {
           console.error('Database error creating team:', err);
           if (err.message.includes('UNIQUE constraint')) {
@@ -963,19 +964,61 @@ router.post('/teams', upload.single('logo'), (req, res) => {
           return res.status(500).json({ error: 'Database error: ' + err.message });
         }
 
-        console.log('Team created with ID:', this.lastID);
+        const teamId = this.lastID;
+        console.log('Team created with ID:', teamId);
 
-        // Get the created team
-        db.get('SELECT * FROM teams WHERE id = ?', [this.lastID], (err, team) => {
-          if (err) {
-            console.error('Error fetching created team:', err);
-            return res.status(500).json({ error: 'Database error fetching team' });
-          }
+        // --- AUTOMATED CREDENTIALS GENERATION ---
+        try {
+          // 1. Generate username (first 3 letters, lowercase, no spaces)
+          const username = name.trim().toLowerCase().replace(/\s+/g, '').substring(0, 3);
+          const password = username + '123';
 
-          console.log('Team created successfully:', team);
-          io.emit('team-added', { team });
-          res.json({ success: true, team });
-        });
+          // 2. Hash password
+          const saltRounds = 10;
+          const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+          // 3. Create user record
+          db.run(
+            `INSERT INTO users (username, password, role, team_id) VALUES (?, ?, ?, ?)`,
+            [username, hashedPassword, 'owner', teamId],
+            function (err) {
+              if (err) {
+                console.error('Error creating automated user:', err);
+                // We don't fail the whole request since team is already created,
+                // but we should log it.
+              } else {
+                const userId = this.lastID;
+                console.log(`Automated user created: ${username} (ID: ${userId}) for team ${teamId}`);
+
+                // 4. Update team with owner_id
+                db.run('UPDATE teams SET owner_id = ? WHERE id = ?', [userId, teamId]);
+              }
+
+              // Get the created team to return in response
+              db.get('SELECT * FROM teams WHERE id = ?', [teamId], (err, team) => {
+                if (err) {
+                  console.error('Error fetching created team:', err);
+                  return res.status(500).json({ error: 'Database error fetching team' });
+                }
+
+                console.log('Team created successfully with automated credentials:', team);
+                io.emit('team-added', { team });
+                res.json({
+                  success: true,
+                  team,
+                  credentials: {
+                    username: username,
+                    password: password
+                  }
+                });
+              });
+            }
+          );
+        } catch (credError) {
+          console.error('Error in credential generation:', credError);
+          // Fallback to original behavior if credential generation fails
+          res.json({ success: true, message: 'Team created but credentials failed' });
+        }
       }
     );
   } catch (error) {

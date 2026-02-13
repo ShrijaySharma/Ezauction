@@ -971,9 +971,9 @@ function AdminDashboard({ user }) {
                   className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
                 >
                   <option value="">Select a player</option>
-                  {players.filter(p => p.status === 'AVAILABLE').map(player => (
+                  {players.filter(p => p.status === 'AVAILABLE' || p.status === 'UNSOLD').map(player => (
                     <option key={player.id} value={player.id}>
-                      {player.was_unsold ? '⚠️ ' : ''}{player.serial_number ? `#${player.serial_number} ` : ''}{player.name} - {player.role} (₹{player.base_price?.toLocaleString()})
+                      {player.status === 'UNSOLD' ? '🔄 ' : ''}{player.was_unsold ? '⚠️ ' : ''}{player.serial_number ? `#${player.serial_number} ` : ''}{player.name} - {player.role} (₹{player.base_price?.toLocaleString()})
                     </option>
                   ))}
                 </select>
