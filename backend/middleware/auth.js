@@ -22,3 +22,10 @@ export function requireOwner(req, res, next) {
   next();
 }
 
+// Middleware to check if user is app owner
+export function requireAppOwner(req, res, next) {
+  if (!req.session.userId || req.session.role !== 'app_owner') {
+    return res.status(403).json({ error: 'App Owner access required' });
+  }
+  next();
+}

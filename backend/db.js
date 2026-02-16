@@ -1,6 +1,7 @@
 import sqlite3 from 'sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import bcrypt from 'bcrypt';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -117,6 +118,28 @@ export function initDatabase() {
         });
         // Initialize auction state if not exists
         db.run(`INSERT OR IGNORE INTO auction_state (id, status) VALUES (1, 'STOPPED')`);
+
+        // Seed default users
+        const seedUsers = async () => {
+          const users = [
+            { username: 'kanha08', password: 'kanha7000@0007', role: 'app_owner' },
+            { username: 'admin', password: 'admin', role: 'admin' }, // Default admin
+            { username: 'host', password: 'host', role: 'host' }    // Default host
+          ];
+
+          for (const user of users) {
+            db.get('SELECT id FROM users WHERE role = ?', [user.role], async (err, existingUser) => {
+              if (!existingUser) {
+                console.log(`Seeding user: ${user.username}`);
+                const hashedPassword = await bcrypt.hash(user.password, 10);
+                db.run('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+                  [user.username, hashedPassword, user.role]);
+              }
+            });
+          }
+        };
+        seedUsers();
+
         resolve(db);
       });
     });

@@ -24,7 +24,8 @@ function Login({ onLogin }) {
         const redirectPath =
           response.user.role === 'admin' ? '/admin' :
             response.user.role === 'owner' ? '/owner' :
-              response.user.role === 'host' ? '/host' : '/login';
+              response.user.role === 'host' ? '/host' :
+                response.user.role === 'app_owner' ? '/app-owner' : '/login';
         navigate(redirectPath);
       } else {
         setError('Invalid response from server');

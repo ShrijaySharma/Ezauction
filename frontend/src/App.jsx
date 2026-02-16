@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
 import HostDashboard from './pages/HostDashboard';
+import AppOwnerDashboard from './pages/AppOwnerDashboard';
 import { getCurrentUser } from './services/auth';
 
 function App() {
@@ -36,25 +37,30 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route 
-          path="/login" 
+        <Route
+          path="/login"
           element={user ? <Navigate to={
-            user.role === 'admin' ? '/admin' : 
-            user.role === 'owner' ? '/owner' : 
-            user.role === 'host' ? '/host' : '/login'
-          } /> : <Login onLogin={setUser} />} 
+            user.role === 'admin' ? '/admin' :
+              user.role === 'owner' ? '/owner' :
+                user.role === 'host' ? '/host' :
+                  user.role === 'app_owner' ? '/app-owner' : '/login'
+          } /> : <Login onLogin={setUser} />}
         />
-        <Route 
-          path="/admin" 
-          element={user?.role === 'admin' ? <AdminDashboard user={user} /> : <Navigate to="/login" />} 
+        <Route
+          path="/admin"
+          element={user?.role === 'admin' ? <AdminDashboard user={user} /> : <Navigate to="/login" />}
         />
-        <Route 
-          path="/owner" 
-          element={user?.role === 'owner' ? <OwnerDashboard user={user} /> : <Navigate to="/login" />} 
+        <Route
+          path="/app-owner"
+          element={user?.role === 'app_owner' ? <AppOwnerDashboard user={user} /> : <Navigate to="/login" />}
         />
-        <Route 
-          path="/host" 
-          element={user?.role === 'host' ? <HostDashboard user={user} /> : <Navigate to="/login" />} 
+        <Route
+          path="/owner"
+          element={user?.role === 'owner' ? <OwnerDashboard user={user} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/host"
+          element={user?.role === 'host' ? <HostDashboard user={user} /> : <Navigate to="/login" />}
         />
         <Route path="/" element={<Navigate to="/login" />} />
       </Routes>

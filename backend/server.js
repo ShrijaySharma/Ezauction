@@ -11,6 +11,7 @@ import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import ownerRoutes from './routes/owner.js';
 import hostRoutes from './routes/host.js';
+import appOwnerRoutes from './routes/appOwner.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -73,6 +74,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/owner', ownerRoutes);
 app.use('/api/host', hostRoutes);
+app.use('/api/app-owner', appOwnerRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
