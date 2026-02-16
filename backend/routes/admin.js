@@ -1441,5 +1441,166 @@ router.post('/remove-player-from-team/:playerId', (req, res) => {
   });
 });
 
+// export default router; // Moved to end of file
+
+// Admin place bid on behalf of team
+router.post('/admin-bid', (req, res) => {
+  const { teamId, amount } = req.body;
+  const db = req.app.locals.db;
+  const io = req.app.locals.io;
+
+  if (!teamId || !amount || amount <= 0) {
+    return res.status(400).json({ error: 'Invalid team ID or bid amount' });
+  }
+
+  // Check auction state
+  db.get('SELECT * FROM auction_state WHERE id = 1', (err, state) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+
+    if (!state || state.status !== 'LIVE') {
+      return res.status(400).json({ error: 'Auction is not live' });
+    }
+
+    if (!state.current_player_id) {
+      return res.status(400).json({ error: 'No player is currently being auctioned' });
+    }
+
+    // Get current highest bid
+    db.get(
+      `SELECT * FROM bids WHERE player_id = ? ORDER BY amount DESC LIMIT 1`,
+      [state.current_player_id],
+      (err, currentHighest) => {
+        if (err) {
+          return res.status(500).json({ error: 'Database error' });
+        }
+
+        db.get('SELECT base_price FROM players WHERE id = ?', [state.current_player_id], (err, player) => {
+          if (err) {
+            return res.status(500).json({ error: 'Database error' });
+          }
+
+          const minimumBid = currentHighest ? currentHighest.amount : player.base_price;
+
+          // Admin override: Allow equal to base price if no bids, otherwise must be greater
+          if (currentHighest && amount <= currentHighest.amount) {
+            return res.status(400).json({
+              error: `Bid must be higher than current highest bid of ₹${currentHighest.amount.toLocaleString()}`
+            });
+          }
+
+          if (amount < player.base_price) {
+            return res.status(400).json({
+              error: `Bid must be at least the base price of ₹${player.base_price.toLocaleString()}`
+            });
+          }
+
+          // Check if this team is already the highest bidder
+          if (currentHighest && currentHighest.team_id === teamId) {
+            return res.status(400).json({ error: 'This team is already the highest bidder' });
+          }
+
+          // Check wallet balance
+          db.get('SELECT budget FROM teams WHERE id = ?', [teamId], (err, team) => {
+            if (err) {
+              return res.status(500).json({ error: 'Database error' });
+            }
+
+            if (!team) {
+              return res.status(400).json({ error: 'Team not found' });
+            }
+
+            // Get max players per team and calculate financial constraints
+            const maxPlayersPerTeam = state.max_players_per_team || 10;
+            const enforceMaxBid = state.enforce_max_bid === 1;
+
+            // Count players bought by this team
+            db.get('SELECT COUNT(*) as count FROM players WHERE sold_to_team = ? AND status = ?',
+              [teamId, 'SOLD'], (err, result) => {
+                if (err) {
+                  return res.status(500).json({ error: 'Database error' });
+                }
+
+                const playersBought = result ? result.count : 0;
+                const remainingPlayers = maxPlayersPerTeam - playersBought;
+
+                // Smart Logic Check
+                if (enforceMaxBid) {
+                  // Check if team has reached max players
+                  if (remainingPlayers <= 0) {
+                    return res.status(400).json({
+                      error: `Team has reached the maximum of ${maxPlayersPerTeam} players`
+                    });
+                  }
+
+                  const minimumAmountToKeep = remainingPlayers * 1000; // Assuming min bid 1000 logic from owner.js
+                  const maxBidAllowed = Math.max(0, team.budget - minimumAmountToKeep);
+
+                  // Check if bid exceeds maximum allowed
+                  if (amount > maxBidAllowed) {
+                    return res.status(400).json({
+                      error: `Bid exceeds maximum allowed (Smart Logic). Max: ₹${maxBidAllowed.toLocaleString()}`
+                    });
+                  }
+                } else {
+                  // Logic OFF: Just check purse
+                  if (amount > team.budget) {
+                    return res.status(400).json({
+                      error: `Bid exceeds team budget of ₹${team.budget.toLocaleString()}`
+                    });
+                  }
+                }
+
+                // Place bid
+                db.run(
+                  `INSERT INTO bids (player_id, team_id, amount) VALUES (?, ?, ?)`,
+                  [state.current_player_id, teamId, amount],
+                  function (err) {
+                    if (err) {
+                      console.error('Error inserting bid:', err);
+                      return res.status(500).json({ error: 'Database error: ' + err.message });
+                    }
+
+                    // Get updated highest bid with team info
+                    db.get(
+                      `SELECT b.*, t.name as team_name, t.id as team_id
+                       FROM bids b
+                       JOIN teams t ON b.team_id = t.id
+                       WHERE b.player_id = ?
+                       ORDER BY b.amount DESC
+                       LIMIT 1`,
+                      [state.current_player_id],
+                      (err, newHighest) => {
+                        if (err) {
+                          return res.status(500).json({ error: 'Database error' });
+                        }
+
+                        // Calculate previous bid amount
+                        const previousBidAmount = currentHighest ? currentHighest.amount : player.base_price;
+
+                        io.emit('bid-placed', {
+                          bid: newHighest,
+                          playerId: state.current_player_id,
+                          previousBid: previousBidAmount
+                        });
+
+                        res.json({
+                          success: true,
+                          highestBid: newHighest,
+                          walletBalance: team.budget // This is simpler for admin view
+                        });
+                      }
+                    );
+                  }
+                );
+              });
+          });
+        });
+      }
+    );
+  });
+});
+
 export default router;
 

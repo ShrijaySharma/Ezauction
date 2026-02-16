@@ -170,9 +170,10 @@ function HostDashboard({ user }) {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
+      window.location.href = '/login';
     } catch (error) {
       console.error('Logout failed:', error);
+      window.location.href = '/login';
     }
   };
 

@@ -242,3 +242,8 @@ export const deleteAllPlayers = async () => {
   return response.data;
 };
 
+export const adminPlaceBid = async (teamId, amount) => {
+  const response = await api.post('/admin/admin-bid', { teamId, amount });
+  return response.data;
+};
+

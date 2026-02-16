@@ -70,10 +70,12 @@ function AdminDashboard({ user }) {
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [showAdminBidding, setShowAdminBidding] = useState(false);
+  const [customBidIncrement, setCustomBidIncrement] = useState(1000);
 
   // Disable body scroll when any modal is open
   useEffect(() => {
-    if (showHistory || showPlayerModal || showTeamManagement || showTeamModal || showTeamSquads || showPurseMonitoring || showBiddingLogicModal || showCredentialsModal) {
+    if (showHistory || showPlayerModal || showTeamManagement || showTeamModal || showTeamSquads || showPurseMonitoring || showBiddingLogicModal || showCredentialsModal || showAdminBidding) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -81,7 +83,7 @@ function AdminDashboard({ user }) {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showHistory, showPlayerModal, showTeamManagement, showTeamModal, showTeamSquads, showPurseMonitoring, showBiddingLogicModal, showCredentialsModal]);
+  }, [showHistory, showPlayerModal, showTeamManagement, showTeamModal, showTeamSquads, showPurseMonitoring, showBiddingLogicModal, showCredentialsModal, showAdminBidding]);
 
   useEffect(() => {
     // Initialize socket
@@ -773,6 +775,35 @@ function AdminDashboard({ user }) {
     }
   };
 
+  const handleAdminPlaceBid = async (teamId, type) => {
+    if (!currentPlayer) return;
+
+    let useBasePrice = false;
+    let bidAmount = 0;
+
+    const currentHighestAmount = highestBid ? highestBid.amount : 0;
+
+    // Calculate new bid amount
+    if (type === 'BASE') {
+      useBasePrice = true;
+      bidAmount = currentPlayer.base_price;
+    } else {
+      // Custom increment bid
+      // If no current bid, start from base_price + increment? Or just base_price?
+      // Usually "BID" means raising.
+      // If no bid exists yet, raising by increment means base_price + increment
+      const startAmount = highestBid ? highestBid.amount : currentPlayer.base_price;
+      bidAmount = startAmount + parseInt(customBidIncrement);
+    }
+
+    try {
+      await adminService.adminPlaceBid(teamId, bidAmount);
+      // Socket will update UI
+    } catch (error) {
+      alert('Error placing bid: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
   const currentBid = highestBid ? highestBid.amount : (currentPlayer ? currentPlayer.base_price : 0);
 
   return (
@@ -885,10 +916,25 @@ function AdminDashboard({ user }) {
 
                 <div className="pt-4 border-t border-gray-700 mt-4">
                   <button
+                    onClick={() => {
+                      setShowAdminBidding(true);
+                      setShowSidebar(false);
+                    }}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white rounded-lg transition-colors text-left shadow-lg border border-orange-500"
+                  >
+                    <div className="font-bold flex items-center gap-2">
+                      <span>⚡</span> Admin Bidding Mode
+                    </div>
+                    <div className="text-sm text-orange-100">Bid on behalf of teams (Hybrid)</div>
+                  </button>
+                </div>
+
+                <div className="pt-4 border-t border-gray-700 mt-4">
+                  <button
                     onClick={handleDeleteAllPlayers}
                     className="w-full px-4 py-3 bg-red-900/50 hover:bg-red-800 text-red-200 rounded-lg transition-colors text-left border border-red-700"
                   >
-                    <div className="font-semibold text-red-100">Clear All Data</div>
+                    <div className="font-semibold text-red-100">Delete All Data</div>
                     <div className="text-sm text-red-400">Permanently delete all players & bids</div>
                   </button>
                 </div>
@@ -2080,6 +2126,188 @@ function AdminDashboard({ user }) {
           </div>
         )
       }
+
+      {/* Admin Bidding Full Screen Mode */}
+      {showAdminBidding && (
+        <div className="fixed inset-0 z-50 bg-gray-900 overflow-hidden flex flex-col">
+          {/* Top Bar */}
+          <div className="bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center shadow-lg shrink-0">
+            <div className="flex items-center gap-4">
+              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                <span>⚡</span> Admin Bidding Console
+              </h2>
+              <div className="h-8 w-px bg-gray-600 mx-2"></div>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-300 text-sm font-semibold">BID Increment:</span>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">₹</span>
+                  <input
+                    type="number"
+                    value={customBidIncrement}
+                    onChange={(e) => setCustomBidIncrement(e.target.value)}
+                    className="w-32 py-1.5 pl-7 pr-3 bg-gray-700 border border-gray-600 rounded text-white font-bold focus:ring-2 focus:ring-orange-500 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {auctionState.status === 'LIVE' ? (
+                <div className="px-3 py-1 bg-green-600 text-white rounded font-bold animate-pulse">
+                  LIVE
+                </div>
+              ) : (
+                <div className="px-3 py-1 bg-red-600 text-white rounded font-bold">
+                  {auctionState.status}
+                </div>
+              )}
+
+              <button
+                onClick={handleUndoBid}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded border border-gray-500 font-semibold"
+              >
+                Undo Last Bid
+              </button>
+
+              <button
+                onClick={() => setShowAdminBidding(false)}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded font-bold"
+              >
+                Exit Console
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left Column: Player Info */}
+            <div className="w-1/4 bg-gray-800 border-r border-gray-700 p-6 flex flex-col overflow-y-auto shrink-0 shadow-xl z-10">
+              {currentPlayer ? (
+                <div className="flex flex-col items-center text-center h-full">
+                  <div className="relative mb-6">
+                    <div className="w-48 h-48 rounded-full border-4 border-yellow-400 p-1 bg-gradient-to-br from-yellow-300 to-orange-500 shadow-2xl">
+                      <img
+                        src={getImageUrl(currentPlayer.image)}
+                        alt={currentPlayer.name}
+                        className="w-full h-full rounded-full object-cover"
+                        onError={(e) => { e.target.src = 'https://via.placeholder.com/200x200?text=Player'; }}
+                      />
+                    </div>
+                    {currentPlayer.serial_number && (
+                      <div className="absolute -top-2 -right-2 bg-blue-900 text-white font-bold text-xl px-3 py-1 rounded-full border-2 border-white shadow-lg">
+                        #{currentPlayer.serial_number}
+                      </div>
+                    )}
+                  </div>
+
+                  <h2 className="text-3xl font-bold text-white mb-2 leading-tight">{currentPlayer.name}</h2>
+                  <div className="flex gap-2 mb-6">
+                    <span className="px-3 py-1 bg-gray-700 text-gray-300 rounded-full text-sm font-semibold">{currentPlayer.role}</span>
+                    {currentPlayer.country && <span className="px-3 py-1 bg-gray-700 text-gray-300 rounded-full text-sm font-semibold">{currentPlayer.country}</span>}
+                  </div>
+
+                  <div className="w-full bg-gray-700/50 rounded-xl p-4 mb-6 border border-gray-600">
+                    <div className="text-gray-400 text-sm uppercase tracking-wider mb-1">Current Bid</div>
+                    <div className="text-4xl font-bold text-green-400">₹{currentBid.toLocaleString()}</div>
+                    {highestBid && (
+                      <div className="mt-2 text-white text-lg">
+                        Leading: <span className="text-yellow-400 font-bold">{highestBid.team_name}</span>
+                      </div>
+                    )}
+                    <div className="mt-3 pt-3 border-t border-gray-600 flex justify-between text-sm">
+                      <span className="text-gray-400">Base Price:</span>
+                      <span className="text-white">₹{currentPlayer.base_price?.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto w-full space-y-3">
+                    <button
+                      onClick={() => handleMarkPlayer('SOLD')}
+                      className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-transform"
+                    >
+                      SOLD
+                    </button>
+                    <button
+                      onClick={() => handleMarkPlayer('UNSOLD')}
+                      className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-transform"
+                    >
+                      UNSOLD
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                  <span className="text-6xl mb-4">🏏</span>
+                  <p className="text-xl">No player loaded</p>
+                  <p className="text-sm mt-2">Load a player from the dashboard to start bidding</p>
+                  <button
+                    onClick={() => setShowAdminBidding(false)}
+                    className="mt-6 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                  >
+                    Back to Dashboard
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right Column: Teams Grid */}
+            <div className="flex-1 bg-gray-900 p-6 overflow-y-auto">
+              {teams.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
+                  {teams.map(team => {
+                    const canAfford = team.budget >= (currentBid + parseInt(customBidIncrement));
+                    // Determine if team is full (only if logic is enabled)
+                    // We need team squad counts for this which might not be updated here exactly unless we listen to everything.
+                    // For now we check basic budget relative to next bid.
+
+                    return (
+                      <div key={team.id} className={`bg-gray-800 rounded-xl border-2 p-4 flex flex-col shadow-lg transition-all ${highestBid?.team_id === team.id ? 'border-green-500 shadow-green-500/20 ring-1 ring-green-500' : 'border-gray-700 hover:border-gray-500'
+                        }`}>
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center overflow-hidden border border-gray-600 shrink-0">
+                            {team.logo ? (
+                              <img src={getImageUrl(team.logo)} alt={team.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-xl font-bold text-gray-400">{team.name.charAt(0)}</span>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-white text-lg truncate leading-tight" title={team.name}>{team.name}</div>
+                            <div className="text-green-400 font-mono font-semibold">₹{team.budget?.toLocaleString()}</div>
+                          </div>
+                        </div>
+
+                        <div className="mt-auto grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => handleAdminPlaceBid(team.id, 'BASE')}
+                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.amount >= (currentPlayer?.base_price || 0)}
+                            className="px-2 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded text-sm font-semibold transition-colors"
+                          >
+                            Base Price
+                          </button>
+                          <button
+                            onClick={() => handleAdminPlaceBid(team.id, 'INCREMENT')}
+                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.team_id === team.id}
+                            className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${highestBid?.team_id === team.id
+                              ? 'bg-green-600 text-white cursor-default'
+                              : 'bg-orange-600 hover:bg-orange-500 text-white hover:shadow-orange-500/20 disabled:bg-gray-700 disabled:text-gray-500 disabled:shadow-none'
+                              }`}
+                          >
+                            {highestBid?.team_id === team.id ? 'Leading' : `BID +${parseInt(customBidIncrement) / 1000}k`}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  Loading teams...
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
