@@ -239,52 +239,53 @@ function HostDashboard({ user }) {
         <div className="flex-1 overflow-hidden p-6 gap-6 grid grid-cols-12 content-stretch">
           {currentPlayer ? (
             <>
-              {/* Left Column: Player Profile */}
-              <div className="col-span-3 flex flex-col gap-6 overflow-hidden">
-                <div className="bg-gray-900/90 backdrop-blur-2xl rounded-3xl p-7 border-2 border-white/20 shadow-2xl flex flex-col gap-5">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-yellow-400/20 rounded-xl shadow-inner">
-                      <svg className="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                    <span className="text-yellow-400/80 font-black uppercase tracking-[0.25em] text-[10px]">Player Category</span>
-                  </div>
-                  <div>
-                    <h2 className="text-white text-4xl sm:text-5xl font-black tracking-tighter mb-2 drop-shadow-2xl leading-tight">{currentPlayer.name}</h2>
-                    <div className="inline-block px-5 py-2 bg-yellow-400 text-blue-900 rounded-full text-xs font-black uppercase tracking-tighter mb-6 shadow-xl shadow-yellow-400/30">
-                      {currentPlayer.role}
-                    </div>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center bg-white/5 p-4 rounded-2xl border border-white/10">
-                        <span className="text-white/40 text-[10px] font-black uppercase tracking-widest">Category</span>
-                        <span className="text-white font-black text-xl tracking-tight uppercase">{currentPlayer.role}</span>
-                      </div>
-                      <div className="flex justify-between items-center bg-white/10 p-4 rounded-2xl border border-white/20 shadow-inner">
-                        <span className="text-yellow-400/60 text-[10px] font-black uppercase tracking-widest">Base Price</span>
-                        <span className="text-yellow-400 font-black text-2xl font-mono tracking-tighter drop-shadow">₹{formatIndianNumber(currentPlayer.base_price || 0)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              {/* Left Column: Enhanced Player Profile (Full Height) */}
+              <div className="col-span-3 flex flex-col h-full overflow-hidden">
+                <div className="flex-1 bg-gray-900/90 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/20 shadow-2xl flex flex-col justify-between relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
 
-                <div className="flex-1 bg-black/40 backdrop-blur-xl rounded-3xl p-6 border border-white/10 shadow-2xl overflow-hidden flex flex-col">
-                  <h3 className="text-white/40 font-bold uppercase tracking-widest text-[10px] mb-4 flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> Live Bids
-                  </h3>
-                  <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-none">
-                    {allBids.length > 0 ? (
-                      allBids.slice(0, 10).map((bid, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 animate-slide-in-right">
-                          <span className="text-white/90 font-black text-sm truncate max-w-[130px] uppercase tracking-tight">{bid.team_name}</span>
-                          <span className="text-green-400 font-black font-mono text-lg">₹{formatIndianNumber(bid.amount)}</span>
+                  {/* Category Badge */}
+                  <div className="relative z-10 flex justify-between items-start">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-yellow-400 rounded-xl shadow-lg shadow-yellow-400/20">
+                          <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
                         </div>
-                      ))
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-white/20 italic text-sm text-center font-bold tracking-widest uppercase opacity-40">
-                        Silent...
+                        <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">Profile</span>
+                      </div>
+                    </div>
+                    {currentPlayer.serial_number && (
+                      <div className="px-4 py-2 bg-white/5 rounded-full border border-white/10 backdrop-blur-md">
+                        <span className="text-white/40 text-[10px] uppercase font-black tracking-widest mr-2">SR</span>
+                        <span className="text-white font-mono font-bold text-lg">{currentPlayer.serial_number}</span>
                       </div>
                     )}
+                  </div>
+
+                  {/* Name & Role */}
+                  <div className="relative z-10 my-auto text-center">
+                    <h2 className="text-white text-5xl lg:text-6xl font-black tracking-tighter mb-4 drop-shadow-2xl leading-[0.9]">
+                      {currentPlayer.name}
+                    </h2>
+                    <div className="inline-block px-6 py-2.5 bg-yellow-400 text-black rounded-full text-sm font-black uppercase tracking-widest shadow-xl shadow-yellow-400/20 transform hover:scale-105 transition-transform">
+                      {currentPlayer.role}
+                    </div>
+                  </div>
+
+                  {/* Stats Grid */}
+                  <div className="relative z-10 grid grid-cols-1 gap-4 mt-auto">
+                    <div className="bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors">
+                      <span className="block text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-center">Country</span>
+                      <div className="text-white font-black text-2xl uppercase tracking-tight text-center">{currentPlayer.country || 'N/A'}</div>
+                    </div>
+                    <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-6 rounded-3xl border border-yellow-400/20 backdrop-blur-md">
+                      <span className="block text-yellow-400/60 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-center">Base Price</span>
+                      <div className="text-yellow-400 font-black text-4xl font-mono tracking-tighter text-center drop-shadow-lg">
+                        ₹{formatIndianNumber(currentPlayer.base_price || 0)}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -301,33 +302,42 @@ function HostDashboard({ user }) {
                       onError={(e) => { e.target.src = 'https://via.placeholder.com/600x800?text=Player'; }}
                     />
                   </div>
-                  {currentPlayer.serial_number && (
-                    <div className="absolute -top-4 -right-4 h-32 w-32 bg-gradient-to-br from-yellow-300 to-yellow-500 text-blue-900 rounded-3xl shadow-2xl border-4 border-white flex flex-col items-center justify-center transform rotate-12 transition-transform hover:rotate-0">
-                      <span className="text-[10px] font-black uppercase opacity-60">SR No.</span>
-                      <span className="text-6xl font-black">{currentPlayer.serial_number}</span>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* Right Column: Bid Action */}
+              {/* Right Column: Bid Action - Optimized for Overflow */}
               <div className="col-span-4 flex flex-col gap-6">
-                <div className={`flex-1 bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-[3rem] p-10 shadow-2xl border-[12px] border-white flex flex-col items-center justify-center text-blue-900 transition-all duration-500 ${bidFlash ? 'scale-[1.05] rotate-1' : ''}`}>
-                  <div className="text-blue-900/40 text-2xl font-black tracking-[0.5em] uppercase mb-6">Current Bid</div>
-                  <div className={`text-8xl sm:text-9xl font-black leading-none tracking-tighter transition-all ${bidFlash ? 'scale-110 mb-6' : 'mb-4'} drop-shadow-xl`}>
-                    ₹{formatIndianNumber(currentBid)}
+                <div className={`flex-1 bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-[3rem] p-6 lg:p-10 shadow-2xl border-[12px] border-white flex flex-col items-center justify-center text-blue-900 transition-all duration-500 ${bidFlash ? 'scale-[1.02] rotate-1' : ''}`}>
+                  <div className="text-blue-900/40 text-xl lg:text-2xl font-black tracking-[0.5em] uppercase mb-4 lg:mb-8 text-center">Current Bid</div>
+
+                  {/* Dynamic Font Size for Amount */}
+                  <div className="w-full grid place-items-center mb-6 lg:mb-10">
+                    <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-center break-words w-full
+                      ${currentBid.toString().length > 7 ? 'text-5xl lg:text-7xl' : (currentBid.toString().length > 5 ? 'text-6xl lg:text-8xl' : 'text-7xl lg:text-9xl')}
+                      ${bidFlash ? 'scale-110' : ''}
+                    `}>
+                      ₹{formatIndianNumber(currentBid)}
+                    </div>
                   </div>
-                  <div className="h-1.5 w-32 bg-blue-900/10 my-10 rounded-full"></div>
+
+                  <div className="h-1.5 w-32 bg-blue-900/10 mb-8 rounded-full"></div>
 
                   {highestBid ? (
-                    <div className="w-full flex flex-col items-center animate-bounce-slow">
-                      <div className="text-blue-900/60 text-sm font-black uppercase tracking-[0.4em] mb-5">Leading Team</div>
-                      <div className="bg-blue-900 text-yellow-400 px-12 py-6 rounded-[2.5rem] text-4xl sm:text-5xl font-black shadow-2xl border-4 border-white/20 flex items-center gap-6">
-                        <span className="text-blue-300">👑</span> {highestBid.team_name}
+                    <div className="w-full flex flex-col items-center animate-bounce-slow px-4">
+                      <div className="text-blue-900/60 text-xs lg:text-sm font-black uppercase tracking-[0.4em] mb-4 text-center">Leading Team</div>
+                      <div className="bg-blue-900 text-yellow-400 w-full px-6 py-4 lg:py-6 rounded-[2rem] shadow-2xl border-4 border-white/20 flex flex-col items-center justify-center text-center gap-2">
+                        <span className="text-2xl mb-1">👑</span>
+                        <span className={`font-black leading-tight break-words w-full
+                          ${highestBid.team_name.length > 15 ? 'text-xl lg:text-2xl' : 'text-2xl lg:text-4xl'}
+                        `}>
+                          {highestBid.team_name}
+                        </span>
                       </div>
                     </div>
                   ) : (
-                    <div className="text-blue-900/50 font-black italic text-3xl animate-pulse uppercase tracking-[0.2em]">Awaiting First Bid</div>
+                    <div className="text-blue-900/50 font-black italic text-2xl lg:text-3xl animate-pulse uppercase tracking-[0.2em] text-center">
+                      Awaiting Bid...
+                    </div>
                   )}
                 </div>
               </div>
