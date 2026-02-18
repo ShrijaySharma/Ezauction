@@ -226,14 +226,6 @@ function HostDashboard({ user }) {
           </div>
 
           <div className="flex items-center gap-6">
-            {!audioEnabled && (
-              <button
-                onClick={enableAudio}
-                className="text-yellow-400 hover:text-yellow-300 transition-all text-sm font-black uppercase tracking-widest px-4 py-2 bg-yellow-400/10 hover:bg-yellow-400/20 rounded-xl border border-yellow-400/50 animate-pulse"
-              >
-                🔊 Enable Sound
-              </button>
-            )}
             <button
               onClick={handleLogout}
               className="text-white/60 hover:text-white transition-all text-sm font-black uppercase tracking-widest px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10"

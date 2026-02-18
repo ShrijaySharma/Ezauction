@@ -2351,18 +2351,8 @@ function AdminDashboard({ user }) {
           </div>
         </div>
       )}
-      {/* Bid Notification Overlay */}
-      {notification && (
-        <BidNotification
-          key={notificationKey}
-          teamName={notification.teamName}
-          increment={notification.increment}
-          onClose={() => setNotification(null)}
-        />
-      )}
     </div>
   );
 }
 
 export default AdminDashboard;
-
