@@ -1,0 +1,29 @@
+// Delete team
+    const { error: deleteError } = await supabase
+      .from('teams')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) throw deleteError;
+
+    // Delete associated owner user if exists
+    if (team && team.owner_id) {
+      const { error: userDeleteError } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', team.owner_id);
+
+      if (userDeleteError) console.error('Error deleting team user:', userDeleteError);
+    }
+
+    io.emit('team-deleted', { teamId: parseInt(id) });
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error('Error deleting team:', err);
+    res.status(500).json({ error: 'Database error: ' + err.message });
+  }
+});
+
+// Update team budget
+router.put('/teams/:id/budget', (req, res) =

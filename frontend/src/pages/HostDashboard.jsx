@@ -28,8 +28,19 @@ function HostDashboard({ user }) {
   const [bidFlash, setBidFlash] = useState(false);
   const [notification, setNotification] = useState(null);
   const [notificationKey, setNotificationKey] = useState(0);
+  const [audioEnabled, setAudioEnabled] = useState(false);
 
   const audioElementRef = useRef(null);
+
+  const enableAudio = () => {
+    if (audioElementRef.current) {
+      audioElementRef.current.play().then(() => {
+        setAudioEnabled(true);
+        audioElementRef.current.pause();
+        audioElementRef.current.currentTime = 0;
+      }).catch(err => console.error('Audio enable failed:', err));
+    }
+  };
 
   useEffect(() => {
     console.log('HostDashboard mounted');
@@ -129,28 +140,18 @@ function HostDashboard({ user }) {
       const data = await hostService.getCurrentInfo();
       // console.log('Loaded current info:', data);
 
-      // Only update if data has actually changed to prevent unnecessary re-renders
-      if (JSON.stringify(data.player) !== JSON.stringify(currentPlayer)) {
-        setCurrentPlayer(data.player);
-      }
-
-      if (JSON.stringify(data.highestBid) !== JSON.stringify(highestBid)) {
-        setHighestBid(data.highestBid);
-      }
+      setCurrentPlayer(data.player);
+      setHighestBid(data.highestBid);
 
       const newBid = data.highestBid ? data.highestBid.amount : (data.player ? data.player.base_price : 0);
-      if (newBid !== currentBid) {
-        setCurrentBid(newBid);
-      }
+      setCurrentBid(newBid);
 
       if (data.status !== status) {
         setStatus(data.status);
       }
 
       const bidsData = await hostService.getAllBids();
-      if (JSON.stringify(bidsData.bids) !== JSON.stringify(allBids)) {
-        setAllBids(bidsData.bids || []);
-      }
+      setAllBids(bidsData.bids || []);
     } catch (error) {
       console.error('Error loading current info:', error);
     }
@@ -159,9 +160,7 @@ function HostDashboard({ user }) {
   const loadTeams = async () => {
     try {
       const data = await hostService.getAllTeams();
-      if (JSON.stringify(data) !== JSON.stringify(teams)) {
-        setTeams(data || []);
-      }
+      setTeams(data || []);
     } catch (error) {
       console.error('Error loading teams:', error);
     }
@@ -193,12 +192,14 @@ function HostDashboard({ user }) {
       {/* Bid Notification Overlay */}
       {notification && (
         <BidNotification
-          key={notification.id}
+          key={notificationKey}
           teamName={notification.teamName}
           increment={notification.increment}
           onClose={() => setNotification(null)}
         />
       )}
+
+
 
       {/* Cinematic Background */}
       <div
@@ -220,11 +221,19 @@ function HostDashboard({ user }) {
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
             <div className="text-4xl sm:text-5xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-200 drop-shadow-2xl">
-              EzAuction™
+              EzAuction
             </div>
           </div>
 
           <div className="flex items-center gap-6">
+            {!audioEnabled && (
+              <button
+                onClick={enableAudio}
+                className="text-yellow-400 hover:text-yellow-300 transition-all text-sm font-black uppercase tracking-widest px-4 py-2 bg-yellow-400/10 hover:bg-yellow-400/20 rounded-xl border border-yellow-400/50 animate-pulse"
+              >
+                🔊 Enable Sound
+              </button>
+            )}
             <button
               onClick={handleLogout}
               className="text-white/60 hover:text-white transition-all text-sm font-black uppercase tracking-widest px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10"

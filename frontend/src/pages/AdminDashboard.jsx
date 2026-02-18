@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { logout } from '../services/auth';
 import * as adminService from '../services/admin';
 import { getImageUrl } from '../utils/imageUtils';
+import BidNotification from '../components/BidNotification';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -73,6 +74,22 @@ function AdminDashboard({ user }) {
   const [showAdminBidding, setShowAdminBidding] = useState(false);
   const [customBidIncrement, setCustomBidIncrement] = useState(1000);
 
+  // Notification State
+  const [notification, setNotification] = useState(null);
+  const [notificationKey, setNotificationKey] = useState(0);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const audioElementRef = useRef(null);
+
+  const enableAudio = () => {
+    if (audioElementRef.current) {
+      audioElementRef.current.play().then(() => {
+        setAudioEnabled(true);
+        audioElementRef.current.pause();
+        audioElementRef.current.currentTime = 0;
+      }).catch(err => console.error('Audio enable failed:', err));
+    }
+  };
+
   // Disable body scroll when any modal is open
   useEffect(() => {
     if (showHistory || showPlayerModal || showTeamManagement || showTeamModal || showTeamSquads || showPurseMonitoring || showBiddingLogicModal || showCredentialsModal || showAdminBidding) {
@@ -86,6 +103,11 @@ function AdminDashboard({ user }) {
   }, [showHistory, showPlayerModal, showTeamManagement, showTeamModal, showTeamSquads, showPurseMonitoring, showBiddingLogicModal, showCredentialsModal, showAdminBidding]);
 
   useEffect(() => {
+    // Initialize Audio
+    const audio = new Audio('/notification_sound.wav');
+    audio.preload = 'auto';
+    audioElementRef.current = audio;
+
     // Initialize socket
     const newSocket = io(API_URL, {
       withCredentials: true,
@@ -126,6 +148,20 @@ function AdminDashboard({ user }) {
         setHighestBid(data.bid);
         setAllBids(prev => [data.bid, ...prev]);
         setPreviousBid(data.previousBid || currentBid);
+
+        // Show Notification
+        setNotification({
+          id: Date.now(),
+          teamName: data.bid.team_name,
+          increment: data.increment || 0
+        });
+        setNotificationKey(prev => prev + 1);
+
+        // Play Sound
+        if (audioElementRef.current) {
+          audioElementRef.current.currentTime = 0;
+          audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
+        }
       }
       // Still refresh in background to be safe
       loadCurrentBid();
@@ -136,6 +172,13 @@ function AdminDashboard({ user }) {
       if (data.highestBid) {
         setHighestBid(data.highestBid);
         setPreviousBid(data.previousBid || currentBid);
+
+        // Play Sound on update too (optional, but good for feedback)
+        if (audioElementRef.current) {
+          audioElementRef.current.currentTime = 0;
+          audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
+        }
+
       } else {
         setHighestBid(null);
       }
@@ -295,12 +338,8 @@ function AdminDashboard({ user }) {
   const loadCurrentBid = async () => {
     try {
       const data = await adminService.getCurrentBid();
-      if (JSON.stringify(data.highestBid) !== JSON.stringify(highestBid)) {
-        setHighestBid(data.highestBid);
-      }
-      if (JSON.stringify(data.player) !== JSON.stringify(currentPlayer)) {
-        setCurrentPlayer(data.player);
-      }
+      setHighestBid(data.highestBid);
+      setCurrentPlayer(data.player);
     } catch (error) {
       console.error('Error loading current bid:', error);
     }
@@ -309,9 +348,7 @@ function AdminDashboard({ user }) {
   const loadAllBids = async () => {
     try {
       const data = await adminService.getAllBids();
-      if (JSON.stringify(data.bids) !== JSON.stringify(allBids)) {
-        setAllBids(data.bids || []);
-      }
+      setAllBids(data.bids || []);
     } catch (error) {
       console.error('Error loading bids:', error);
     }
@@ -320,9 +357,7 @@ function AdminDashboard({ user }) {
   const loadPlayers = async () => {
     try {
       const data = await adminService.getAllPlayers();
-      if (JSON.stringify(data.players) !== JSON.stringify(players)) {
-        setPlayers(data.players || []);
-      }
+      setPlayers(data.players || []);
     } catch (error) {
       console.error('Error loading players:', error);
     }
@@ -828,6 +863,14 @@ function AdminDashboard({ user }) {
             </div>
           </div>
           <div className="flex gap-2">
+            {!audioEnabled && (
+              <button
+                onClick={enableAudio}
+                className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg transition-colors animate-pulse"
+              >
+                🔊 Enable Audio
+              </button>
+            )}
             <button
               onClick={() => setShowHistory(true)}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
@@ -2307,6 +2350,15 @@ function AdminDashboard({ user }) {
             </div>
           </div>
         </div>
+      )}
+      {/* Bid Notification Overlay */}
+      {notification && (
+        <BidNotification
+          key={notificationKey}
+          teamName={notification.teamName}
+          increment={notification.increment}
+          onClose={() => setNotification(null)}
+        />
       )}
     </div>
   );

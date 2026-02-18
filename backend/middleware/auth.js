@@ -22,6 +22,14 @@ export function requireOwner(req, res, next) {
   next();
 }
 
+// Middleware to check if user is host
+export function requireHost(req, res, next) {
+  if (!req.session.userId || req.session.role !== 'host') {
+    return res.status(403).json({ error: 'Host access required' });
+  }
+  next();
+}
+
 // Middleware to check if user is app owner
 export function requireAppOwner(req, res, next) {
   if (!req.session.userId || req.session.role !== 'app_owner') {

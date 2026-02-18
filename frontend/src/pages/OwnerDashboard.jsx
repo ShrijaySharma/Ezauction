@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import { logout } from '../services/auth';
 import * as ownerService from '../services/owner';
 import { getImageUrl } from '../utils/imageUtils';
+import BidNotification from '../components/BidNotification';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -43,6 +44,8 @@ function OwnerDashboard({ user }) {
   const [teams, setTeams] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [teamPlayers, setTeamPlayers] = useState([]);
+  const [notification, setNotification] = useState(null);
+  const [notificationKey, setNotificationKey] = useState(0);
 
   // Financial constraints state
   const [totalAllowedPlayers, setTotalAllowedPlayers] = useState(10);
@@ -85,6 +88,14 @@ function OwnerDashboard({ user }) {
     newSocket.on('bid-placed', (data) => {
       setBidFlash(true);
       setTimeout(() => setBidFlash(false), 500);
+
+      // Show Notification
+      setNotification({
+        id: Date.now(),
+        teamName: data.bid.team_name,
+        increment: data.increment || 0
+      });
+      setNotificationKey(prev => prev + 1);
 
       // 3-second bid lockout
       setBidLockout(true);
@@ -371,6 +382,16 @@ function OwnerDashboard({ user }) {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {/* Bid Notification Overlay */}
+      {notification && (
+        <BidNotification
+          key={notificationKey}
+          teamName={notification.teamName}
+          increment={notification.increment}
+          onClose={() => setNotification(null)}
+        />
+      )}
+
       {/* Stadium Background Image */}
       <div
         className="fixed inset-0 z-0"

@@ -3,10 +3,9 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import session from 'express-session';
 import cors from 'cors';
-import sqlite3 from 'sqlite3';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { initDatabase } from './db.js';
+
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import ownerRoutes from './routes/owner.js';
@@ -38,7 +37,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded images
+// Serve uploaded images (Keep for backward compatibility if any local files remain, though we use Supabase now)
 app.use('/uploads', express.static(join(__dirname, 'uploads')));
 
 // Health check endpoint
@@ -62,11 +61,7 @@ app.use(session({
   }
 }));
 
-// Initialize database
-const db = await initDatabase();
-
-// Make db available to routes
-app.locals.db = db;
+// Make io available to routes
 app.locals.io = io;
 
 // Routes
@@ -91,5 +86,5 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`📱 Access from network: http://<YOUR_LOCAL_IP>:${PORT}`);
 });
 
-export { io, db };
+export { io };
 

@@ -1,36 +1,42 @@
 // Helper function to get proper image URL
 export const getImageUrl = (imagePath) => {
-  if (!imagePath || imagePath === '?') {
+  if (!imagePath || typeof imagePath !== 'string') {
     return 'https://via.placeholder.com/300x300?text=?';
   }
 
-  // If it's already a full URL (http/https), check if it's localhost and convert
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+  const path = imagePath.trim();
+
+  if (path === '' || path === '?') {
+    return 'https://via.placeholder.com/300x300?text=?';
+  }
+
+  // Check if it's already a full URL (http/https)
+  if (path.startsWith('http://') || path.startsWith('https://')) {
     // If it contains localhost or 127.0.0.1, replace with current hostname
-    if (imagePath.includes('localhost') || imagePath.includes('127.0.0.1')) {
+    // This is useful for local development on other devices
+    if (path.includes('localhost') || path.includes('127.0.0.1')) {
       const host = window.location.hostname;
       const protocol = window.location.protocol;
       try {
-        const url = new URL(imagePath);
+        const url = new URL(path);
+        // Replace ONLY hostname, keep port and path
         return `${protocol}//${host}:${url.port}${url.pathname}`;
       } catch (e) {
-        // If URL parsing fails, try simple replacement
-        return imagePath.replace(/localhost|127\.0\.0\.1/, host);
+        // Fallback: simple replace
+        return path.replace(/localhost|127\.0\.0\.1/, host);
       }
     }
-    // Otherwise return as is (external URLs)
-    return imagePath;
+    return path;
   }
 
   // If it's a relative path starting with /uploads, convert to full URL
-  if (imagePath.startsWith('/uploads/')) {
+  if (path.startsWith('/uploads/')) {
     const host = window.location.hostname;
     const protocol = window.location.protocol;
     const port = '4000'; // Backend port
-    return `${protocol}//${host}:${port}${imagePath}`;
+    return `${protocol}//${host}:${port}${path}`;
   }
 
-  // Return as is for other cases
-  return imagePath;
+  return path;
 };
 
