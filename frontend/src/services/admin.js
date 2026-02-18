@@ -63,6 +63,13 @@ export const getAuctionHistory = async () => {
   return response.data;
 };
 
+// Bulk add players
+export const addPlayersBulk = async (players) => {
+  const response = await api.post('/admin/players-bulk', { players });
+  return response.data;
+};
+
+// Add new player
 export const addPlayer = async (playerData) => {
   const response = await api.post('/admin/players', playerData);
   return response.data;

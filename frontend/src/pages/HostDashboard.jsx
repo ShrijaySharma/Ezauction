@@ -299,7 +299,7 @@ function HostDashboard({ user }) {
                       src={getImageUrl(currentPlayer.image)}
                       alt={currentPlayer.name}
                       className="w-full h-full object-contain filter drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]"
-                      onError={(e) => { e.target.src = 'https://via.placeholder.com/600x800?text=Player'; }}
+                      onError={(e) => { e.target.src = '/deafult_player.png'; }}
                     />
                   </div>
                 </div>

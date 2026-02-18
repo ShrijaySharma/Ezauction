@@ -5,6 +5,7 @@ import { logout } from '../services/auth';
 import * as adminService from '../services/admin';
 import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
+import BulkUploadModal from '../components/BulkUploadModal';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -45,6 +46,7 @@ function AdminDashboard({ user }) {
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [previousBid, setPreviousBid] = useState(0);
   const [teams, setTeams] = useState([]);
   const [editingTeamBudget, setEditingTeamBudget] = useState(null);
@@ -1045,7 +1047,7 @@ function AdminDashboard({ user }) {
                         alt={currentPlayer.name}
                         className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/200x300?text=Player';
+                          e.target.src = '/deafult_player.png';
                         }}
                       />
                     </div>
@@ -1233,7 +1235,35 @@ function AdminDashboard({ user }) {
 
         {/* Player Management */}
         <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 mt-4">
-          <h3 className="text-white font-semibold mb-3">Player Management</h3>
+          {/* Player Management Header */}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              Manage Players
+            </h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowBulkModal(true)}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-lg shadow-green-900/50 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Bulk Add
+              </button>
+              <button
+                onClick={handleAddPlayer}
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600 text-white rounded-lg transition-all shadow-lg shadow-orange-900/50 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Player
+              </button>
+            </div>
+          </div>
 
           {/* Search and Filters */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-3">
@@ -1422,6 +1452,30 @@ function AdminDashboard({ user }) {
             )}
           </div>
         </div >
+
+        {showAdminBidding && (
+          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#1e1e1e] rounded-xl border border-gray-700 shadow-2xl w-full max-w-md p-6">
+              <h2 className="text-xl font-bold text-white mb-4">Admin Bidding</h2>
+              <p className="text-gray-400 mb-6">Place a bid on behalf of a team.</p>
+
+              {/* Simple form for admin bidding would go here - for now just closable */}
+              <div className="flex justify-end">
+                <button onClick={() => setShowAdminBidding(false)} className="px-4 py-2 bg-gray-700 text-white rounded">Close</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showBulkModal && (
+          <BulkUploadModal
+            onClose={() => setShowBulkModal(false)}
+            onSuccess={() => {
+              loadPlayers();
+              // Don't need to do much else as socket will trigger updates too
+            }}
+          />
+        )}
 
         {/* History Modal */}
         {

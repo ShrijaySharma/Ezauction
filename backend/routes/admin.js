@@ -993,6 +993,67 @@ router.post('/players', async (req, res) => {
   }
 });
 
+// Bulk add players
+router.post('/players-bulk', async (req, res) => {
+  const { players } = req.body;
+  const io = req.app.locals.io;
+
+  if (!players || !Array.isArray(players) || players.length === 0) {
+    return res.status(400).json({ error: 'Invalid players data' });
+  }
+
+  try {
+    const validPlayers = [];
+    const errors = [];
+
+    // Pre-process and validate
+    for (let i = 0; i < players.length; i++) {
+      const p = players[i];
+      if (!p.name || !p.role || !p.base_price) {
+        errors.push({ index: i, error: 'Missing required fields (Name, Role, Base Price)', data: p });
+        continue;
+      }
+      validPlayers.push({
+        name: p.name,
+        role: p.role,
+        base_price: parseFloat(p.base_price),
+        country: p.country || null,
+        serial_number: p.serial_number ? parseInt(p.serial_number) : null,
+        status: 'AVAILABLE',
+        image: null // Default image will be handled by frontend if null
+      });
+    }
+
+    if (validPlayers.length === 0) {
+      return res.status(400).json({ error: 'No valid players found to add', detailedErrors: errors });
+    }
+
+    // Bulk insert
+    const { data: inserted, error: insertError } = await supabase
+      .from('players')
+      .insert(validPlayers)
+      .select();
+
+    if (insertError) throw insertError;
+
+    console.log(`Bulk added ${inserted.length} players`);
+
+    // Emit event for frontend update
+    io.emit('player-added', { count: inserted.length });
+
+    res.json({
+      success: true,
+      count: inserted.length,
+      totalProcessed: players.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
+
+  } catch (err) {
+    console.error('Error adding players bulk:', err);
+    res.status(500).json({ error: 'Database error: ' + err.message });
+  }
+});
+
 // Update player
 router.put('/players/:id', async (req, res) => {
   const { id } = req.params;

@@ -1,13 +1,13 @@
 // Helper function to get proper image URL
 export const getImageUrl = (imagePath) => {
   if (!imagePath || typeof imagePath !== 'string') {
-    return 'https://via.placeholder.com/300x300?text=?';
+    return '/deafult_player.png';
   }
 
   const path = imagePath.trim();
 
   if (path === '' || path === '?') {
-    return 'https://via.placeholder.com/300x300?text=?';
+    return '/deafult_player.png';
   }
 
   // Check if it's already a full URL (http/https)

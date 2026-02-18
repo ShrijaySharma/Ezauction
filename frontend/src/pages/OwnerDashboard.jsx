@@ -463,7 +463,7 @@ function OwnerDashboard({ user }) {
                         alt={currentPlayer.name}
                         className="w-full h-full rounded-full object-cover"
                         onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/300x300?text=Player';
+                          e.target.src = '/deafult_player.png';
                         }}
                       />
                     </div>
@@ -680,7 +680,7 @@ function OwnerDashboard({ user }) {
                       alt={player.name}
                       className="w-full h-32 object-cover rounded mb-2"
                       onError={(e) => {
-                        e.target.src = 'https://via.placeholder.com/300x300?text=Player';
+                        e.target.src = '/deafult_player.png';
                       }}
                     />
                     <h3 className="text-white font-bold text-lg">{player.name}</h3>
@@ -736,7 +736,7 @@ function OwnerDashboard({ user }) {
                       alt={player.name}
                       className="w-full h-32 object-cover rounded mb-2"
                       onError={(e) => {
-                        e.target.src = 'https://via.placeholder.com/300x300?text=Player';
+                        e.target.src = '/deafult_player.png';
                       }}
                     />
                     <h3 className="text-white font-bold text-lg">{player.name}</h3>
@@ -788,7 +788,7 @@ function OwnerDashboard({ user }) {
                       alt={player.name}
                       className="w-full h-32 object-cover rounded mb-2"
                       onError={(e) => {
-                        e.target.src = 'https://via.placeholder.com/300x300?text=Player';
+                        e.target.src = '/deafult_player.png';
                       }}
                     />
                     <h3 className="text-white font-bold text-lg">{player.name}</h3>
