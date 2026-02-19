@@ -25,13 +25,9 @@ function Overlay() {
         document.body.classList.add('bg-transparent');
 
         // Connect to the server. 
-        // If API_URL is relative (starts with /), io() works fine because it builds upon window.location.
-        // But we need to ensure it hits the proxy.
-        // If we use io(API_URL), and API_URL is '/api', it connects to namespace /api.
-        // We want root namespace.
-        // Solution: empty io() connects to window.location, and the proxy /socket.io handles it.
-        const newSocket = io({
-            path: '/socket.io', // default, explicit
+        // In production, we need to connect to the backend URL explicitly if we rely on API_URL.
+        const newSocket = io(API_URL, {
+            withCredentials: true,
             transports: ['websocket', 'polling']
         });
         setSocket(newSocket);
