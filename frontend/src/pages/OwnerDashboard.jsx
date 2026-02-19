@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import { logout } from '../services/auth';
 import * as ownerService from '../services/owner';
 import { getImageUrl } from '../utils/imageUtils';
-import BidNotification from '../components/BidNotification';
+import { getImageUrl } from '../utils/imageUtils';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -89,13 +89,8 @@ function OwnerDashboard({ user }) {
       setBidFlash(true);
       setTimeout(() => setBidFlash(false), 500);
 
-      // Show Notification
-      setNotification({
-        id: Date.now(),
-        teamName: data.bid.team_name,
-        increment: data.increment || 0
-      });
-      setNotificationKey(prev => prev + 1);
+      setBidFlash(true);
+      setTimeout(() => setBidFlash(false), 500);
 
       // 3-second bid lockout
       setBidLockout(true);
@@ -507,7 +502,7 @@ function OwnerDashboard({ user }) {
                             </div>
                           )}
                         </div>
-                        <div className="text-4xl sm:text-6xl">🪙</div>
+                        <div className="text-4xl sm:text-6xl"></div>
                       </div>
                     </div>
                   </div>

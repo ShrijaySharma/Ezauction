@@ -324,7 +324,7 @@ function HostDashboard({ user }) {
                     <div className="w-full flex flex-col items-center animate-bounce-slow px-4">
                       <div className="text-blue-900/60 text-xs lg:text-sm font-black uppercase tracking-[0.4em] mb-4 text-center">Leading Team</div>
                       <div className="bg-blue-900 text-yellow-400 w-full px-6 py-4 lg:py-6 rounded-[2rem] shadow-2xl border-4 border-white/20 flex flex-col items-center justify-center text-center gap-2">
-                        <span className="text-2xl mb-1">👑</span>
+                        <span className="text-2xl mb-1"></span>
                         <span className={`font-black leading-tight break-words w-full
                           ${highestBid.team_name.length > 15 ? 'text-xl lg:text-2xl' : 'text-2xl lg:text-4xl'}
                         `}>

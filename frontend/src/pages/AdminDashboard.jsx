@@ -1439,15 +1439,6 @@ function AdminDashboard({ user }) {
                     ) : (
                       <>
                         <button
-                          onClick={() => {
-                            setEditingTeamBudget(team.id);
-                            setNewBudget(team.budget?.toString() || '0');
-                          }}
-                          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors text-sm"
-                        >
-                          Edit Budget
-                        </button>
-                        <button
                           onClick={() => handleLockTeamBidding(team.id, !team.bidding_locked)}
                           className={`px-3 py-1.5 rounded transition-colors text-sm ${team.bidding_locked
                             ? 'bg-green-600 hover:bg-green-700 text-white'
