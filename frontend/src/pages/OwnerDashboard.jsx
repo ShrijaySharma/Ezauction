@@ -422,7 +422,7 @@ function OwnerDashboard({ user }) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
                 </button>
-                <div className="text-yellow-400 font-bold text-lg sm:text-2xl">EzAuction™</div>
+                <img src="/ezauction.png" alt="EzAuction" className="h-12 sm:h-16 object-contain" />
               </div>
               <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
                 <div className="text-white text-xs sm:text-sm flex gap-2 sm:gap-4">

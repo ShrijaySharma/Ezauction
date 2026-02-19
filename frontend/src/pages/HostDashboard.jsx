@@ -220,9 +220,7 @@ function HostDashboard({ user }) {
           <div className="w-32"></div> {/* Spacer for symmetry */}
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <div className="text-4xl sm:text-5xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-200 drop-shadow-2xl">
-              EzAuction
-            </div>
+            <img src="/ezauction.png" alt="EzAuction" className="h-16 sm:h-24 object-contain drop-shadow-2xl" />
           </div>
 
           <div className="flex items-center gap-6">

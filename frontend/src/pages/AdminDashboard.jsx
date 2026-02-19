@@ -1081,6 +1081,20 @@ function AdminDashboard({ user }) {
                   </div>
                 </div>
 
+                {/* Action Bar */}
+                <div className="flex flex-wrap gap-4 mb-8 mt-6">
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/overlay`;
+                      navigator.clipboard.writeText(url);
+                      alert('Overlay link copied to clipboard: ' + url);
+                    }}
+                    className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-lg flex items-center gap-2 transition-all"
+                  >
+                    📺 Copy Overlay Link
+                  </button>
+                </div>
+
                 {/* Player Actions */}
                 <div className="mt-6 flex flex-wrap gap-3">
                   <button

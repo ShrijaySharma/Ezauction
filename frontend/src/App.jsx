@@ -5,6 +5,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
 import HostDashboard from './pages/HostDashboard';
 import AppOwnerDashboard from './pages/AppOwnerDashboard';
+import Overlay from './pages/Overlay';
 import { getCurrentUser } from './services/auth';
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/overlay" element={<Overlay />} />
         <Route
           path="/login"
           element={user ? <Navigate to={

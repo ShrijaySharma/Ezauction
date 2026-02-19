@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin.js';
 import ownerRoutes from './routes/owner.js';
 import hostRoutes from './routes/host.js';
 import appOwnerRoutes from './routes/appOwner.js';
+import { supabase } from './supabaseClient.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -77,6 +78,57 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
+  });
+
+  // Handle request for initial state (e.g. from Overlay)
+  socket.on('request-info', async () => {
+    try {
+      const { data: state } = await supabase
+        .from('auction_state')
+        .select('current_player_id')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (state && state.current_player_id) {
+        // Fetch player
+        const { data: player } = await supabase
+          .from('players')
+          .select('*')
+          .eq('id', state.current_player_id)
+          .single();
+
+        if (player) {
+          socket.emit('player-loaded', { player });
+
+          // Fetch highest bid for this player
+          const { data: bid } = await supabase
+            .from('bids')
+            .select('*')
+            .eq('player_id', state.current_player_id)
+            .order('amount', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (bid) {
+            // Fetch team name
+            const { data: team } = await supabase
+              .from('teams')
+              .select('name')
+              .eq('id', bid.team_id)
+              .maybeSingle();
+
+            const processedBid = {
+              ...bid,
+              team_name: team ? team.name : null
+            };
+
+            socket.emit('bid-updated', { highestBid: processedBid });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error sending initial info:', err);
+    }
   });
 });
 
