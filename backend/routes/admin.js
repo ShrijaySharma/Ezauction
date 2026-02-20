@@ -1020,7 +1020,7 @@ router.post('/players-bulk', async (req, res) => {
         country: p.country || null,
         serial_number: p.serial_number ? parseInt(p.serial_number) : null,
         status: 'AVAILABLE',
-        image: null // Default image will be handled by frontend if null
+        image: p.image || null // Default image will be handled by frontend if null
       });
     }
 

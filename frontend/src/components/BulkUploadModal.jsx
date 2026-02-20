@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-// adminBid was invalidly imported here
 import * as adminService from '../services/admin';
+import * as XLSX from 'xlsx';
 
 // Simple CSV Parser
 const parseCSV = (text) => {
@@ -28,11 +28,11 @@ const parseCSV = (text) => {
     return result;
 };
 
-const SAMPLE_CSV = `name,role,base_price,country,serial_number
-Virat Kohli,Batsman,20000000,India,18
-Rohit Sharma,Batsman,16000000,India,45
-Jasprit Bumrah,Bowler,12000000,India,93
-Ben Stokes,All Rounder,15000000,England,55`;
+const SAMPLE_CSV = `name,role,base_price,country,serial_number,image
+Virat Kohli,Batsman,20000000,India,18,
+Rohit Sharma,Batsman,16000000,India,45,
+Jasprit Bumrah,Bowler,12000000,India,93,
+Ben Stokes,All Rounder,15000000,England,55,`;
 
 const BulkUploadModal = ({ onClose, onSuccess }) => {
     const [csvText, setCsvText] = useState('');
@@ -48,9 +48,18 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
             setFile(selectedFile);
             const reader = new FileReader();
             reader.onload = (event) => {
-                setCsvText(event.target.result);
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const csvString = XLSX.utils.sheet_to_csv(worksheet);
+                    setCsvText(csvString);
+                } catch (err) {
+                    setError('Error parsing file: ' + err.message);
+                }
             };
-            reader.readAsText(selectedFile);
+            reader.readAsArrayBuffer(selectedFile);
         }
     };
 
@@ -138,9 +147,9 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Method 1: File Upload */}
                                 <div className="bg-[#2a2a2a] p-6 rounded-lg border border-gray-700">
-                                    <h3 className="text-lg font-semibold text-white mb-4">Option 1: Upload CSV File</h3>
+                                    <h3 className="text-lg font-semibold text-white mb-4">Option 1: Upload CSV or Excel File</h3>
                                     <p className="text-gray-400 text-sm mb-4">
-                                        Upload a CSV file with headers: <code className="bg-black px-1 rounded">name, role, base_price, country, serial_number</code>
+                                        Upload a filed with headers: <code className="bg-black px-1 rounded">name, role, base_price, country, serial_number, image</code>
                                     </p>
                                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer hover:bg-[#333] transition-colors">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -148,9 +157,9 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                                 <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
                                             </svg>
                                             <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                            <p className="text-xs text-gray-500">CSV file only</p>
+                                            <p className="text-xs text-gray-500">CSV or XLSX file only</p>
                                         </div>
-                                        <input type="file" className="hidden" accept=".csv" onChange={handleFileChange} />
+                                        <input type="file" className="hidden" accept=".csv,.xlsx,.xls" onChange={handleFileChange} />
                                     </label>
                                     {file && <p className="mt-2 text-green-400 text-sm">Selected: {file.name}</p>}
                                 </div>

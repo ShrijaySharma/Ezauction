@@ -12,6 +12,13 @@ export const getImageUrl = (imagePath) => {
 
   // Check if it's already a full URL (http/https)
   if (path.startsWith('http://') || path.startsWith('https://')) {
+    // Check for Google Drive URL
+    const driveRegex = /(?:drive\.google\.com\/(?:file\/d\/|open\?id=)|docs\.google\.com\/uc\?id=)([a-zA-Z0-9_-]+)/;
+    const driveMatch = path.match(driveRegex);
+    if (driveMatch && driveMatch[1]) {
+      return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+    }
+
     // If it contains localhost or 127.0.0.1, replace with current hostname
     // This is useful for local development on other devices
     if (path.includes('localhost') || path.includes('127.0.0.1')) {
