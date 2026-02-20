@@ -865,14 +865,7 @@ function AdminDashboard({ user }) {
             </div>
           </div>
           <div className="flex gap-2">
-            {!audioEnabled && (
-              <button
-                onClick={enableAudio}
-                className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg transition-colors animate-pulse"
-              >
-                🔊 Enable Audio
-              </button>
-            )}
+
             <button
               onClick={() => setShowHistory(true)}
               className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
@@ -1390,7 +1383,7 @@ function AdminDashboard({ user }) {
 
         {/* Team Budget Management */}
         < div className="bg-gray-800 rounded-lg p-4 border border-gray-700" >
-          <h3 className="text-white font-semibold mb-3">Team Budget Management</h3>
+          <h3 className="text-white font-semibold mb-3">Team Bidding Allowance</h3>
           <div className="space-y-3">
             {teams.length > 0 ? (
               teams.map((team) => (

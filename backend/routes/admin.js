@@ -1363,12 +1363,13 @@ router.put('/teams/:id', upload.single('logo'), async (req, res) => {
 });
 
 // Delete team
+// Delete team
 router.delete('/teams/:id', async (req, res) => {
   const { id } = req.params;
   const io = req.app.locals.io;
 
   try {
-    // Check constraints
+    // Check constraints - check for bids and sold players
     const { count: bidCount } = await supabase.from('bids').select('id', { count: 'exact', head: true }).eq('team_id', id);
     const { count: playerCount } = await supabase.from('players').select('id', { count: 'exact', head: true }).eq('sold_to_team', id);
 
@@ -1376,23 +1377,26 @@ router.delete('/teams/:id', async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete team with existing bids or sold players' });
     }
 
-    // Get owner_id to delete user
-    const { data: team } = await supabase.from('teams').select('owner_id').eq('id', id).single();
+    // 1. Break likely circular dependency: Set owner_id to NULL on the team
+    await supabase.from('teams').update({ owner_id: null }).eq('id', id);
 
-    // Delete team
-    const { error: deleteError } = await supabase.from('teams').delete().eq('id', id);
-    if (deleteError) throw deleteError;
-
-    // Delete user
-    if (team && team.owner_id) {
-      await supabase.from('users').delete().eq('id', team.owner_id);
+    // 2. Delete all users associated with this team (this should catch the owner)
+    // Note: If multiple users exist for one team (shouldn't happen but good to be safe), this cleans them up.
+    const { error: deleteUsersError } = await supabase.from('users').delete().eq('team_id', id);
+    if (deleteUsersError) {
+      console.error('Error deleting team users:', deleteUsersError);
+      // Continue anyway, as we want to delete the team
     }
+
+    // 3. Delete team
+    const { error: deleteTeamError } = await supabase.from('teams').delete().eq('id', id);
+    if (deleteTeamError) throw deleteTeamError;
 
     io.emit('team-deleted', { teamId: parseInt(id) });
     res.json({ success: true });
   } catch (err) {
     console.error('Error deleting team:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 
@@ -1436,23 +1440,65 @@ router.put('/teams/:id/credentials', async (req, res) => {
   const { username, password } = req.body;
   const io = req.app.locals.io;
 
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
   try {
     const { data: team } = await supabase.from('teams').select('owner_id').eq('id', id).single();
     if (!team) return res.status(404).json({ error: 'Team not found' });
 
-    // Check conflict
-    const { data: existing } = await supabase.from('users').select('id').eq('username', username).neq('id', team.owner_id).maybeSingle();
+    // Check conflict (username taken by someone else?)
+    // We check if any user has this username, EXCLUDING the current owner_id (if it exists)
+    let query = supabase.from('users').select('id').eq('username', username);
+    if (team.owner_id) {
+      query = query.neq('id', team.owner_id);
+    }
+    const { data: existing } = await query.maybeSingle();
+
     if (existing) return res.status(400).json({ error: 'Username taken' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    let ownerId = team.owner_id;
 
-    // Update user
-    await supabase.from('users').update({ username, password: hashedPassword }).eq('id', team.owner_id);
+    if (ownerId) {
+      // Try to update existing user
+      const { error: updateError } = await supabase.from('users').update({ username, password: hashedPassword }).eq('id', ownerId);
+      if (updateError) {
+        console.error("Error updating user, might rely on recreating:", updateError);
+      }
+      // Verify if user actually exists still
+      const { data: userCheck } = await supabase.from('users').select('id').eq('id', ownerId).maybeSingle();
+      if (!userCheck) {
+        ownerId = null; // Valid user not found, recreate
+      }
+    }
+
+    if (!ownerId) {
+      // Create new user if no owner_id or user missing
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert([{
+          username,
+          password: hashedPassword,
+          role: 'owner',
+          team_id: id
+        }])
+        .select()
+        .single();
+
+      if (createError) throw createError;
+      ownerId = newUser.id;
+    }
 
     // Update team
     const { data: updatedTeam, error: updateError } = await supabase
       .from('teams')
-      .update({ access_code: username, plain_password: password })
+      .update({
+        access_code: username,
+        plain_password: password,
+        owner_id: ownerId
+      })
       .eq('id', id)
       .select()
       .single();
@@ -1469,7 +1515,7 @@ router.put('/teams/:id/credentials', async (req, res) => {
 
   } catch (err) {
     console.error('Error updating creds:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 

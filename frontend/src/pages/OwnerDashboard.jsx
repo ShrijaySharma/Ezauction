@@ -268,7 +268,7 @@ function OwnerDashboard({ user }) {
       console.log('Placing bid:', newBidAmount, 'Current balance:', walletBalance);
       const response = await ownerService.placeBid(newBidAmount);
       console.log('Bid response:', response);
-      playBidSound();
+
 
       // Update wallet balance immediately from response
       if (response && response.walletBalance !== undefined) {
@@ -308,7 +308,7 @@ function OwnerDashboard({ user }) {
       console.log('Placing base price bid:', basePriceAmount, 'Current balance:', walletBalance);
       const response = await ownerService.placeBid(basePriceAmount);
       console.log('Base price bid response:', response);
-      playBidSound();
+
 
       // Update wallet balance immediately from response
       if (response && response.walletBalance !== undefined) {
@@ -336,23 +336,7 @@ function OwnerDashboard({ user }) {
     }
   };
 
-  const playBidSound = () => {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
-
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.1);
-  };
 
   const handleLogout = async () => {
     try {
@@ -409,12 +393,7 @@ function OwnerDashboard({ user }) {
                 <img src="/ezauction.png" alt="EzAuction" className="h-12 sm:h-16 object-contain" />
               </div>
               <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                <div className="text-white text-xs sm:text-sm flex gap-2 sm:gap-4">
-                  <span className="hover:text-yellow-400 cursor-pointer hidden sm:inline">WELCOME</span>
-                  <span className="text-yellow-400 font-bold">AUCTION</span>
-                  <span className="hover:text-yellow-400 cursor-pointer hidden sm:inline">TEAMS</span>
-                  <span className="hover:text-yellow-400 cursor-pointer hidden sm:inline">PLAYERS</span>
-                </div>
+
                 <div className="flex items-center gap-2 sm:gap-3">
                   <div className="w-6 h-6 sm:w-8 sm:h-8 bg-yellow-400 rounded-full flex items-center justify-center text-blue-900 font-bold text-xs sm:text-sm">
                     {user.username.charAt(0).toUpperCase()}
