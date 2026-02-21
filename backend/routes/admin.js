@@ -1706,7 +1706,7 @@ router.post('/admin-bid', async (req, res) => {
     }
 
     // 4. Check wallet balance
-    const { data: team } = await supabase.from('teams').select('budget').eq('id', teamId).single();
+    const { data: team } = await supabase.from('teams').select('budget, name').eq('id', teamId).single();
     if (!team) return res.status(400).json({ error: 'Team not found' });
 
     // Smart logic

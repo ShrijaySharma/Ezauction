@@ -59,10 +59,10 @@ function BidNotification({ teamName, increment, onClose }) {
           <div className="text-4xl animate-bounce">🔔</div>
           <div className="flex-1">
             <div className="text-blue-900 font-bold text-2xl mb-1">
-              {teamName} BID!
+              {teamName || 'Unknown Team'} BID!
             </div>
             <div className="text-blue-800 text-lg font-semibold">
-              +₹{increment.toLocaleString('en-IN')}
+              +₹{(increment || 0).toLocaleString('en-IN')}
             </div>
           </div>
         </div>
