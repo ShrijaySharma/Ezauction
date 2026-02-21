@@ -216,11 +216,13 @@ function HostDashboard({ user }) {
 
       <div className="relative z-10 h-full w-full flex flex-col">
         {/* Top bar - Simplified & Centered */}
-        <div className="h-20 flex items-center justify-between px-8 bg-black/40 backdrop-blur-md border-b border-white/10 relative">
-          <div className="w-32"></div> {/* Spacer for symmetry */}
+        <div className="h-24 flex items-center justify-between px-8 bg-black/40 backdrop-blur-md border-b border-white/10 relative">
+          <div className="flex items-center gap-4">
+            <img src="/qr.jpeg" alt="Tournament Logo" className="h-16 object-contain drop-shadow-xl" onError={(e) => e.target.style.display = 'none'} />
+          </div>
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <img src="/ezauction.png" alt="EzAuction" className="h-16 sm:h-24 object-contain drop-shadow-2xl" />
+            <img src="/ezauction.png" alt="EzAuction" className="h-16 sm:h-20 object-contain drop-shadow-2xl" />
           </div>
 
           <div className="flex items-center gap-6">
@@ -255,14 +257,13 @@ function HostDashboard({ user }) {
                       </div>
                     </div>
                     <div className="px-5 py-3 bg-white/10 rounded-2xl border-2 border-yellow-400/50 backdrop-blur-xl shadow-[0_0_20px_rgba(250,204,21,0.2)]">
-                      <span className="text-yellow-400/60 text-[12px] uppercase font-black tracking-[0.2em] mr-3">Serial</span>
                       <span className="text-white font-mono font-black text-3xl drop-shadow-lg">{currentPlayer.serial_number}</span>
                     </div>
                   </div>
 
                   {/* Name & Role */}
                   <div className="relative z-10 my-auto text-center">
-                    <h2 className="text-white text-5xl lg:text-6xl font-black tracking-tighter mb-4 drop-shadow-2xl leading-[0.9]">
+                    <h2 className="text-white text-4xl lg:text-5xl font-black tracking-tighter mb-4 drop-shadow-2xl leading-[0.9]">
                       {currentPlayer.name}
                     </h2>
                     <div className="inline-block px-6 py-2.5 bg-yellow-400 text-black rounded-full text-sm font-black uppercase tracking-widest shadow-xl shadow-yellow-400/20 transform hover:scale-105 transition-transform">
@@ -277,10 +278,6 @@ function HostDashboard({ user }) {
                       <div className="text-white font-black text-2xl uppercase tracking-tight text-center">{currentPlayer.age || 'N/A'} YRS</div>
                     </div>
                     <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-6 rounded-3xl border border-yellow-400/20 backdrop-blur-md">
-                      <span className="block text-yellow-400/60 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-center">Country</span>
-                      <div className="text-white font-black text-2xl uppercase tracking-tight text-center">{currentPlayer.country || 'N/A'}</div>
-                    </div>
-                    <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-6 rounded-3xl border border-yellow-400/20 backdrop-blur-md">
                       <span className="block text-yellow-400/60 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-center">Base Price</span>
                       <div className="text-yellow-400 font-black text-4xl font-mono tracking-tighter text-center drop-shadow-lg">
                         ₹{formatIndianNumber(currentPlayer.base_price || 0)}
@@ -292,7 +289,7 @@ function HostDashboard({ user }) {
 
               {/* Center Column: Image */}
               <div className="col-span-5 flex flex-col items-center justify-center relative overflow-hidden group px-6">
-                <div className={`relative h-full w-full max-h-[78vh] aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
+                <div className={`relative h-full w-full max-h-[70vh] aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
                   <div className="absolute inset-0 bg-yellow-400/10 rounded-[4rem] blur-[100px] animate-pulse"></div>
                   <div className={`w-full h-full rounded-[3rem] border-[12px] p-5 bg-black/50 backdrop-blur-3xl shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
                     <img
@@ -307,8 +304,8 @@ function HostDashboard({ user }) {
 
               {/* Right Column: Bid Action - Optimized for Overflow */}
               <div className="col-span-4 flex flex-col gap-6">
-                <div className={`flex-1 bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-[3rem] p-6 lg:p-10 shadow-2xl border-[12px] border-white flex flex-col items-center justify-center text-blue-900 transition-all duration-500 ${bidFlash ? 'scale-[1.02] rotate-1' : ''}`}>
-                  <div className="text-blue-900/40 text-xl lg:text-2xl font-black tracking-[0.5em] uppercase mb-4 lg:mb-8 text-center">Current Bid</div>
+                <div className={`flex-1 bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-[3rem] p-4 lg:p-6 shadow-2xl border-[12px] border-white flex flex-col items-center justify-center text-blue-900 transition-all duration-500 ${bidFlash ? 'scale-[1.02] rotate-1' : ''}`}>
+                  <div className="text-blue-900/40 text-lg lg:text-xl font-black tracking-[0.5em] uppercase mb-2 lg:mb-4 text-center">Current Bid</div>
 
                   {/* Dynamic Font Size for Amount */}
                   <div className="w-full grid place-items-center mb-6 lg:mb-10">
