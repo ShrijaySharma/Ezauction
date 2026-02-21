@@ -112,7 +112,7 @@ function AdminDashboard({ user }) {
     audioElementRef.current = audio;
 
     // Initialize socket
-    const newSocket = io(API_URL, {
+    const newSocket = io('/', {
       withCredentials: true,
       transports: ['websocket', 'polling']
     });

@@ -49,7 +49,7 @@ function HostDashboard({ user }) {
     audio.preload = 'auto';
     audioElementRef.current = audio;
 
-    const newSocket = io(API_URL, {
+    const newSocket = io('/', {
       withCredentials: true,
       transports: ['websocket', 'polling']
     });

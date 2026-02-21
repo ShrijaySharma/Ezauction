@@ -26,7 +26,7 @@ function Overlay() {
 
         // Connect to the server. 
         // In production, we need to connect to the backend URL explicitly if we rely on API_URL.
-        const newSocket = io(API_URL, {
+        const newSocket = io('/', {
             withCredentials: true,
             transports: ['websocket', 'polling']
         });
@@ -85,6 +85,7 @@ function Overlay() {
 
         return () => {
             newSocket.close();
+            clearInterval(pollInterval);
             document.body.classList.remove('bg-transparent');
         };
     }, []); // Removed currentPlayer dependency to prevent socket reconnection cycles
