@@ -35,10 +35,34 @@ function Overlay() {
         newSocket.on('connect', () => {
             console.log('Overlay connected to socket');
             newSocket.emit('request-info');
-            // Request initial data if needed, or wait for updates
-            // We can reuse the host service's endpoint or just wait for events
-            // For now, we rely on events pushed or polling if we had a service
         });
+
+        // Polling as fallback
+        const pollInterval = setInterval(async () => {
+            try {
+                const response = await fetch(`${API_URL}/host/current-info`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.player) setCurrentPlayer(prev =>
+                        JSON.stringify(prev) !== JSON.stringify(data.player) ? data.player : prev
+                    );
+
+                    if (data.highestBid) {
+                        setHighestBid(data.highestBid);
+                        setCurrentBid(data.highestBid.amount);
+                        setLeadingTeam(data.highestBid.team_name);
+                    } else {
+                        setHighestBid(null);
+                        setLeadingTeam(null);
+                        if (data.player) {
+                            setCurrentBid(data.player.base_price);
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Overlay polling error:', err);
+            }
+        }, 2000);
 
         // Since we don't have a service imported that fetches data (to avoid auth deps if possible),
         // we might need to rely on the socket pushing an initial state or just wait.
