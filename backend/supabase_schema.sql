@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS public.players (
   sold_to_team bigint,
   was_unsold integer default 0,
   serial_number integer,
+  age integer,
   created_at timestamptz default now()
 );
 

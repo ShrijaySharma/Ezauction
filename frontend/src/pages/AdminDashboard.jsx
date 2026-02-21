@@ -1059,6 +1059,7 @@ function AdminDashboard({ user }) {
                     <h2 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">{currentPlayer.name}</h2>
                     <div className="space-y-3 mb-4">
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">🏏 Role:</span> {currentPlayer.role}</p>
+                      <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">👤 Age:</span> {currentPlayer.age || 'N/A'}</p>
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">🌍 Country:</span> {currentPlayer.country || 'N/A'}</p>
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">💰 Base Price:</span> ₹{currentPlayer.base_price?.toLocaleString()}</p>
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">📊 Status:</span> <span className="px-2 py-1 bg-blue-600/30 rounded">{currentPlayer.status}</span></p>
@@ -1351,7 +1352,7 @@ function AdminDashboard({ user }) {
                           {player.status || 'AVAIL'}
                         </span>
                       </div>
-                      <div className="text-gray-400 text-xs mt-0.5">{player.role} • ₹{player.base_price?.toLocaleString()}</div>
+                      <div className="text-gray-400 text-xs mt-0.5">{player.role} • {player.age ? `${player.age} yrs • ` : ''}₹{player.base_price?.toLocaleString()}</div>
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
                       {!!player.was_unsold && (

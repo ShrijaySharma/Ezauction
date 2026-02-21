@@ -975,6 +975,7 @@ router.post('/players', async (req, res) => {
         role,
         country: country || null,
         base_price: base_price,
+        age: age ? parseInt(age) : null,
         status: 'AVAILABLE',
         serial_number: finalSerialNum
       }])
@@ -1126,6 +1127,7 @@ router.put('/players/:id', async (req, res) => {
     if (country !== undefined) updates.country = country;
     if (base_price !== undefined) updates.base_price = base_price;
     if (status !== undefined) updates.status = status;
+    if (age !== undefined) updates.age = age !== null && age !== '' ? parseInt(age) : null;
     if (sold_price !== undefined) updates.sold_price = sold_price;
     if (sold_to_team !== undefined) updates.sold_to_team = sold_to_team;
     if (serial_number !== undefined) {

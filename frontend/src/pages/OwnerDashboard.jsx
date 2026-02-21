@@ -448,7 +448,7 @@ function OwnerDashboard({ user }) {
                         {currentPlayer.role}
                       </div>
                       <div className="bg-yellow-400 text-blue-900 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold text-sm sm:text-lg shadow-lg">
-                        {currentPlayer.base_price ? `Base: ₹${formatIndianNumber(currentPlayer.base_price)}` : 'Base Price'}
+                        {currentPlayer.base_price ? `Base: ₹${formatIndianNumber(currentPlayer.base_price)}` : 'Base Price'} | Age: {currentPlayer.age || 'N/A'}
                       </div>
                     </div>
 
