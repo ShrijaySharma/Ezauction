@@ -87,7 +87,7 @@ function Overlay() {
             newSocket.close();
             document.body.classList.remove('bg-transparent');
         };
-    }, [currentPlayer]);
+    }, []); // Removed currentPlayer dependency to prevent socket reconnection cycles
 
     const flashBid = () => {
         setBidFlash(true);

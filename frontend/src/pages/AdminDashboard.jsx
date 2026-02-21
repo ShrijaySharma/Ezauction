@@ -146,7 +146,48 @@ function AdminDashboard({ user }) {
       }
     });
 
+    newSocket.on('bid-placed', (data) => {
+      if (data && data.bid) {
+        setHighestBid(data.bid);
+        setAllBids(prev => [data.bid, ...prev]);
+        setPreviousBid(prev => data.previousBid || prev);
 
+        // Show Notification
+        setNotification({
+          id: Date.now(),
+          teamName: data.bid.team_name || 'Unknown Team',
+          increment: data.increment || 0
+        });
+        setNotificationKey(prev => prev + 1);
+
+        // Play Sound
+        if (audioElementRef.current) {
+          audioElementRef.current.currentTime = 0;
+          audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
+        }
+      }
+      // Still refresh in background to be safe
+      loadCurrentBid();
+      loadAllBids();
+    });
+
+    newSocket.on('bid-updated', (data) => {
+      if (data && data.highestBid) {
+        setHighestBid(data.highestBid);
+        setPreviousBid(prev => data.previousBid || prev);
+
+        // Play Sound on update too (optional, but good for feedback)
+        if (audioElementRef.current) {
+          audioElementRef.current.currentTime = 0;
+          audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
+        }
+
+      } else {
+        setHighestBid(null);
+      }
+      loadCurrentBid();
+      loadAllBids();
+    });
     newSocket.on('auction-status-changed', (data) => {
       setAuctionState(prev => ({ ...prev, status: data.status }));
     });
