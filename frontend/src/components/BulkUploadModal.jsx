@@ -28,11 +28,11 @@ const parseCSV = (text) => {
     return result;
 };
 
-const SAMPLE_CSV = `name,role,base_price,country,serial_number,image
-Virat Kohli,Batsman,20000000,India,18,
-Rohit Sharma,Batsman,16000000,India,45,
-Jasprit Bumrah,Bowler,12000000,India,93,
-Ben Stokes,All Rounder,15000000,England,55,`;
+const SAMPLE_CSV = `name,role,base_price,country,age,serial_number,image
+Virat Kohli,Batsman,20000000,India,35,18,
+Rohit Sharma,Batsman,16000000,India,36,45,
+Jasprit Bumrah,Bowler,12000000,India,30,93,
+Ben Stokes,All Rounder,15000000,England,32,55,`;
 
 const BulkUploadModal = ({ onClose, onSuccess }) => {
     const [csvText, setCsvText] = useState('');
@@ -149,7 +149,7 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                 <div className="bg-[#2a2a2a] p-6 rounded-lg border border-gray-700">
                                     <h3 className="text-lg font-semibold text-white mb-4">Option 1: Upload CSV or Excel File</h3>
                                     <p className="text-gray-400 text-sm mb-4">
-                                        Upload a filed with headers: <code className="bg-black px-1 rounded">name, role, base_price, country, serial_number, image</code>
+                                        Upload a filed with headers: <code className="bg-black px-1 rounded">name, role, base_price, country, age, serial_number, image</code>
                                     </p>
                                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer hover:bg-[#333] transition-colors">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -199,6 +199,7 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                             <th className="px-6 py-3">Name</th>
                                             <th className="px-6 py-3">Role</th>
                                             <th className="px-6 py-3">Team</th>
+                                            <th className="px-6 py-3">Age</th>
                                             <th className="px-6 py-3">Base Price</th>
                                             <th className="px-6 py-3">Serial</th>
                                         </tr>
@@ -210,6 +211,7 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                                 <td className="px-6 py-4 font-medium text-white">{row.name}</td>
                                                 <td className="px-6 py-4">{row.role}</td>
                                                 <td className="px-6 py-4">{row.country || '-'}</td>
+                                                <td className="px-6 py-4">{row.age || '-'}</td>
                                                 <td className="px-6 py-4">{row.base_price}</td>
                                                 <td className="px-6 py-4">{row.serial_number || '-'}</td>
                                             </tr>

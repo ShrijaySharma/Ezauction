@@ -917,7 +917,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
 
 // Add new player
 router.post('/players', async (req, res) => {
-  const { name, image, role, country, base_price, serial_number } = req.body;
+  const { name, image, role, country, age, base_price, serial_number } = req.body;
   const io = req.app.locals.io;
 
   if (!name || !role || !base_price) {
@@ -1018,6 +1018,7 @@ router.post('/players-bulk', async (req, res) => {
         role: p.role,
         base_price: parseFloat(p.base_price),
         country: p.country || null,
+        age: p.age ? parseInt(p.age) : null,
         serial_number: p.serial_number ? parseInt(p.serial_number) : null,
         status: 'AVAILABLE',
         image: p.image || null // Default image will be handled by frontend if null
@@ -1057,7 +1058,7 @@ router.post('/players-bulk', async (req, res) => {
 // Update player
 router.put('/players/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, image, role, country, base_price, status, sold_price, sold_to_team, serial_number } = req.body;
+  const { name, image, role, country, age, base_price, status, sold_price, sold_to_team, serial_number } = req.body;
   const io = req.app.locals.io;
 
   try {

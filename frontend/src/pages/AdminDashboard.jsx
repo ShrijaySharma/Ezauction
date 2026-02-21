@@ -40,6 +40,7 @@ function AdminDashboard({ user }) {
     image: '',
     role: 'Batsman',
     country: '',
+    age: '',
     base_price: '',
     serial_number: ''
   });
@@ -675,6 +676,7 @@ function AdminDashboard({ user }) {
       image: '',
       role: 'Batsman',
       country: '',
+      age: '',
       base_price: '',
       serial_number: ''
     });
@@ -688,6 +690,7 @@ function AdminDashboard({ user }) {
       image: player.image || '',
       role: player.role || 'Batsman',
       country: player.country || '',
+      age: player.age || '',
       base_price: player.base_price || '',
       serial_number: player.serial_number || ''
     });
@@ -781,6 +784,7 @@ function AdminDashboard({ user }) {
           image: imageUrl || null,
           role: playerForm.role,
           country: playerForm.country || null,
+          age: playerForm.age ? parseInt(playerForm.age) : null,
           base_price: parseFloat(playerForm.base_price),
           serial_number: playerForm.serial_number ? parseInt(playerForm.serial_number) : null
         });
@@ -796,6 +800,7 @@ function AdminDashboard({ user }) {
           image: imageUrl || null,
           role: playerForm.role,
           country: playerForm.country || null,
+          age: playerForm.age ? parseInt(playerForm.age) : null,
           base_price: parseFloat(playerForm.base_price),
           serial_number: playerForm.serial_number ? parseInt(playerForm.serial_number) : null
         });
@@ -1615,13 +1620,14 @@ function AdminDashboard({ user }) {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-gray-300 text-sm font-medium mb-2">Country</label>
+                      <label className="block text-gray-300 text-sm font-medium mb-2">Age</label>
                       <input
-                        type="text"
-                        value={playerForm.country}
-                        onChange={(e) => setPlayerForm({ ...playerForm, country: e.target.value })}
+                        type="number"
+                        value={playerForm.age}
+                        onChange={(e) => setPlayerForm({ ...playerForm, age: e.target.value })}
                         className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
-                        placeholder="Country"
+                        placeholder="Age"
+                        min="1"
                       />
                     </div>
                     <div>

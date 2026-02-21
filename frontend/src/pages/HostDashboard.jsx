@@ -254,12 +254,10 @@ function HostDashboard({ user }) {
                         <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">Profile</span>
                       </div>
                     </div>
-                    {currentPlayer.serial_number && (
-                      <div className="px-4 py-2 bg-white/5 rounded-full border border-white/10 backdrop-blur-md">
-                        <span className="text-white/40 text-[10px] uppercase font-black tracking-widest mr-2">SR</span>
-                        <span className="text-white font-mono font-bold text-lg">{currentPlayer.serial_number}</span>
-                      </div>
-                    )}
+                    <div className="px-5 py-3 bg-white/10 rounded-2xl border-2 border-yellow-400/50 backdrop-blur-xl shadow-[0_0_20px_rgba(250,204,21,0.2)]">
+                      <span className="text-yellow-400/60 text-[12px] uppercase font-black tracking-[0.2em] mr-3">Serial</span>
+                      <span className="text-white font-mono font-black text-3xl drop-shadow-lg">{currentPlayer.serial_number}</span>
+                    </div>
                   </div>
 
                   {/* Name & Role */}
@@ -275,7 +273,11 @@ function HostDashboard({ user }) {
                   {/* Stats Grid */}
                   <div className="relative z-10 grid grid-cols-1 gap-4 mt-auto">
                     <div className="bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors">
-                      <span className="block text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-center">Country</span>
+                      <span className="block text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-center">Age</span>
+                      <div className="text-white font-black text-2xl uppercase tracking-tight text-center">{currentPlayer.age || 'N/A'} YRS</div>
+                    </div>
+                    <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-6 rounded-3xl border border-yellow-400/20 backdrop-blur-md">
+                      <span className="block text-yellow-400/60 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-center">Country</span>
                       <div className="text-white font-black text-2xl uppercase tracking-tight text-center">{currentPlayer.country || 'N/A'}</div>
                     </div>
                     <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-6 rounded-3xl border border-yellow-400/20 backdrop-blur-md">
@@ -311,7 +313,7 @@ function HostDashboard({ user }) {
                   {/* Dynamic Font Size for Amount */}
                   <div className="w-full grid place-items-center mb-6 lg:mb-10">
                     <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-center break-words w-full
-                      ${currentBid.toString().length > 7 ? 'text-5xl lg:text-7xl' : (currentBid.toString().length > 5 ? 'text-6xl lg:text-8xl' : 'text-7xl lg:text-9xl')}
+                      ${currentBid.toString().length > 7 ? 'text-4xl lg:text-6xl' : (currentBid.toString().length > 5 ? 'text-5xl lg:text-7xl' : 'text-6xl lg:text-8xl')}
                       ${bidFlash ? 'scale-110' : ''}
                     `}>
                       ₹{formatIndianNumber(currentBid)}
