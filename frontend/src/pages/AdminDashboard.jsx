@@ -6,6 +6,7 @@ import * as adminService from '../services/admin';
 import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
 import BulkUploadModal from '../components/BulkUploadModal';
+import { getSocketUrl } from '../config';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -111,8 +112,8 @@ function AdminDashboard({ user }) {
     audio.preload = 'auto';
     audioElementRef.current = audio;
 
-    // Initialize socket
-    const newSocket = io('/', {
+    console.log('AdminDashboard mounted');
+    const newSocket = io(getSocketUrl(), {
       withCredentials: true,
       transports: ['websocket', 'polling']
     });

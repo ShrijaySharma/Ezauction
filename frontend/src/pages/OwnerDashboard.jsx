@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import { logout } from '../services/auth';
 import * as ownerService from '../services/owner';
 import { getImageUrl } from '../utils/imageUtils';
+import { getSocketUrl } from '../config';
 
 
 // Auto-detect API URL based on current host
@@ -57,7 +58,7 @@ function OwnerDashboard({ user }) {
 
   useEffect(() => {
     // Initialize socket
-    const newSocket = io('/', {
+    const newSocket = io(getSocketUrl(), {
       withCredentials: true,
       transports: ['websocket', 'polling']
     });

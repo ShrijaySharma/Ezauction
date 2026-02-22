@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { getImageUrl } from '../utils/imageUtils';
+import { getSocketUrl } from '../config';
 
 // Auto-detect API URL
 const getApiUrl = () => {
@@ -25,8 +26,8 @@ function Overlay() {
         document.body.classList.add('bg-transparent');
 
         // Connect to the server. 
-        // In production, we need to connect to the backend URL explicitly if we rely on API_URL.
-        const newSocket = io('/', {
+        // In production, we need to connect to the backend URL explicitly.
+        const newSocket = io(getSocketUrl(), {
             withCredentials: true,
             transports: ['websocket', 'polling']
         });

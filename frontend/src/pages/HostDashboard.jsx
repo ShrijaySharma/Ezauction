@@ -5,6 +5,7 @@ import { logout } from '../services/auth';
 import * as hostService from '../services/host';
 import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
+import { getSocketUrl } from '../config';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -49,7 +50,7 @@ function HostDashboard({ user }) {
     audio.preload = 'auto';
     audioElementRef.current = audio;
 
-    const newSocket = io('/', {
+    const newSocket = io(getSocketUrl(), {
       withCredentials: true,
       transports: ['websocket', 'polling']
     });
