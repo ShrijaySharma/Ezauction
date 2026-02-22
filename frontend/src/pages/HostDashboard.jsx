@@ -77,6 +77,7 @@ function HostDashboard({ user }) {
         setHighestBid(data.bid);
         setCurrentBid(data.bid.amount);
 
+        // Play sound ONLY on bid-placed to avoid double trigger with bid-updated
         if (audioElementRef.current) {
           audioElementRef.current.currentTime = 0;
           audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
@@ -90,17 +91,29 @@ function HostDashboard({ user }) {
       if (data.highestBid) {
         setHighestBid(data.highestBid);
         setCurrentBid(data.highestBid.amount);
-
-        if (audioElementRef.current) {
-          audioElementRef.current.currentTime = 0;
-          audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
-        }
-      } else if (!data.highestBid) {
+        // We don't play sound here as it's triggered by bid-placed for new bids
+      } else {
         setHighestBid(null);
-        loadCurrentInfo(); // Refresh to get initial base price if bid undo results in 0 bids
+        // Refresh to get correct base price
+        loadCurrentInfo();
       }
-      loadCurrentInfo();
     });
+
+    // Auto-unlock audio on first user interaction
+    const handleFirstClick = () => {
+      if (!audioEnabled) {
+        if (audioElementRef.current) {
+          audioElementRef.current.play().then(() => {
+            setAudioEnabled(true);
+            audioElementRef.current.pause();
+            audioElementRef.current.currentTime = 0;
+            console.log('Audio context unlocked');
+          }).catch(err => console.error('Audio auto-unlock failed:', err));
+        }
+      }
+      document.removeEventListener('click', handleFirstClick);
+    };
+    document.addEventListener('click', handleFirstClick);
 
     newSocket.on('player-loaded', (data) => {
       console.log('Player loaded event:', data);
@@ -224,6 +237,20 @@ function HostDashboard({ user }) {
           </div>
 
           <div className="flex items-center gap-6">
+            {/* Audio Unlock Indicator */}
+            {!audioEnabled && (
+              <button
+                onClick={enableAudio}
+                className="flex items-center gap-2 px-4 py-2 bg-yellow-400 text-black rounded-xl font-black text-sm uppercase tracking-widest animate-pulse shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+              >
+                <span>🔊</span> Enable Sound
+              </button>
+            )}
+            {audioEnabled && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-xl font-black text-sm uppercase tracking-widest border border-green-500/30">
+                <span>🔔</span> Sound Active
+              </div>
+            )}
             <button
               onClick={handleLogout}
               className="text-white/60 hover:text-white transition-all text-sm font-black uppercase tracking-widest px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10"
