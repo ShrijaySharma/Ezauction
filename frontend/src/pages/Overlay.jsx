@@ -173,7 +173,7 @@ function Overlay() {
                     <div className={`absolute inset-0 bg-yellow-400 rounded-full blur-xl opacity-20 ${bidFlash ? 'opacity-60 scale-110' : ''} transition-all duration-300`}></div>
                     <div className="w-full h-full rounded-full border-4 border-white/20 bg-black/40 overflow-hidden shadow-2xl relative">
                         <img
-                            src={getImageUrl(currentPlayer.image)}
+                            src={getImageUrl(currentPlayer.thumb_url || currentPlayer.image)}
                             alt={currentPlayer.name}
                             className="w-full h-full object-cover"
                             onError={(e) => { e.target.src = '/deafult_player.png'; }}

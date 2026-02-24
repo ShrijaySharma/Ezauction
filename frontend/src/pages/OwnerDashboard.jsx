@@ -423,7 +423,7 @@ function OwnerDashboard({ user }) {
                   <div className="relative">
                     <div className="w-32 h-32 sm:w-48 sm:h-48 md:w-64 md:h-64 rounded-full border-4 border-yellow-400 p-1 bg-gradient-to-br from-yellow-300 to-yellow-500 shadow-2xl">
                       <img
-                        src={getImageUrl(currentPlayer.image)}
+                        src={getImageUrl(currentPlayer.thumb_url || currentPlayer.image)}
                         alt={currentPlayer.name}
                         className="w-full h-full rounded-full object-cover"
                         onError={(e) => {

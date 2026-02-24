@@ -86,24 +86,29 @@ export const deletePlayer = async (playerId) => {
 };
 
 export const uploadImage = async (file) => {
-  const formData = new FormData();
-  formData.append('image', file);
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
 
-  const API_BASE_URL = getApiBaseUrl();
-  const response = await fetch(`${API_BASE_URL}/admin/upload-image`, {
-    method: 'POST',
-    body: formData,
-    credentials: 'include'
-  });
+    const API_BASE_URL = getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/admin/upload-image`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Image upload failed' }));
-    throw new Error(errorData.error || 'Image upload failed');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Image upload failed' }));
+      throw new Error(errorData.error || 'Image upload failed');
+    }
+
+    const data = await response.json();
+    // Backend returns full URL and thumbUrl
+    return { imageUrl: data.imageUrl, thumbUrl: data.thumbUrl };
+  } catch (error) {
+    console.error('Error in uploadImage:', error);
+    throw error;
   }
-
-  const data = await response.json();
-  // Backend returns full URL
-  return data.imageUrl;
 };
 
 export const getAllTeams = async () => {

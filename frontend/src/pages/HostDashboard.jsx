@@ -234,7 +234,7 @@ function HostDashboard({ user }) {
           <div className="w-40"></div> {/* Spacer for symmetry */}
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <img src="/qr.png" alt="Tournament Logo" className="h-24 sm:h-28 lg:h-32 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
+            <img src="/ezauction.png" alt="Tournament Logo" className="h-24 sm:h-28 lg:h-32 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
           </div>
 
           <div className="flex items-center gap-6">
@@ -317,11 +317,11 @@ function HostDashboard({ user }) {
               <div className="col-span-5 flex flex-col items-center justify-center relative overflow-hidden group px-6">
                 <div className={`relative h-full w-full max-h-[70vh] aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
                   <div className="absolute inset-0 bg-yellow-400/10 rounded-[4rem] blur-[100px] animate-pulse"></div>
-                  <div className={`w-full h-full rounded-[3rem] border-[12px] p-5 bg-black/50 backdrop-blur-3xl shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
+                  <div className={`w-full h-full rounded-[3rem] border-[12px] bg-black/50 backdrop-blur-3xl shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
                     <img
                       src={getImageUrl(currentPlayer.image)}
                       alt={currentPlayer.name}
-                      className="w-full h-full object-contain filter drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]"
+                      className="w-full h-full object-cover filter drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]"
                       onError={(e) => { e.target.src = '/deafult_player.png'; }}
                     />
                   </div>
@@ -385,6 +385,15 @@ function HostDashboard({ user }) {
             For renting this auction app contact <span className="text-yellow-400 font-black px-4 bg-yellow-400/10 py-1 rounded-lg border border-yellow-400/20 scale-110 inline-block mx-2">7697544446</span>
           </p>
         </div>
+      </div>
+
+      {/* Silent Image Preloader for Main Images */}
+      {/* We are preloading main images here because the host dashboard uses the main high-res image */}
+      {currentPlayer && currentPlayer.image && (
+        <link rel="preload" as="image" href={getImageUrl(currentPlayer.image)} />
+      )}
+      <div style={{ display: 'none' }}>
+        {/* We would need to fetch all pending players to preload them here. But as host dashboard doesn't load all players, maybe just a global preload is enough. If we fetched players, we could map here. Since players isn't in state on this page, we'll skip preloading the entire list here to save making another API request. The AdminDashboard preloading handles caching in the browser anyway. */}
       </div>
 
       <style>{`

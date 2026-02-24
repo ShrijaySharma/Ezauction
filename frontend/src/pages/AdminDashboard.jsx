@@ -674,6 +674,7 @@ function AdminDashboard({ user }) {
     setPlayerForm({
       name: '',
       image: '',
+      thumb_url: '',
       role: 'Batsman',
       country: '',
       age: '',
@@ -688,6 +689,7 @@ function AdminDashboard({ user }) {
     setPlayerForm({
       name: player.name || '',
       image: player.image || '',
+      thumb_url: player.thumb_url || '',
       role: player.role || 'Batsman',
       country: player.country || '',
       age: player.age || '',
@@ -695,7 +697,7 @@ function AdminDashboard({ user }) {
       serial_number: player.serial_number || ''
     });
     setImageFile(null);
-    setImagePreview(player.image || null);
+    setImagePreview(player.thumb_url || player.image || null);
     setShowPlayerModal(true);
   };
 
@@ -758,14 +760,17 @@ function AdminDashboard({ user }) {
 
     try {
       let imageUrl = playerForm.image;
+      let thumbUrl = playerForm.thumb_url;
 
       // Upload image if file is selected
       if (imageFile) {
         setUploadingImage(true);
         try {
           console.log('Uploading image:', imageFile.name);
-          imageUrl = await adminService.uploadImage(imageFile);
-          console.log('Image uploaded successfully:', imageUrl);
+          const uploadResult = await adminService.uploadImage(imageFile);
+          imageUrl = uploadResult.imageUrl;
+          thumbUrl = uploadResult.thumbUrl;
+          console.log('Image uploaded successfully:', { imageUrl, thumbUrl });
           setUploadingImage(false);
         } catch (error) {
           console.error('Image upload error:', error);
@@ -773,15 +778,17 @@ function AdminDashboard({ user }) {
           alert('Error uploading image: ' + (error.message || 'Upload failed. Please try again.'));
           return;
         }
-      } else if (!playerForm.image) {
+      } else if (!playerForm.image && !playerForm.thumb_url) {
         // No image file and no URL provided
         imageUrl = null;
+        thumbUrl = null;
       }
 
       if (editingPlayer) {
         const result = await adminService.updatePlayer(editingPlayer.id, {
           name: playerForm.name,
           image: imageUrl || null,
+          thumb_url: thumbUrl || null,
           role: playerForm.role,
           country: playerForm.country || null,
           age: playerForm.age ? parseInt(playerForm.age) : null,
@@ -798,6 +805,7 @@ function AdminDashboard({ user }) {
         const result = await adminService.addPlayer({
           name: playerForm.name,
           image: imageUrl || null,
+          thumb_url: thumbUrl || null,
           role: playerForm.role,
           country: playerForm.country || null,
           age: playerForm.age ? parseInt(playerForm.age) : null,
@@ -1041,7 +1049,7 @@ function AdminDashboard({ user }) {
                   <div className="relative">
                     <div className="w-48 h-64 rounded-lg overflow-hidden shadow-lg ring-2 ring-gray-700">
                       <img
-                        src={getImageUrl(currentPlayer.image)}
+                        src={getImageUrl(currentPlayer.thumb_url || currentPlayer.image)}
                         alt={currentPlayer.name}
                         className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                         onError={(e) => {
@@ -1568,7 +1576,7 @@ function AdminDashboard({ user }) {
                       {imagePreview && (
                         <div className="mb-3">
                           <img
-                            src={imagePreview}
+                            src={getImageUrl(imagePreview)}
                             alt="Preview"
                             className="w-32 h-32 object-cover rounded-lg border border-gray-600"
                           />
@@ -2410,6 +2418,13 @@ function AdminDashboard({ user }) {
           </div>
         </div>
       )}
+      {/* Silent Image Preloader */}
+      <div style={{ display: 'none' }}>
+        {players.filter(p => (p.status === 'AVAILABLE' || p.status === 'UNSOLD') && (p.thumb_url || p.image)).map(player => (
+          <img key={`preload-${player.id}`} src={getImageUrl(player.thumb_url || player.image)} alt="" />
+        ))}
+      </div>
+
     </div>
   );
 }

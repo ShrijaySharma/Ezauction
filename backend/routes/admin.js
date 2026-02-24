@@ -4,6 +4,8 @@ import fs from 'fs';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import { supabase } from '../supabaseClient.js';
+import path from 'path';
+import sharp from 'sharp';
 
 const router = express.Router();
 
@@ -869,42 +871,72 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
     console.log('File uploaded locally:', req.file.filename, req.file.size, 'bytes');
 
     const fileContent = fs.readFileSync(req.file.path);
-    const filename = req.file.filename; // Use the generated unique filename from multer
+    const uniqueId = Date.now().toString();
+    const mainFilename = `main/${uniqueId}.webp`;
+    const thumbFilename = `thumb/${uniqueId}.webp`;
 
-    const { data, error } = await supabase
+    // Process main image (800x1000, WebP, 75 quality, strip metadata)
+    const mainBuffer = await sharp(fileContent)
+      .resize(800, 1000, { fit: 'cover' })
+      .webp({ quality: 75 })
+      .withMetadata(false) // strip metadata
+      .toBuffer();
+
+    // Process thumbnail image (400x500, WebP, 70 quality, strip metadata)
+    const thumbBuffer = await sharp(fileContent)
+      .resize(400, 500, { fit: 'cover' })
+      .webp({ quality: 70 })
+      .withMetadata(false) // strip metadata
+      .toBuffer();
+
+    // Upload Main Image
+    const { error: mainError } = await supabase
       .storage
       .from('auction-images')
-      .upload(filename, fileContent, {
-        contentType: req.file.mimetype,
+      .upload(mainFilename, mainBuffer, {
+        contentType: 'image/webp',
         upsert: true
       });
 
-    if (error) {
-      console.error('Supabase storage upload error:', error);
-      throw error;
+    if (mainError) {
+      console.error('Supabase storage main image upload error:', mainError);
+      throw mainError;
     }
 
-    // Get public URL
-    const { data: publicUrlData } = supabase
+    // Upload Thumbnail Image
+    const { error: thumbError } = await supabase
       .storage
       .from('auction-images')
-      .getPublicUrl(filename);
+      .upload(thumbFilename, thumbBuffer, {
+        contentType: 'image/webp',
+        upsert: true
+      });
 
-    const publicUrl = publicUrlData.publicUrl;
-    console.log('Image uploaded to Supabase:', publicUrl);
+    if (thumbError) {
+      console.error('Supabase storage thumb image upload error:', thumbError);
+      throw thumbError;
+    }
+
+    // Get public URLs
+    const { data: mainUrlData } = supabase
+      .storage
+      .from('auction-images')
+      .getPublicUrl(mainFilename);
+
+    const { data: thumbUrlData } = supabase
+      .storage
+      .from('auction-images')
+      .getPublicUrl(thumbFilename);
+
+    const imageUrl = mainUrlData.publicUrl;
+    const thumbUrl = thumbUrlData.publicUrl;
+
+    console.log('Images uploaded to Supabase:', { imageUrl, thumbUrl });
 
     // Clean up local file
     fs.unlinkSync(req.file.path);
 
-    // Return the PUBLIC URL. 
-    // Note: The frontend might expect a relative path if it prepends the host.
-    // However, we should return the full URL now.
-    // If usage elsewhere prepends server URL, we might need to adjust.
-    // But usually frontend just uses `src={player.image}`.
-    // If `player.image` was `/uploads/foo.jpg`, frontend might have used `http://localhost:4000/uploads/foo.jpg`.
-    // Now it is `https://supabase.../foo.jpg`.
-    // We should return the full URL.
-    res.json({ success: true, imageUrl: publicUrl });
+    res.json({ success: true, imageUrl, thumbUrl });
   } catch (error) {
     console.error('Upload error:', error);
     // Try to cleanup
@@ -972,6 +1004,7 @@ router.post('/players', async (req, res) => {
       .insert([{
         name,
         image: image || null,
+        thumb_url: req.body.thumb_url || null,
         role,
         country: country || null,
         base_price: base_price,
@@ -1022,7 +1055,8 @@ router.post('/players-bulk', async (req, res) => {
         age: p.age ? parseInt(p.age) : null,
         serial_number: p.serial_number ? parseInt(p.serial_number) : null,
         status: 'AVAILABLE',
-        image: p.image || null // Default image will be handled by frontend if null
+        image: p.image || null, // Default image will be handled by frontend if null
+        thumb_url: p.thumb_url || null
       });
     }
 
@@ -1059,7 +1093,7 @@ router.post('/players-bulk', async (req, res) => {
 // Update player
 router.put('/players/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, image, role, country, age, base_price, status, sold_price, sold_to_team, serial_number } = req.body;
+  const { name, image, thumb_url, role, country, age, base_price, status, sold_price, sold_to_team, serial_number } = req.body;
   const io = req.app.locals.io;
 
   try {
@@ -1123,6 +1157,7 @@ router.put('/players/:id', async (req, res) => {
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (image !== undefined) updates.image = image; // Supabase path or URL
+    if (thumb_url !== undefined) updates.thumb_url = thumb_url;
     if (role !== undefined) updates.role = role;
     if (country !== undefined) updates.country = country;
     if (base_price !== undefined) updates.base_price = base_price;

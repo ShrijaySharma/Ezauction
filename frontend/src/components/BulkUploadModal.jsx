@@ -148,8 +148,8 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                 {/* Method 1: File Upload */}
                                 <div className="bg-[#2a2a2a] p-6 rounded-lg border border-gray-700">
                                     <h3 className="text-lg font-semibold text-white mb-4">Option 1: Upload CSV or Excel File</h3>
-                                    <p className="text-gray-400 text-sm mb-4">
-                                        Upload a filed with headers: <code className="bg-black px-1 rounded">name, role, base_price, country, age, serial_number, image</code>
+                                    <p className="mb-2 text-sm text-gray-400">
+                                        Upload a file with headers: <code className="bg-black px-1 rounded">name, role, base_price, country, age, serial_number, image, thumb_url</code>
                                     </p>
                                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer hover:bg-[#333] transition-colors">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -169,7 +169,7 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                     <h3 className="text-lg font-semibold text-white mb-4">Option 2: Paste CSV Data</h3>
                                     <textarea
                                         className="w-full h-32 bg-black border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
-                                        placeholder={`name,role,base_price,country\nDhoni,WK-Batsman,20000000,India`}
+                                        placeholder={`name,role,base_price,country,age,serial_number,image,thumb_url\nDhoni,WK-Batsman,20000000,India,42,7,https://example.com/dhoni.jpg,https://example.com/dhoni_thumb.jpg`}
                                         value={csvText}
                                         onChange={(e) => setCsvText(e.target.value)}
                                     ></textarea>
@@ -202,6 +202,8 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                             <th className="px-6 py-3">Age</th>
                                             <th className="px-6 py-3">Base Price</th>
                                             <th className="px-6 py-3">Serial</th>
+                                            <th className="px-6 py-3">Image</th>
+                                            <th className="px-6 py-3">Thumb URL</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -214,6 +216,8 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                                 <td className="px-6 py-4">{row.age || '-'}</td>
                                                 <td className="px-6 py-4">{row.base_price}</td>
                                                 <td className="px-6 py-4">{row.serial_number || '-'}</td>
+                                                <td className="px-6 py-4">{row.image ? <a href={row.image} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Link</a> : '-'}</td>
+                                                <td className="px-6 py-4">{row.thumb_url ? <a href={row.thumb_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Link</a> : '-'}</td>
                                             </tr>
                                         ))}
                                     </tbody>
