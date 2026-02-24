@@ -90,55 +90,77 @@ router.post('/enforce-max-bid', async (req, res) => {
   }
 });
 
-// Delete all players and bids permanently
+// Delete all players, teams, bids, and assets permanently
 router.delete('/players-all', async (req, res) => {
   const io = req.app.locals.io;
 
   try {
-    // 1. Get all player images to delete from Storage
+    const pathsToDelete = [];
+
+    const extractStoragePath = (url) => {
+      if (!url) return null;
+      // Extract from /auction-images/ onwards
+      const match = url.match(/\/auction-images\/(.+)$/);
+      return match ? match[1] : null;
+    };
+
+    // 1. Get all player images
     const { data: players, error: fetchError } = await supabase
       .from('players')
-      .select('image')
-      .not('image', 'is', null);
+      .select('image, thumb_url');
 
     if (fetchError) {
       console.error('Error fetching players for image deletion:', fetchError);
     } else if (players && players.length > 0) {
-      // Extract paths from URLs or store paths directly?
-      // Assuming we store relative paths like '/uploads/filename.jpg' or just 'filename.jpg'
-      // If we used the local upload logic, it was '/uploads/filename'.
-      // With Supabase, we will store the path in the bucket.
-      // Since existing data might be local paths, we might need to handle that?
-      // But we are migrating. Let's assume new data or we just try to delete.
+      players.forEach(p => {
+        const mainPath = extractStoragePath(p.image);
+        if (mainPath) pathsToDelete.push(mainPath);
 
-      const pathsToDelete = players
-        .map(p => {
-          // If stored as full URL, extract path. If relative, use as is.
-          // We will adopt a standard of storing the path within the bucket.
-          // e.g., 'player-123.jpg'
-          if (!p.image) return null;
-          const parts = p.image.split('/');
-          return parts[parts.length - 1]; // Simple filename extraction
-        })
-        .filter(p => p !== null);
-
-      if (pathsToDelete.length > 0) {
-        const { error: storageError } = await supabase
-          .storage
-          .from('auction-images')
-          .remove(pathsToDelete);
-
-        if (storageError) console.error('Error deleting images from storage:', storageError);
-      }
+        const thumbPath = extractStoragePath(p.thumb_url);
+        if (thumbPath) pathsToDelete.push(thumbPath);
+      });
     }
 
-    // 2. Delete data
+    // 2. Get all team logos
+    const { data: teams, error: fetchTeamsError } = await supabase
+      .from('teams')
+      .select('logo');
+
+    if (fetchTeamsError) {
+      console.error('Error fetching teams for logo deletion:', fetchTeamsError);
+    } else if (teams && teams.length > 0) {
+      teams.forEach(t => {
+        const logoPath = extractStoragePath(t.logo);
+        if (logoPath) pathsToDelete.push(logoPath);
+      });
+    }
+
+    // 3. Delete from storage
+    if (pathsToDelete.length > 0) {
+      const { error: storageError } = await supabase
+        .storage
+        .from('auction-images')
+        .remove(pathsToDelete);
+
+      if (storageError) console.error('Error deleting images from storage:', storageError);
+    }
+
+    // 4. Delete database data
     // Supabase doesn't support "TRUNCATE" via JS easily, use delete with filter
+    // Break circular dependency first
+    await supabase.from('teams').update({ owner_id: null }).neq('id', 0);
+
+    const { error: deleteUsersError } = await supabase.from('users').delete().eq('role', 'owner');
+    if (deleteUsersError) console.error('Error deleting owners:', deleteUsersError);
+
     const { error: deleteBidsError } = await supabase.from('bids').delete().neq('id', 0); // Delete all
     if (deleteBidsError) throw deleteBidsError;
 
     const { error: deletePlayersError } = await supabase.from('players').delete().neq('id', 0); // Delete all
     if (deletePlayersError) throw deletePlayersError;
+
+    const { error: deleteTeamsError } = await supabase.from('teams').delete().neq('id', 0); // Delete all
+    if (deleteTeamsError) throw deleteTeamsError;
 
     const { error: updateStateError } = await supabase
       .from('auction_state')
@@ -148,10 +170,11 @@ router.delete('/players-all', async (req, res) => {
     if (updateStateError) throw updateStateError;
 
     io.emit('all-players-deleted');
-    res.json({ success: true, message: 'All players and bids deleted permanently' });
+    io.emit('team-deleted');
+    res.json({ success: true, message: 'All data deleted permanently' });
   } catch (err) {
-    console.error('Error clearing players:', err);
-    res.status(500).json({ error: 'Database error clearing players' });
+    console.error('Error clearing data:', err);
+    res.status(500).json({ error: 'Database error clearing data' });
   }
 });
 
@@ -1231,7 +1254,8 @@ router.get('/teams', async (req, res) => {
   try {
     const { data: teams, error } = await supabase
       .from('teams')
-      .select('*');
+      .select('*')
+      .order('id', { ascending: true });
 
     if (error) throw error;
 

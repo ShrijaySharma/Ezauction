@@ -434,7 +434,7 @@ function AdminDashboard({ user }) {
   };
 
   const handleDeleteAllPlayers = async () => {
-    if (!confirm('CRITICAL: Are you sure you want to delete ALL players and bids permanently? This action cannot be undone.')) {
+    if (!confirm('CRITICAL: Are you sure you want to delete ALL data (players, bids, teams, images, users) permanently? This action cannot be undone.')) {
       return;
     }
     const doubleCheck = prompt('Type "DELETE" to confirm permanent deletion:');
@@ -442,10 +442,11 @@ function AdminDashboard({ user }) {
 
     try {
       await adminService.deleteAllPlayers();
-      alert('All players and bids deleted successfully');
+      alert('All data deleted successfully');
       loadData();
+      loadTeams();
     } catch (error) {
-      alert('Error deleting all players: ' + error.response?.data?.error);
+      alert('Error deleting data: ' + error.response?.data?.error);
     }
   };
 
@@ -1977,6 +1978,7 @@ function AdminDashboard({ user }) {
                           <div className="flex-1">
                             <div className="text-white font-bold truncate">{team.name}</div>
                             <div className="text-gray-400 text-sm">Owner: {team.owner_name || 'N/A'}</div>
+                            <div className="text-blue-400 text-xs font-bold mt-1">Players: {players.filter(p => p.sold_to_team === team.id && p.status === 'SOLD').length}</div>
                           </div>
                         </div>
                         <div className="bg-gray-800 p-3 rounded-lg border border-gray-600">
@@ -2383,6 +2385,7 @@ function AdminDashboard({ user }) {
                           <div className="min-w-0">
                             <div className="font-bold text-white text-lg truncate leading-tight" title={team.name}>{team.name}</div>
                             <div className="text-green-400 font-mono font-semibold">₹{team.budget?.toLocaleString()}</div>
+                            <div className="text-blue-400 text-xs font-bold mt-0.5">Players: {players.filter(p => p.sold_to_team === team.id && p.status === 'SOLD').length}</div>
                           </div>
                         </div>
 
