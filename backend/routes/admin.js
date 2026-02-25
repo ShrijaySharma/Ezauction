@@ -898,18 +898,18 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
     const mainFilename = `main/${uniqueId}.webp`;
     const thumbFilename = `thumb/${uniqueId}.webp`;
 
-    // Process main image (800x1000, WebP, 75 quality, strip metadata)
+    // Process main image (800x1000, WebP, 75 quality)
     const mainBuffer = await sharp(fileContent)
       .resize(800, 1000, { fit: 'cover' })
+      .flatten({ background: { r: 255, g: 255, b: 255 } })
       .webp({ quality: 75 })
-      .withMetadata(false) // strip metadata
       .toBuffer();
 
-    // Process thumbnail image (400x500, WebP, 70 quality, strip metadata)
+    // Process thumbnail image (400x500, WebP, 70 quality)
     const thumbBuffer = await sharp(fileContent)
       .resize(400, 500, { fit: 'cover' })
+      .flatten({ background: { r: 255, g: 255, b: 255 } })
       .webp({ quality: 70 })
-      .withMetadata(false) // strip metadata
       .toBuffer();
 
     // Upload Main Image
