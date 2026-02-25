@@ -1,3 +1,5 @@
+import { API_URL } from '../config';
+
 // Helper function to get proper image URL
 export const getImageUrl = (imagePath) => {
   if (!imagePath || typeof imagePath !== 'string') {
@@ -12,6 +14,11 @@ export const getImageUrl = (imagePath) => {
 
   // Check if it's already a full URL (http/https)
   if (path.startsWith('http://') || path.startsWith('https://')) {
+    // Check for Supabase URL (Intercept with Backend Proxy to bypass ISP Jio blocks)
+    if (path.includes('supabase.co')) {
+      const backendUrl = API_URL.replace(/\/api$/, ''); // Remove /api suffix if present
+      return `${backendUrl}/api/proxy-image?url=${encodeURIComponent(path)}`;
+    }
     // Check for Google Drive URL
     const driveRegex = /(?:drive\.google\.com\/(?:file\/d\/|open\?id=)|docs\.google\.com\/uc\?id=)([a-zA-Z0-9_-]+)/;
     const driveMatch = path.match(driveRegex);

@@ -72,6 +72,34 @@ app.use('/api/owner', ownerRoutes);
 app.use('/api/host', hostRoutes);
 app.use('/api/app-owner', appOwnerRoutes);
 
+// Image proxy to bypass ISP DNS blocks in India (e.g. Reliance Jio blocking *.supabase.co)
+app.get('/api/proxy-image', async (req, res) => {
+  const imageUrl = req.query.url;
+  if (!imageUrl) {
+    return res.status(400).send('URL query parameter is required');
+  }
+
+  try {
+    // We fetch the image from Supabase via Render's backend (which isn't blocked by Jio)
+    const response = await fetch(imageUrl);
+
+    if (!response.ok) {
+      return res.status(response.status).send('Failed to fetch image from Supabase');
+    }
+
+    // Set exactly the same headers the image should have
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/webp');
+    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
+
+    // Stream the image directly to the client's browser using arrayBuffer
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error('Proxy Error:', error);
+    res.status(500).send('Internal Server Error while proxying image');
+  }
+});
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
