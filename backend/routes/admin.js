@@ -1,6 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import fs from 'fs';
+import { decode } from 'base64-arraybuffer';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
 import { supabase } from '../supabaseClient.js';
@@ -910,11 +911,15 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
       .webp({ quality: 70 })
       .toBuffer();
 
+    // Convert WebP Buffer to ArrayBuffer using base64 due to Vercel dropping native NodeJS Buffers 
+    const mainBase64 = mainBuffer.toString('base64');
+    const mainArrayBuffer = decode(mainBase64);
+
     // Upload Main Image
     const { error: mainError } = await supabase
       .storage
       .from('auction-images')
-      .upload(mainFilename, mainBuffer, {
+      .upload(mainFilename, mainArrayBuffer, {
         contentType: 'image/webp',
         upsert: true
       });
@@ -924,11 +929,15 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
       throw mainError;
     }
 
+    // Convert WebP Buffer to ArrayBuffer using base64
+    const thumbBase64 = thumbBuffer.toString('base64');
+    const thumbArrayBuffer = decode(thumbBase64);
+
     // Upload Thumbnail Image
     const { error: thumbError } = await supabase
       .storage
       .from('auction-images')
-      .upload(thumbFilename, thumbBuffer, {
+      .upload(thumbFilename, thumbArrayBuffer, {
         contentType: 'image/webp',
         upsert: true
       });
@@ -1288,11 +1297,14 @@ router.post('/teams', upload.single('logo'), async (req, res) => {
     let logoPath = null;
     if (req.file) {
       const fileContent = req.file.buffer;
+      const base64Str = fileContent.toString('base64');
+      const arrayBuffer = decode(base64Str);
+
       const ext = req.file.originalname.split('.').pop();
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       const filename = `team-${uniqueSuffix}.${ext}`;
 
-      const { error: uploadError } = await supabase.storage.from('auction-images').upload(filename, fileContent, { upsert: true, contentType: req.file.mimetype });
+      const { error: uploadError } = await supabase.storage.from('auction-images').upload(filename, arrayBuffer, { upsert: true, contentType: req.file.mimetype });
       if (uploadError) console.error('Logo upload error:', uploadError);
       else {
         const { data: publicUrlData } = supabase.storage.from('auction-images').getPublicUrl(filename);
@@ -1392,11 +1404,14 @@ router.put('/teams/:id', upload.single('logo'), async (req, res) => {
 
     if (req.file) {
       const fileContent = req.file.buffer;
+      const base64Str = fileContent.toString('base64');
+      const arrayBuffer = decode(base64Str);
+
       const ext = req.file.originalname.split('.').pop();
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       const filename = `team-${uniqueSuffix}.${ext}`;
 
-      const { error: uploadError } = await supabase.storage.from('auction-images').upload(filename, fileContent, { upsert: true, contentType: req.file.mimetype });
+      const { error: uploadError } = await supabase.storage.from('auction-images').upload(filename, arrayBuffer, { upsert: true, contentType: req.file.mimetype });
       if (!uploadError) {
         const { data: publicUrlData } = supabase.storage.from('auction-images').getPublicUrl(filename);
         updates.logo = publicUrlData.publicUrl;
