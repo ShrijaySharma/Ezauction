@@ -26,6 +26,7 @@ function HostDashboard({ user }) {
   const [currentBid, setCurrentBid] = useState(0);
   const [allBids, setAllBids] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [unsoldPlayers, setUnsoldPlayers] = useState([]);
   const [bidFlash, setBidFlash] = useState(false);
   const [notification, setNotification] = useState(null);
   const [notificationKey, setNotificationKey] = useState(0);
@@ -61,6 +62,7 @@ function HostDashboard({ user }) {
     // Initial data load
     loadCurrentInfo();
     loadTeams();
+    loadUnsoldPlayers();
 
     newSocket.on('bid-placed', (data) => {
       console.log('Bid placed event:', data);
@@ -177,6 +179,16 @@ function HostDashboard({ user }) {
       setTeams(data || []);
     } catch (error) {
       console.error('Error loading teams:', error);
+    }
+  };
+
+  const loadUnsoldPlayers = async () => {
+    try {
+      const data = await hostService.getUnsoldPlayers();
+      setUnsoldPlayers(data || []);
+      console.log(`Preloading ${data?.length || 0} unsold player images for instant rendering`);
+    } catch (error) {
+      console.error('Error loading unsold players for preloading:', error);
     }
   };
 
@@ -388,12 +400,14 @@ function HostDashboard({ user }) {
       </div>
 
       {/* Silent Image Preloader for Main Images */}
-      {/* We are preloading main images here because the host dashboard uses the main high-res image */}
-      {currentPlayer && currentPlayer.image && (
-        <link rel="preload" as="image" href={getImageUrl(currentPlayer.image)} />
-      )}
+      {/* We are preloading ALL unsold main images here so the browser caches them during random selection */}
       <div style={{ display: 'none' }}>
-        {/* We would need to fetch all pending players to preload them here. But as host dashboard doesn't load all players, maybe just a global preload is enough. If we fetched players, we could map here. Since players isn't in state on this page, we'll skip preloading the entire list here to save making another API request. The AdminDashboard preloading handles caching in the browser anyway. */}
+        {currentPlayer && currentPlayer.image && (
+          <link rel="preload" as="image" href={getImageUrl(currentPlayer.image)} />
+        )}
+        {unsoldPlayers.map((p) => (
+          p.image && <link key={p.id} rel="preload" as="image" href={getImageUrl(p.image)} />
+        ))}
       </div>
 
       <style>{`

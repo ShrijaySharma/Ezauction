@@ -15,3 +15,8 @@ export const getAllTeams = async () => {
   return response.data;
 };
 
+export const getUnsoldPlayers = async () => {
+  const response = await api.get('/host/unsold-players');
+  return response.data;
+};
+

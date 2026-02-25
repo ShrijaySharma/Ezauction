@@ -162,4 +162,21 @@ router.get('/team-budgets', async (req, res) => {
   }
 });
 
+// Get all unsold/available players for caching images
+router.get('/unsold-players', async (req, res) => {
+  try {
+    const { data: players, error } = await supabase
+      .from('players')
+      .select('id, name, image')
+      .in('status', ['AVAILABLE', 'UNSOLD'])
+      .order('id', { ascending: true }); // Simple stable order
+
+    if (error) throw error;
+    res.json(players || []);
+  } catch (err) {
+    console.error('Error fetching unsold players:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
