@@ -891,9 +891,9 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
   }
 
   try {
-    console.log('File uploaded locally:', req.file.filename, req.file.size, 'bytes');
+    console.log('File uploaded to memory:', req.file.originalname, req.file.size, 'bytes');
 
-    const fileContent = fs.readFileSync(req.file.path);
+    const fileContent = req.file.buffer;
     const uniqueId = Date.now().toString();
     const mainFilename = `main/${uniqueId}.webp`;
     const thumbFilename = `thumb/${uniqueId}.webp`;
@@ -954,16 +954,12 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
 
     console.log('Images uploaded to Supabase:', { imageUrl, thumbUrl });
 
-    // Clean up local file
-    fs.unlinkSync(req.file.path);
+    // Clean up local file (No longer needed for memoryStorage)
 
     res.json({ success: true, imageUrl, thumbUrl });
   } catch (error) {
     console.error('Upload error:', error);
-    // Try to cleanup
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
+    // Try to cleanup (No longer needed)
     res.status(500).json({ error: 'Failed to process upload: ' + error.message });
   }
 });
@@ -1291,15 +1287,17 @@ router.post('/teams', upload.single('logo'), async (req, res) => {
     // Upload logo if exists
     let logoPath = null;
     if (req.file) {
-      const fileContent = fs.readFileSync(req.file.path);
-      const filename = req.file.filename;
+      const fileContent = req.file.buffer;
+      const ext = req.file.originalname.split('.').pop();
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const filename = `team-${uniqueSuffix}.${ext}`;
+
       const { error: uploadError } = await supabase.storage.from('auction-images').upload(filename, fileContent, { upsert: true, contentType: req.file.mimetype });
       if (uploadError) console.error('Logo upload error:', uploadError);
       else {
         const { data: publicUrlData } = supabase.storage.from('auction-images').getPublicUrl(filename);
         logoPath = publicUrlData.publicUrl;
       }
-      fs.unlinkSync(req.file.path);
     }
 
     const teamBudget = budget ? parseFloat(budget) : 1000000;
@@ -1393,14 +1391,16 @@ router.put('/teams/:id', upload.single('logo'), async (req, res) => {
     if (budget !== undefined) updates.budget = parseFloat(budget);
 
     if (req.file) {
-      const fileContent = fs.readFileSync(req.file.path);
-      const filename = req.file.filename;
+      const fileContent = req.file.buffer;
+      const ext = req.file.originalname.split('.').pop();
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const filename = `team-${uniqueSuffix}.${ext}`;
+
       const { error: uploadError } = await supabase.storage.from('auction-images').upload(filename, fileContent, { upsert: true, contentType: req.file.mimetype });
       if (!uploadError) {
         const { data: publicUrlData } = supabase.storage.from('auction-images').getPublicUrl(filename);
         updates.logo = publicUrlData.publicUrl;
       }
-      fs.unlinkSync(req.file.path);
     }
 
     if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No fields' });
