@@ -54,6 +54,7 @@ function OwnerDashboard({ user }) {
   const [remainingPlayers, setRemainingPlayers] = useState(0);
   const [minimumAmountToKeep, setMinimumAmountToKeep] = useState(0);
   const [maxBidAllowed, setMaxBidAllowed] = useState(0);
+  const [baseBidAmount, setBaseBidAmount] = useState(1000);
   const [bidLockout, setBidLockout] = useState(false);
 
   useEffect(() => {
@@ -181,6 +182,7 @@ function OwnerDashboard({ user }) {
       setRemainingPlayers(data.remainingPlayers || 0);
       setMinimumAmountToKeep(data.minimumAmountToKeep || 0);
       setMaxBidAllowed(data.maxBidAllowed !== undefined ? data.maxBidAllowed : (data.totalBudget || 0));
+      setBaseBidAmount(data.baseBidAmount || 1000);
 
       // Load stats
       if (data.stats) {
@@ -477,27 +479,38 @@ function OwnerDashboard({ user }) {
                   </div>
                 </div>
 
-                {/* Wallet Balance */}
-                <div className="mt-4 sm:mt-6 bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-4 sm:p-6 shadow-xl border-2 border-green-400">
-                  <div className="text-white text-center">
-                    <div className="text-xs sm:text-sm font-semibold mb-1">YOUR WALLET BALANCE</div>
-                    <div className="text-2xl sm:text-4xl font-bold">₹{formatIndianNumber(walletBalance)}</div>
-                    {committedAmount > 0 && (
-                      <div className="mt-2 text-xs sm:text-sm opacity-90">
-                        <div>Total Budget: ₹{formatIndianNumber(totalBudget)}</div>
-                        <div className="text-yellow-200">Committed: ₹{formatIndianNumber(committedAmount)}</div>
-                      </div>
-                    )}
+                {/* Wallet Balance & Constraints Container */}
+                <div className="mt-4 sm:mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Wallet Balance */}
+                  <div className="bg-gradient-to-r from-green-600 to-green-700 rounded-xl p-4 sm:p-6 shadow-xl border-2 border-green-400 flex items-center justify-between">
+                    <div className="flex-1 text-white">
+                      <div className="text-xs sm:text-sm font-semibold mb-1 uppercase tracking-wider text-green-200">Wallet Balance</div>
+                      <div className="text-2xl sm:text-4xl font-bold">₹{formatIndianNumber(walletBalance)}</div>
+                      {committedAmount > 0 && (
+                        <div className="mt-2 text-xs opacity-90">
+                          <div>Budget: ₹{formatIndianNumber(totalBudget)}</div>
+                          <div className="text-yellow-200">Committed: ₹{formatIndianNumber(committedAmount)}</div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Wallet Icon */}
+                    <div className="hidden sm:block shrink-0 ml-4 bg-green-800/50 p-3 rounded-full border border-green-500/50">
+                      <img src="/WALLET_IMG.png" alt="Wallet" className="w-12 h-12 object-contain" />
+                    </div>
                   </div>
-                </div>
 
-                {/* Financial Constraints Info */}
-                <div className="mt-2 bg-gray-800/80 rounded-xl p-3 sm:p-4 border border-blue-500/30">
-                  <div className="flex justify-center text-sm">
-                    <div className="bg-blue-900/40 p-2 rounded border border-blue-500/20 w-full sm:w-1/2">
-                      <div className="text-blue-200 text-xs text-center">Squad Size Limit</div>
-                      <div className="text-white font-bold text-center text-lg">{playersBought}/{totalAllowedPlayers} Players</div>
-                      <div className="text-gray-400 text-xs text-center">Needed: {remainingPlayers}</div>
+                  {/* Bidding Limits */}
+                  <div className="bg-gray-800/80 rounded-xl p-4 sm:p-6 shadow-xl border border-blue-500/30 flex items-center justify-between">
+                    <div className="flex-1 text-white">
+                      <div className="text-xs sm:text-sm font-semibold mb-1 uppercase tracking-wider text-blue-300">Max Bid Allowed</div>
+                      <div className="text-2xl sm:text-3xl font-bold text-yellow-400">₹{formatIndianNumber(maxBidAllowed)}</div>
+                      <div className="mt-2 text-xs text-gray-400">
+                        <div>Reserved for {remainingPlayers} players: ₹{formatIndianNumber(minimumAmountToKeep)}</div>
+                      </div>
+                    </div>
+                    <div className="shrink-0 ml-4 bg-blue-900/40 p-2 sm:p-3 rounded-lg border border-blue-500/20 text-center min-w-[80px]">
+                      <div className="text-blue-200 text-xs sm:text-[10px] uppercase font-semibold">Squad limit</div>
+                      <div className="text-white font-bold text-lg sm:text-xl">{playersBought}/{totalAllowedPlayers}</div>
                     </div>
                   </div>
                 </div>

@@ -244,8 +244,8 @@ export const updateMaxPlayersPerTeam = async (maxPlayersPerTeam) => {
   return response.data;
 };
 
-export const updateEnforceMaxBid = async (enforceMaxBid) => {
-  const response = await api.post('/admin/enforce-max-bid', { enforceMaxBid });
+export const updateEnforceMaxBid = async (enforceMaxBid, baseBidAmount) => {
+  const response = await api.post('/admin/enforce-max-bid', { enforceMaxBid, baseBidAmount });
   return response.data;
 };
 

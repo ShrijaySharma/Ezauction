@@ -96,7 +96,8 @@ router.get('/current-info', async (req, res) => {
         const playersBought = stats.sold;
         const remainingPlayers = maxPlayersPerTeam - playersBought;
         const enforceMaxBid = state?.enforce_max_bid === 1;
-        const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * 1000) : 0;
+        const baseBidAmount = state?.base_bid_amount || 1000;
+        const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * baseBidAmount) : 0;
         const totalBudget = team.budget;
         const availableBalance = totalBudget - committedAmount;
         const maxBidAllowed = enforceMaxBid ? Math.max(0, totalBudget - minimumAmountToKeep) : totalBudget;
@@ -121,7 +122,8 @@ router.get('/current-info', async (req, res) => {
             remainingPlayers: remainingPlayers,
             minimumAmountToKeep: minimumAmountToKeep,
             maxBidAllowed: maxBidAllowed,
-            enforceMaxBid: enforceMaxBid
+            enforceMaxBid: enforceMaxBid,
+            baseBidAmount: baseBidAmount
         });
 
     } catch (err) {
@@ -205,7 +207,8 @@ router.post('/bid', async (req, res) => {
         }
 
         const enforceMaxBid = state.enforce_max_bid === 1;
-        const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * 1000) : 0;
+        const baseBidAmount = state.base_bid_amount || 1000;
+        const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * baseBidAmount) : 0;
         const maxBidAllowed = enforceMaxBid ? Math.max(0, team.budget - minimumAmountToKeep) : team.budget;
 
         if (amount > maxBidAllowed) {

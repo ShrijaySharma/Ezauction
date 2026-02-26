@@ -55,7 +55,8 @@ router.get('/auction-state', async (req, res) => {
           increment2: state.bid_increment_2
         },
         maxPlayersPerTeam: state.max_players_per_team || 10,
-        enforceMaxBid: state.enforce_max_bid === 1
+        enforceMaxBid: state.enforce_max_bid === 1,
+        baseBidAmount: state.base_bid_amount || 1000
       });
     }
   } catch (err) {
@@ -66,7 +67,7 @@ router.get('/auction-state', async (req, res) => {
 
 // Update enforce max bid setting
 router.post('/enforce-max-bid', async (req, res) => {
-  const { enforceMaxBid } = req.body;
+  const { enforceMaxBid, baseBidAmount } = req.body;
   const io = req.app.locals.io;
 
   try {
@@ -74,6 +75,7 @@ router.post('/enforce-max-bid', async (req, res) => {
       .from('auction_state')
       .update({
         enforce_max_bid: enforceMaxBid ? 1 : 0,
+        base_bid_amount: baseBidAmount !== undefined ? baseBidAmount : 1000,
         updated_at: new Date()
       })
       .eq('id', 1);
@@ -83,8 +85,8 @@ router.post('/enforce-max-bid', async (req, res) => {
       return res.status(500).json({ error: 'Database error' });
     }
 
-    io.emit('enforce-max-bid-changed', { enforceMaxBid });
-    res.json({ success: true, enforceMaxBid });
+    io.emit('enforce-max-bid-changed', { enforceMaxBid, baseBidAmount });
+    res.json({ success: true, enforceMaxBid, baseBidAmount });
   } catch (err) {
     console.error('Unexpected error:', err);
     res.status(500).json({ error: 'Server error' });

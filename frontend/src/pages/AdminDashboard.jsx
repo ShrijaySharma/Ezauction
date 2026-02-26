@@ -22,7 +22,7 @@ const API_URL = getApiUrl();
 function AdminDashboard({ user }) {
   const navigate = useNavigate();
   const [socket, setSocket] = useState(null);
-  const [auctionState, setAuctionState] = useState({ status: 'STOPPED', biddingLocked: false });
+  const [auctionState, setAuctionState] = useState({ status: 'STOPPED', biddingLocked: false, baseBidAmount: 1000 });
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [highestBid, setHighestBid] = useState(null);
   const [allBids, setAllBids] = useState([]);
@@ -331,7 +331,11 @@ function AdminDashboard({ user }) {
       }
 
       if (data.enforceMaxBid !== undefined && data.enforceMaxBid !== enforceMaxBid) {
-        setEnforceMaxBid(data.enforceMaxBid);
+        setAuctionState(stateData => ({
+          ...stateData,
+          enforceMaxBid: data.enforceMaxBid,
+          baseBidAmount: data.baseBidAmount || 1000
+        }));
       }
     } catch (error) {
       console.error('Error loading auction state:', error);
@@ -424,12 +428,24 @@ function AdminDashboard({ user }) {
     }
   };
 
-  const handleUpdateEnforceMaxBid = async (val) => {
+  const handleUpdateEnforceMaxBid = async (val, newBaseBid) => {
     try {
-      await adminService.updateEnforceMaxBid(val);
-      alert(`Bidding logic ${val ? 'enabled' : 'disabled'}!`);
+      const amountToSave = newBaseBid !== undefined ? newBaseBid : auctionState.baseBidAmount;
+      const data = await adminService.updateEnforceMaxBid(val, amountToSave);
+      setAuctionState({ ...auctionState, enforceMaxBid: data.enforceMaxBid, baseBidAmount: data.baseBidAmount });
+      alert(`Bidding logic updated!`);
     } catch (error) {
       alert('Error updating bidding logic: ' + error.response?.data?.error);
+    }
+  };
+
+  const handleUpdateBaseBidAmount = async (amount) => {
+    try {
+      const data = await adminService.updateEnforceMaxBid(auctionState.enforceMaxBid, amount);
+      setAuctionState({ ...auctionState, enforceMaxBid: data.enforceMaxBid, baseBidAmount: data.baseBidAmount });
+      alert('Reserve per player amount updated!');
+    } catch (error) {
+      alert('Error updating reserve amount: ' + error.response?.data?.error);
     }
   };
 
@@ -438,6 +454,7 @@ function AdminDashboard({ user }) {
       return;
     }
     const doubleCheck = prompt('Type "DELETE" to confirm permanent deletion:');
+
     if (doubleCheck !== 'DELETE') return;
 
     try {
@@ -2041,19 +2058,40 @@ function AdminDashboard({ user }) {
                     </div>
 
                     <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-white font-semibold">Enforce Max Bid Logic</label>
-                        <button
-                          onClick={() => handleUpdateEnforceMaxBid(!enforceMaxBid)}
-                          className={`px-4 py-2 rounded-lg font-bold transition-colors ${enforceMaxBid ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-400'}`}
-                        >
-                          {enforceMaxBid ? 'ON' : 'OFF'}
-                        </button>
+                      <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                          <label className="text-white font-semibold">Enforce Max Bid Logic</label>
+                          <button
+                            onClick={() => handleUpdateEnforceMaxBid(!auctionState.enforceMaxBid)}
+                            className={`px-4 py-2 rounded-lg font-bold transition-colors ${auctionState.enforceMaxBid ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-400'}`}
+                          >
+                            {auctionState.enforceMaxBid ? 'ON' : 'OFF'}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-gray-600 pt-3">
+                          <label className="text-white font-semibold text-sm">Reserve Amount per Remaining Player (₹)</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              value={auctionState.baseBidAmount || 1000}
+                              onChange={(e) => setAuctionState({ ...auctionState, baseBidAmount: parseInt(e.target.value) || 0 })}
+                              className="w-24 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-white text-sm"
+                            />
+                            <button
+                              onClick={() => handleUpdateBaseBidAmount(auctionState.baseBidAmount)}
+                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+
+                        <p className="text-sm text-gray-400 mt-2">
+                          If <strong>ON</strong>, owners MUST keep enough money for their remaining player slots (Current: ₹{auctionState.baseBidAmount || 1000} per player).<br />
+                          If <strong>OFF</strong>, owners can bid their entire purse on any single player.
+                        </p>
                       </div>
-                      <p className="text-sm text-gray-400">
-                        If <strong>ON</strong>, owners MUST keep enough money for their remaining player slots (₹1000 per player).<br />
-                        If <strong>OFF</strong>, owners can bid their entire purse on any single player.
-                      </p>
                     </div>
 
                     <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-500/30">
