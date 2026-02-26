@@ -309,17 +309,23 @@ function AdminDashboard({ user }) {
         setAuctionState(data);
       }
 
-      if (JSON.stringify(data.bidIncrements) !== JSON.stringify(bidIncrements)) {
-        setBidIncrements(data.bidIncrements);
-        setNewIncrements(data.bidIncrements);
-      }
+      setBidIncrements(prev => {
+        if (JSON.stringify(data.bidIncrements) !== JSON.stringify(prev)) {
+          setNewIncrements(data.bidIncrements);
+          return data.bidIncrements;
+        }
+        return prev;
+      });
 
-      // Load max players config
+      // Load max players config using functional update to avoid stale closure and input resets
       const maxPlayers = data.maxPlayersPerTeam || 10;
-      if (maxPlayers !== maxPlayersPerTeam) {
-        setMaxPlayersPerTeam(maxPlayers);
-        setNewMaxPlayersPerTeam(maxPlayers);
-      }
+      setMaxPlayersPerTeam(prev => {
+        if (prev !== maxPlayers) {
+          setNewMaxPlayersPerTeam(maxPlayers);
+          return maxPlayers;
+        }
+        return prev;
+      });
 
       if (data.currentPlayerId) {
         const playerData = await adminService.getCurrentBid();
