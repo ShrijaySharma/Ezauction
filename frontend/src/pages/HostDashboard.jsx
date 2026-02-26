@@ -248,7 +248,7 @@ function HostDashboard({ user }) {
           </div>
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <img src="/GAPL.png" alt="GAPL Logo" className="h-24 sm:h-28 lg:h-32 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
+            <img src="/GAPL.png" alt="GAPL Logo" className="h-32 sm:h-40 lg:h-48 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
           </div>
 
           <div className="flex items-center gap-6">
@@ -394,13 +394,13 @@ function HostDashboard({ user }) {
         </div>
 
         {/* Sponsors Footer - Replaced Promotional Footer */}
-        <div className="h-20 lg:h-24 flex flex-col items-center justify-center bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pb-2 pt-2">
-          <div className="text-white/40 text-[10px] font-black tracking-[0.3em] uppercase mb-2">SPONSORS</div>
-          <div className="flex items-center justify-center gap-6 sm:gap-10 lg:gap-16">
-            <img src="/Holy Faith ( sponsor).png" alt="Holy Faith" className="h-8 sm:h-10 lg:h-12 object-contain" />
-            <img src="/Navneet ( sponsor).webp" alt="Navneet" className="h-8 sm:h-10 lg:h-12 object-contain" />
-            <img src="/Ratna Sagar ( sponsor ).png" alt="Ratna Sagar" className="h-8 sm:h-10 lg:h-12 object-contain" />
-            <img src="/Sumeet ( sponsor ).png" alt="Sumeet" className="h-8 sm:h-10 lg:h-12 object-contain" />
+        <div className="h-24 lg:h-32 flex flex-col items-center justify-center bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pb-2 pt-2">
+          <div className="text-white/40 text-[10px] sm:text-xs font-black tracking-[0.3em] uppercase mb-3">SPONSORS</div>
+          <div className="flex items-center justify-center gap-8 sm:gap-12 lg:gap-20">
+            <img src="/Holy Faith ( sponsor).png" alt="Holy Faith" className="h-12 sm:h-16 lg:h-20 object-contain" />
+            <img src="/Navneet ( sponsor).webp" alt="Navneet" className="h-12 sm:h-16 lg:h-20 object-contain" />
+            <img src="/Ratna Sagar ( sponsor ).png" alt="Ratna Sagar" className="h-12 sm:h-16 lg:h-20 object-contain" />
+            <img src="/Sumeet ( sponsor ).png" alt="Sumeet" className="h-12 sm:h-16 lg:h-20 object-contain" />
           </div>
         </div>
       </div>
