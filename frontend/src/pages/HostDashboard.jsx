@@ -243,10 +243,12 @@ function HostDashboard({ user }) {
       <div className="relative z-10 h-full w-full flex flex-col">
         {/* Top bar - Simplified & Centered */}
         <div className="h-32 flex items-center justify-between px-8 bg-black/40 backdrop-blur-md border-b border-white/10 relative">
-          <div className="w-40"></div> {/* Spacer for symmetry */}
-
           <div className="absolute left-6 lg:left-12 top-1/2 -translate-y-1/2 flex flex-col items-center">
-            <img src="/GAPL.png" alt="GAPL Logo" className="h-16 sm:h-20 lg:h-28 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
+            <img src="/ezauction.png" alt="EzAuction Logo" className="h-16 sm:h-20 lg:h-28 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
+          </div>
+
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+            <img src="/GAPL.png" alt="GAPL Logo" className="h-24 sm:h-28 lg:h-32 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
           </div>
 
           <div className="flex items-center gap-6">
