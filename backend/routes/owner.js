@@ -97,7 +97,9 @@ router.get('/current-info', async (req, res) => {
         const remainingPlayers = maxPlayersPerTeam - playersBought;
         const enforceMaxBid = state?.enforce_max_bid === 1;
         const baseBidAmount = state?.base_bid_amount || 1000;
-        const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * baseBidAmount) : 0;
+        // The current player being auctioned counts as one of the remaining players, so we deduct 1
+        const reservedPlayersCount = Math.max(0, remainingPlayers - 1);
+        const minimumAmountToKeep = enforceMaxBid ? (reservedPlayersCount * baseBidAmount) : 0;
         const totalBudget = team.budget;
         const availableBalance = totalBudget - committedAmount;
         const maxBidAllowed = enforceMaxBid ? Math.max(0, totalBudget - minimumAmountToKeep) : totalBudget;
@@ -208,16 +210,18 @@ router.post('/bid', async (req, res) => {
 
         const enforceMaxBid = state.enforce_max_bid === 1;
         const baseBidAmount = state.base_bid_amount || 1000;
-        const minimumAmountToKeep = enforceMaxBid ? (remainingPlayers * baseBidAmount) : 0;
+        // Similar to current-info, we must subtract 1 since we are actively bidding on one of these remaining players
+        const reservedPlayersCount = Math.max(0, remainingPlayers - 1);
+        const minimumAmountToKeep = enforceMaxBid ? (reservedPlayersCount * baseBidAmount) : 0;
         const maxBidAllowed = enforceMaxBid ? Math.max(0, team.budget - minimumAmountToKeep) : team.budget;
 
         if (amount > maxBidAllowed) {
             if (enforceMaxBid) {
                 return res.status(400).json({
-                    error: `Bid exceeds maximum allowed. You need to keep ${minimumAmountToKeep.toLocaleString()} for ${remainingPlayers} remaining player(s).`,
+                    error: `Bid exceeds maximum allowed. You need to keep ${minimumAmountToKeep.toLocaleString()} for ${reservedPlayersCount} remaining player(s).`,
                     maxBidAllowed,
                     minimumAmountToKeep,
-                    remainingPlayers
+                    remainingPlayers: reservedPlayersCount
                 });
             } else {
                 return res.status(400).json({
