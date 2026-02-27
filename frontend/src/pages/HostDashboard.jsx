@@ -242,33 +242,33 @@ function HostDashboard({ user }) {
 
       <div className="relative z-10 h-full w-full flex flex-col">
         {/* Top bar - Simplified & Centered */}
-        <div className="h-32 flex items-center justify-end px-8 bg-black/40 backdrop-blur-md border-b border-white/10 relative">
+        <div className="h-20 md:h-32 flex items-center justify-end px-4 md:px-8 bg-black/40 backdrop-blur-md border-b border-white/10 relative">
           <div className="absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 flex flex-col items-center">
-            <img src="/ezauction.png" alt="EzAuction Logo" className="h-10 sm:h-12 lg:h-16 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
+            <img src="/ezauction.png" alt="EzAuction Logo" className="h-8 sm:h-12 lg:h-16 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
           </div>
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <img src="/GAPL.png" alt="GAPL Logo" className="h-32 sm:h-40 lg:h-48 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
+            <img src="/GAPL.png" alt="GAPL Logo" className="h-24 sm:h-40 lg:h-48 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 md:gap-6">
             {/* Audio Unlock Indicator */}
             {!audioEnabled && (
               <button
                 onClick={enableAudio}
-                className="flex items-center gap-2 px-4 py-2 bg-yellow-400 text-black rounded-xl font-black text-sm uppercase tracking-widest animate-pulse shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+                className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-yellow-400 text-black rounded-xl font-black text-xs md:text-sm uppercase tracking-widest animate-pulse shadow-[0_0_20px_rgba(250,204,21,0.4)]"
               >
-                <span>🔊</span> Enable Sound
+                <span>🔊</span> <span className="hidden sm:inline">Enable Sound</span>
               </button>
             )}
             {audioEnabled && (
-              <div className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-400 rounded-xl font-black text-sm uppercase tracking-widest border border-green-500/30">
-                <span>🔔</span> Sound Active
+              <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-green-500/20 text-green-400 rounded-xl font-black text-xs md:text-sm uppercase tracking-widest border border-green-500/30">
+                <span>🔔</span> <span className="hidden sm:inline">Sound Active</span>
               </div>
             )}
             <button
               onClick={handleLogout}
-              className="text-white/60 hover:text-white transition-all text-sm font-black uppercase tracking-widest px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10"
+              className="text-white/60 hover:text-white transition-all text-xs md:text-sm font-black uppercase tracking-widest px-3 py-1.5 md:px-4 md:py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10"
             >
               Logout
             </button>
@@ -276,12 +276,12 @@ function HostDashboard({ user }) {
         </div>
 
         {/* Main Grid */}
-        <div className="flex-1 overflow-hidden p-6 gap-6 grid grid-cols-12 content-stretch">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-4 md:p-6 gap-4 md:gap-6 flex flex-col md:grid md:grid-cols-12 md:content-stretch">
           {currentPlayer ? (
             <>
               {/* Left Column: Enhanced Player Profile (Full Height) */}
-              <div className="col-span-3 flex flex-col h-full overflow-hidden">
-                <div className="flex-1 bg-gray-900/90 backdrop-blur-2xl rounded-[2.5rem] p-8 border-2 border-white/20 shadow-2xl flex flex-col justify-between relative overflow-hidden group">
+              <div className="col-span-12 md:col-span-3 flex flex-col flex-none md:h-full overflow-hidden">
+                <div className="flex-1 bg-gray-900/90 backdrop-blur-2xl rounded-[2.5rem] p-6 md:p-8 border-2 border-white/20 shadow-2xl flex flex-col justify-between relative overflow-hidden group min-h-[300px] md:min-h-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
 
                   {/* Category Badge */}
@@ -328,10 +328,10 @@ function HostDashboard({ user }) {
               </div>
 
               {/* Center Column: Image */}
-              <div className="col-span-5 flex flex-col items-center justify-center relative overflow-hidden group px-6">
-                <div className={`relative h-full w-full max-h-[70vh] aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
+              <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-center relative overflow-hidden group px-2 md:px-6 py-4 md:py-0">
+                <div className={`relative w-full max-w-[300px] md:max-w-none md:h-full md:max-h-[70vh] aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
                   <div className="absolute inset-0 bg-yellow-400/10 rounded-[4rem] blur-[100px] animate-pulse"></div>
-                  <div className={`w-full h-full rounded-[3rem] border-[12px] bg-black/50 backdrop-blur-3xl shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
+                  <div className={`w-full h-full rounded-[3rem] border-[8px] md:border-[12px] bg-black/50 backdrop-blur-3xl shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
                     <img
                       src={getImageUrl(currentPlayer.image)}
                       alt={currentPlayer.name}
@@ -343,8 +343,8 @@ function HostDashboard({ user }) {
               </div>
 
               {/* Right Column: Bid Action - Optimized for Overflow */}
-              <div className="col-span-4 flex flex-col gap-6">
-                <div className={`flex-1 bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-[3rem] p-4 lg:p-6 shadow-2xl border-[12px] border-white flex flex-col items-center justify-center text-blue-900 transition-all duration-500 ${bidFlash ? 'scale-[1.02] rotate-1' : ''}`}>
+              <div className="col-span-12 md:col-span-4 flex flex-col gap-4 md:gap-6 min-h-[300px] md:min-h-0 mb-8 md:mb-0">
+                <div className={`flex-1 bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-[2.5rem] md:rounded-[3rem] p-4 lg:p-6 shadow-2xl border-[8px] md:border-[12px] border-white flex flex-col items-center justify-center text-blue-900 transition-all duration-500 ${bidFlash ? 'scale-[1.02] rotate-1' : ''}`}>
                   <div className="text-blue-900/40 text-lg lg:text-xl font-black tracking-[0.5em] uppercase mb-2 lg:mb-4 text-center">Current Bid</div>
 
                   {/* Dynamic Font Size for Amount */}
@@ -380,8 +380,8 @@ function HostDashboard({ user }) {
               </div>
             </>
           ) : (
-            <div className="col-span-12 flex items-center justify-center h-full">
-              <div className="bg-white/5 backdrop-blur-3xl rounded-[4rem] p-24 border border-white/10 text-center shadow-2xl relative overflow-hidden group">
+            <div className="col-span-12 flex items-center justify-center md:h-full min-h-[60vh]">
+              <div className="bg-white/5 backdrop-blur-3xl rounded-[3rem] md:rounded-[4rem] p-8 md:p-24 border border-white/10 text-center shadow-2xl relative overflow-hidden group">
                 <div className="absolute inset-0 bg-yellow-400/5 blur-[120px]"></div>
                 <div className="relative">
                   <div className="text-[12rem] mb-12 animate-bounce opacity-40">🏏</div>
@@ -394,13 +394,13 @@ function HostDashboard({ user }) {
         </div>
 
         {/* Sponsors Footer - Replaced Promotional Footer */}
-        <div className="h-24 lg:h-32 flex flex-col items-center justify-center bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pb-2 pt-2">
+        <div className="h-auto md:h-24 lg:h-32 flex flex-col items-center justify-center bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] py-4 md:py-2 shrink-0">
           <div className="text-white/40 text-[10px] sm:text-xs font-black tracking-[0.3em] uppercase mb-3">SPONSORS</div>
-          <div className="flex items-center justify-center gap-8 sm:gap-12 lg:gap-20">
-            <img src="/Sumeet ( sponsor ).png" alt="Sumeet" className="h-12 sm:h-16 lg:h-20 object-contain" />
-            <img src="/Navneet ( sponsor).webp" alt="Navneet" className="h-12 sm:h-16 lg:h-20 object-contain" />
-            <img src="/Ratna Sagar ( sponsor ).png" alt="Ratna Sagar" className="h-12 sm:h-16 lg:h-20 object-contain" />
-            <img src="/Holy Faith ( sponsor).png" alt="Holy Faith" className="h-12 sm:h-16 lg:h-20 object-contain" />
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 lg:gap-20 px-4">
+            <img src="/Sumeet ( sponsor ).png" alt="Sumeet" className="h-8 sm:h-12 lg:h-20 object-contain" />
+            <img src="/Navneet ( sponsor).webp" alt="Navneet" className="h-8 sm:h-12 lg:h-20 object-contain" />
+            <img src="/Ratna Sagar ( sponsor ).png" alt="Ratna Sagar" className="h-8 sm:h-12 lg:h-20 object-contain" />
+            <img src="/Holy Faith ( sponsor).png" alt="Holy Faith" className="h-8 sm:h-12 lg:h-20 object-contain" />
           </div>
         </div>
       </div>
