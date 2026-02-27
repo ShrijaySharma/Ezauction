@@ -242,13 +242,13 @@ function HostDashboard({ user }) {
 
       <div className="relative z-10 h-full w-full flex flex-col">
         {/* Top bar - Simplified & Centered */}
-        <div className="h-20 md:h-32 flex items-center justify-end px-4 md:px-8 bg-black/40 backdrop-blur-md border-b border-white/10 relative">
-          <div className="absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 flex flex-col items-center">
-            <img src="/ezauction.png" alt="EzAuction Logo" className="h-8 sm:h-12 lg:h-16 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
+        <div className="h-16 md:h-32 flex items-center justify-between md:justify-end px-4 md:px-8 bg-black/40 backdrop-blur-md border-b border-white/10 relative shrink-0">
+          <div className="md:absolute md:left-4 lg:left-8 md:top-1/2 md:-translate-y-1/2 flex flex-col items-center">
+            <img src="/ezauction.png" alt="EzAuction Logo" className="h-6 sm:h-12 lg:h-16 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]" />
           </div>
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <img src="/GAPL.png" alt="GAPL Logo" className="h-24 sm:h-40 lg:h-48 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-transform duration-500" />
+            <img src="/GAPL.png" alt="GAPL Logo" className="h-12 sm:h-40 lg:h-48 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]" />
           </div>
 
           <div className="flex items-center gap-2 md:gap-6">
@@ -256,19 +256,19 @@ function HostDashboard({ user }) {
             {!audioEnabled && (
               <button
                 onClick={enableAudio}
-                className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-yellow-400 text-black rounded-xl font-black text-xs md:text-sm uppercase tracking-widest animate-pulse shadow-[0_0_20px_rgba(250,204,21,0.4)]"
+                className="flex items-center gap-1.5 md:gap-2 px-2 py-1 md:px-4 md:py-2 bg-yellow-400 text-black rounded-lg md:rounded-xl font-black text-[10px] md:text-sm uppercase tracking-widest animate-pulse"
               >
-                <span>🔊</span> <span className="hidden sm:inline">Enable Sound</span>
+                <span>🔊</span> <span className="hidden sm:inline">Sound</span>
               </button>
             )}
             {audioEnabled && (
-              <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-green-500/20 text-green-400 rounded-xl font-black text-xs md:text-sm uppercase tracking-widest border border-green-500/30">
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-green-500/20 text-green-400 rounded-xl font-black text-xs md:text-sm uppercase tracking-widest border border-green-500/30">
                 <span>🔔</span> <span className="hidden sm:inline">Sound Active</span>
               </div>
             )}
             <button
               onClick={handleLogout}
-              className="text-white/60 hover:text-white transition-all text-xs md:text-sm font-black uppercase tracking-widest px-3 py-1.5 md:px-4 md:py-2 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10"
+              className="text-white/60 hover:text-white transition-all text-[10px] md:text-sm font-black uppercase tracking-widest px-2 py-1 md:px-4 md:py-2 bg-white/5 hover:bg-white/10 rounded-lg md:rounded-xl border border-white/10"
             >
               Logout
             </button>
@@ -276,50 +276,38 @@ function HostDashboard({ user }) {
         </div>
 
         {/* Main Grid */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-4 md:p-6 gap-4 md:gap-6 flex flex-col md:grid md:grid-cols-12 md:content-stretch">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-2 md:p-6 gap-2 md:gap-6 flex flex-col md:grid md:grid-cols-12 md:content-stretch scrollbar-none">
           {currentPlayer ? (
             <>
-              {/* Left Column: Enhanced Player Profile (Full Height) */}
-              <div className="col-span-12 md:col-span-3 flex flex-col flex-none md:h-full overflow-hidden">
-                <div className="flex-1 bg-gray-900/90 backdrop-blur-2xl rounded-[2.5rem] p-6 md:p-8 border-2 border-white/20 shadow-2xl flex flex-col justify-between relative overflow-hidden group min-h-[300px] md:min-h-0">
+              {/* Left Column: Enhanced Player Profile */}
+              <div className="col-span-12 md:col-span-3 flex flex-col flex-none md:h-full overflow-hidden order-2 md:order-1">
+                <div className="flex-1 bg-gray-900/90 backdrop-blur-2xl rounded-2xl md:rounded-[2.5rem] p-4 md:p-8 border md:border-2 border-white/20 shadow-xl md:shadow-2xl flex flex-row md:flex-col justify-between items-center md:items-stretch relative overflow-hidden group gap-4 md:gap-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
 
-                  {/* Category Badge */}
-                  <div className="relative z-10 flex justify-between items-start">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-yellow-400 rounded-xl shadow-lg shadow-yellow-400/20">
-                          <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                        </div>
-                        <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">Profile</span>
+                  {/* Left Side (Mobile) / Top (Desktop) */}
+                  <div className="relative z-10 flex flex-col items-start gap-2 md:gap-0 md:justify-between w-1/2 md:w-auto h-full justify-center">
+                    <div className="px-3 py-1.5 md:px-5 md:py-3 bg-white/10 rounded-xl md:rounded-2xl border md:border-2 border-yellow-400/50 backdrop-blur-xl mb-2 md:mb-0">
+                      <span className="text-white font-mono font-black text-lg md:text-3xl drop-shadow-lg">#{currentPlayer.serial_number}</span>
+                    </div>
+                    <div className="text-left md:text-center mt-0 md:mt-auto">
+                      <h2 className="text-white text-xl sm:text-2xl md:text-4xl lg:text-5xl font-black tracking-tighter mb-1 md:mb-4 drop-shadow-2xl leading-[1.1] md:leading-[0.9] line-clamp-2 md:line-clamp-none">
+                        {currentPlayer.name}
+                      </h2>
+                      <div className="inline-block px-3 py-1 md:px-6 md:py-2.5 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm font-black uppercase tracking-widest shadow-lg md:shadow-xl shadow-yellow-400/20">
+                        {currentPlayer.role}
                       </div>
                     </div>
-                    <div className="px-5 py-3 bg-white/10 rounded-2xl border-2 border-yellow-400/50 backdrop-blur-xl shadow-[0_0_20px_rgba(250,204,21,0.2)]">
-                      <span className="text-white font-mono font-black text-3xl drop-shadow-lg">{currentPlayer.serial_number}</span>
-                    </div>
                   </div>
 
-                  {/* Name & Role */}
-                  <div className="relative z-10 my-auto text-center">
-                    <h2 className="text-white text-4xl lg:text-5xl font-black tracking-tighter mb-4 drop-shadow-2xl leading-[0.9]">
-                      {currentPlayer.name}
-                    </h2>
-                    <div className="inline-block px-6 py-2.5 bg-yellow-400 text-black rounded-full text-sm font-black uppercase tracking-widest shadow-xl shadow-yellow-400/20 transform hover:scale-105 transition-transform">
-                      {currentPlayer.role}
+                  {/* Right Side (Mobile) / Bottom Grid (Desktop) */}
+                  <div className="relative z-10 flex flex-col gap-2 md:grid md:grid-cols-1 md:gap-4 mt-0 md:mt-auto w-1/2 md:w-auto">
+                    <div className="bg-white/5 p-2 md:p-6 rounded-xl md:rounded-3xl border border-white/10 backdrop-blur-md flex flex-row md:flex-col justify-between items-center md:block">
+                      <span className="text-white/40 text-[8px] md:text-[10px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] md:mb-2 md:text-center block">Age</span>
+                      <div className="text-white font-black text-sm md:text-2xl uppercase tracking-tight md:text-center">{currentPlayer.age || 'N/A'} <span className="hidden md:inline">YRS</span></div>
                     </div>
-                  </div>
-
-                  {/* Stats Grid */}
-                  <div className="relative z-10 grid grid-cols-1 gap-4 mt-auto">
-                    <div className="bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors">
-                      <span className="block text-white/40 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-center">Age</span>
-                      <div className="text-white font-black text-2xl uppercase tracking-tight text-center">{currentPlayer.age || 'N/A'} YRS</div>
-                    </div>
-                    <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-6 rounded-3xl border border-yellow-400/20 backdrop-blur-md">
-                      <span className="block text-yellow-400/60 text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-center">Base Price</span>
-                      <div className="text-yellow-400 font-black text-4xl font-mono tracking-tighter text-center drop-shadow-lg">
+                    <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-3 md:p-6 rounded-xl md:rounded-3xl border border-yellow-400/20 backdrop-blur-md flex flex-col justify-center h-full md:block">
+                      <span className="block text-yellow-400/60 text-[8px] md:text-[10px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] mb-1 md:mb-2 text-center">Base Price</span>
+                      <div className="text-yellow-400 font-black text-lg md:text-4xl font-mono tracking-tighter text-center drop-shadow-lg leading-none">
                         ₹{formatIndianNumber(currentPlayer.base_price || 0)}
                       </div>
                     </div>
@@ -328,14 +316,14 @@ function HostDashboard({ user }) {
               </div>
 
               {/* Center Column: Image */}
-              <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-center relative overflow-hidden group px-2 md:px-6 py-4 md:py-0">
-                <div className={`relative w-full max-w-[300px] md:max-w-none md:h-full md:max-h-[70vh] aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
-                  <div className="absolute inset-0 bg-yellow-400/10 rounded-[4rem] blur-[100px] animate-pulse"></div>
-                  <div className={`w-full h-full rounded-[3rem] border-[8px] md:border-[12px] bg-black/50 backdrop-blur-3xl shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
+              <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-center relative overflow-hidden group px-1 md:px-6 py-1 md:py-0 order-1 md:order-2">
+                <div className={`relative w-full max-w-[220px] sm:max-w-[280px] md:max-w-none md:h-full md:max-h-[70vh] aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
+                  <div className="absolute inset-0 bg-yellow-400/10 rounded-[2rem] md:rounded-[4rem] blur-[50px] md:blur-[100px] animate-pulse"></div>
+                  <div className={`w-full h-full rounded-3xl md:rounded-[3rem] border-[4px] md:border-[12px] bg-black/50 backdrop-blur-3xl shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
                     <img
                       src={getImageUrl(currentPlayer.image)}
                       alt={currentPlayer.name}
-                      className="w-full h-full object-contain filter drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]"
+                      className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] md:drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]"
                       onError={(e) => { e.target.src = '/deafult_player.png'; }}
                     />
                   </div>
@@ -343,39 +331,42 @@ function HostDashboard({ user }) {
               </div>
 
               {/* Right Column: Bid Action - Optimized for Overflow */}
-              <div className="col-span-12 md:col-span-4 flex flex-col gap-4 md:gap-6 min-h-[300px] md:min-h-0 mb-8 md:mb-0">
-                <div className={`flex-1 bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-[2.5rem] md:rounded-[3rem] p-4 lg:p-6 shadow-2xl border-[8px] md:border-[12px] border-white flex flex-col items-center justify-center text-blue-900 transition-all duration-500 ${bidFlash ? 'scale-[1.02] rotate-1' : ''}`}>
-                  <div className="text-blue-900/40 text-lg lg:text-xl font-black tracking-[0.5em] uppercase mb-2 lg:mb-4 text-center">Current Bid</div>
+              <div className="col-span-12 md:col-span-4 flex flex-col gap-2 md:gap-6 shrink-0 md:min-h-0 mb-4 md:mb-0 order-3 z-10">
+                <div className={`flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-[3rem] p-3 md:p-4 lg:p-6 shadow-2xl border-[4px] md:border-[12px] border-white items-center justify-between md:justify-center text-blue-900 transition-all duration-500 gap-3 md:gap-0 h-full ${bidFlash ? 'scale-[1.02] rotate-1' : ''}`}>
 
-                  {/* Dynamic Font Size for Amount */}
-                  <div className="w-full grid place-items-center mb-6 lg:mb-10">
-                    <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-center break-words w-full
-                      ${currentBid.toString().length > 7 ? 'text-4xl lg:text-6xl' : (currentBid.toString().length > 5 ? 'text-5xl lg:text-7xl' : 'text-6xl lg:text-8xl')}
+                  {/* Mobile Left / Desktop Top: Bid Amount */}
+                  <div className="flex flex-col items-start md:items-center w-5/12 md:w-full">
+                    <div className="text-blue-900/60 md:text-blue-900/40 text-[10px] md:text-lg lg:text-xl font-black tracking-[0.2em] md:tracking-[0.5em] uppercase md:mb-2 lg:mb-4 text-left md:text-center">Current Bid</div>
+                    <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-left md:text-center break-words w-full
+                      ${currentBid.toString().length > 7 ? 'text-2xl md:text-4xl lg:text-6xl' : (currentBid.toString().length > 5 ? 'text-3xl md:text-5xl lg:text-7xl' : 'text-3xl md:text-6xl lg:text-8xl')}
                       ${bidFlash ? 'scale-110' : ''}
                     `}>
                       ₹{formatIndianNumber(currentBid)}
                     </div>
                   </div>
 
-                  <div className="h-1.5 w-32 bg-blue-900/10 mb-8 rounded-full"></div>
+                  <div className="hidden md:block h-1.5 w-32 bg-blue-900/10 mb-8 rounded-full"></div>
+                  <div className="block md:hidden w-px h-12 bg-blue-900/20 mx-1"></div>
 
-                  {highestBid ? (
-                    <div className="w-full flex flex-col items-center animate-bounce-slow px-4">
-                      <div className="text-blue-900/60 text-xs lg:text-sm font-black uppercase tracking-[0.4em] mb-4 text-center">Leading Team</div>
-                      <div className="bg-blue-900 text-yellow-400 w-full px-6 py-4 lg:py-6 rounded-[2rem] shadow-2xl border-4 border-white/20 flex flex-col items-center justify-center text-center gap-2">
-                        <span className="text-2xl mb-1"></span>
-                        <span className={`font-black leading-tight break-words w-full
-                          ${highestBid.team_name.length > 15 ? 'text-xl lg:text-2xl' : 'text-2xl lg:text-4xl'}
-                        `}>
-                          {highestBid.team_name}
-                        </span>
+                  {/* Mobile Right / Desktop Bottom: Leading Team */}
+                  <div className="flex flex-col items-end md:items-center w-7/12 md:w-full animate-bounce-slow">
+                    {highestBid ? (
+                      <>
+                        <div className="text-blue-900/60 text-[9px] md:text-xs lg:text-sm font-black uppercase tracking-[0.2em] md:tracking-[0.4em] mb-1 md:mb-4 text-right md:text-center">Leading Team</div>
+                        <div className="bg-blue-900 text-yellow-400 w-full px-3 py-2 md:px-6 md:py-4 lg:py-6 rounded-xl md:rounded-[2rem] shadow-xl md:shadow-2xl border-2 md:border-4 border-white/20 flex flex-col items-center justify-center text-center gap-1 md:gap-2">
+                          <span className={`font-black leading-tight break-words w-full truncate md:overflow-visible md:whitespace-normal
+                            ${highestBid.team_name.length > 15 ? 'text-sm md:text-xl lg:text-2xl' : 'text-base md:text-2xl lg:text-4xl'}
+                          `}>
+                            {highestBid.team_name}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-blue-900/50 font-black italic text-sm md:text-2xl lg:text-3xl animate-pulse uppercase tracking-[0.1em] md:tracking-[0.2em] text-right md:text-center w-full">
+                        Awaiting Bid
                       </div>
-                    </div>
-                  ) : (
-                    <div className="text-blue-900/50 font-black italic text-2xl lg:text-3xl animate-pulse uppercase tracking-[0.2em] text-center">
-                      Awaiting Bid...
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
             </>
@@ -394,13 +385,13 @@ function HostDashboard({ user }) {
         </div>
 
         {/* Sponsors Footer - Replaced Promotional Footer */}
-        <div className="h-auto md:h-24 lg:h-32 flex flex-col items-center justify-center bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] py-4 md:py-2 shrink-0">
-          <div className="text-white/40 text-[10px] sm:text-xs font-black tracking-[0.3em] uppercase mb-3">SPONSORS</div>
-          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 lg:gap-20 px-4">
-            <img src="/Sumeet ( sponsor ).png" alt="Sumeet" className="h-8 sm:h-12 lg:h-20 object-contain" />
-            <img src="/Navneet ( sponsor).webp" alt="Navneet" className="h-8 sm:h-12 lg:h-20 object-contain" />
-            <img src="/Ratna Sagar ( sponsor ).png" alt="Ratna Sagar" className="h-8 sm:h-12 lg:h-20 object-contain" />
-            <img src="/Holy Faith ( sponsor).png" alt="Holy Faith" className="h-8 sm:h-12 lg:h-20 object-contain" />
+        <div className="h-auto md:h-24 lg:h-32 flex flex-col items-center justify-center bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] py-2 md:py-2 shrink-0">
+          <div className="text-white/40 text-[8px] sm:text-xs font-black tracking-[0.3em] uppercase mb-2 md:mb-3">SPONSORS</div>
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 lg:gap-20 px-2 md:px-4">
+            <img src="/Sumeet ( sponsor ).png" alt="Sumeet" className="h-6 sm:h-12 lg:h-20 object-contain" />
+            <img src="/Navneet ( sponsor).webp" alt="Navneet" className="h-6 sm:h-12 lg:h-20 object-contain" />
+            <img src="/Ratna Sagar ( sponsor ).png" alt="Ratna Sagar" className="h-6 sm:h-12 lg:h-20 object-contain" />
+            <img src="/Holy Faith ( sponsor).png" alt="Holy Faith" className="h-6 sm:h-12 lg:h-20 object-contain" />
           </div>
         </div>
       </div>
