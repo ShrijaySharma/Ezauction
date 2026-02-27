@@ -244,11 +244,11 @@ function HostDashboard({ user }) {
         {/* Top bar - Simplified & Centered */}
         <div className="h-16 md:h-32 flex items-center justify-between md:justify-end px-4 md:px-8 bg-black/40 backdrop-blur-md border-b border-white/10 relative shrink-0">
           <div className="md:absolute md:left-4 lg:left-8 md:top-1/2 md:-translate-y-1/2 flex flex-col items-center">
-            <img src="/ezauction.png" alt="EzAuction Logo" className="h-6 sm:h-12 lg:h-16 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]" />
+            <img src="/ezauction.png" alt="EzAuction Logo" className="h-6 sm:h-12 lg:h-16 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] md:hover:scale-105 transition-transform duration-500" />
           </div>
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <img src="/GAPL.png" alt="GAPL Logo" className="h-12 sm:h-40 lg:h-48 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)]" />
+            <img src="/GAPL.png" alt="GAPL Logo" className="h-12 sm:h-40 lg:h-48 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] md:hover:scale-105 transition-transform duration-500" />
           </div>
 
           <div className="flex items-center gap-2 md:gap-6">
@@ -256,7 +256,7 @@ function HostDashboard({ user }) {
             {!audioEnabled && (
               <button
                 onClick={enableAudio}
-                className="flex items-center gap-1.5 md:gap-2 px-2 py-1 md:px-4 md:py-2 bg-yellow-400 text-black rounded-lg md:rounded-xl font-black text-[10px] md:text-sm uppercase tracking-widest animate-pulse"
+                className="flex items-center gap-1.5 md:gap-2 px-2 py-1 md:px-4 md:py-2 bg-yellow-400 text-black rounded-lg md:rounded-xl font-black text-[10px] md:text-sm uppercase tracking-widest animate-pulse md:shadow-[0_0_20px_rgba(250,204,21,0.4)]"
               >
                 <span>🔊</span> <span className="hidden sm:inline">Sound</span>
               </button>
@@ -281,19 +281,33 @@ function HostDashboard({ user }) {
             <>
               {/* Left Column: Enhanced Player Profile */}
               <div className="col-span-12 md:col-span-3 flex flex-col flex-none md:h-full overflow-hidden order-2 md:order-1">
-                <div className="flex-1 bg-gray-900/90 backdrop-blur-2xl rounded-2xl md:rounded-[2.5rem] p-4 md:p-8 border md:border-2 border-white/20 shadow-xl md:shadow-2xl flex flex-row md:flex-col justify-between items-center md:items-stretch relative overflow-hidden group gap-4 md:gap-0">
+                <div className="flex-1 bg-gray-900/90 backdrop-blur-2xl rounded-2xl md:rounded-[2.5rem] p-4 md:p-8 border md:border-2 border-white/20 shadow-xl md:shadow-2xl flex flex-row md:flex-col justify-between items-center md:items-stretch relative overflow-hidden group gap-4 md:gap-0 md:min-h-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
+
+                  {/* Desktop Category Badge (hidden on mobile) */}
+                  <div className="hidden md:flex relative z-10 justify-between items-start mb-4">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-yellow-400 rounded-xl shadow-lg shadow-yellow-400/20">
+                          <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        </div>
+                        <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">Profile</span>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Left Side (Mobile) / Top (Desktop) */}
                   <div className="relative z-10 flex flex-col items-start gap-2 md:gap-0 md:justify-between w-1/2 md:w-auto h-full justify-center">
-                    <div className="px-3 py-1.5 md:px-5 md:py-3 bg-white/10 rounded-xl md:rounded-2xl border md:border-2 border-yellow-400/50 backdrop-blur-xl mb-2 md:mb-0">
-                      <span className="text-white font-mono font-black text-lg md:text-3xl drop-shadow-lg">#{currentPlayer.serial_number}</span>
+                    <div className="px-3 py-1.5 md:px-5 md:py-3 bg-white/10 rounded-xl md:rounded-2xl border md:border-2 border-yellow-400/50 backdrop-blur-xl mb-2 md:mb-0 md:self-end md:-mt-16 md:shadow-[0_0_20px_rgba(250,204,21,0.2)]">
+                      <span className="text-white font-mono font-black text-lg md:text-3xl drop-shadow-lg"><span className="md:hidden">#</span>{currentPlayer.serial_number}</span>
                     </div>
                     <div className="text-left md:text-center mt-0 md:mt-auto">
                       <h2 className="text-white text-xl sm:text-2xl md:text-4xl lg:text-5xl font-black tracking-tighter mb-1 md:mb-4 drop-shadow-2xl leading-[1.1] md:leading-[0.9] line-clamp-2 md:line-clamp-none">
                         {currentPlayer.name}
                       </h2>
-                      <div className="inline-block px-3 py-1 md:px-6 md:py-2.5 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm font-black uppercase tracking-widest shadow-lg md:shadow-xl shadow-yellow-400/20">
+                      <div className="inline-block px-3 py-1 md:px-6 md:py-2.5 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm font-black uppercase tracking-widest shadow-lg md:shadow-xl shadow-yellow-400/20 md:hover:scale-105 md:transition-transform">
                         {currentPlayer.role}
                       </div>
                     </div>
@@ -301,13 +315,13 @@ function HostDashboard({ user }) {
 
                   {/* Right Side (Mobile) / Bottom Grid (Desktop) */}
                   <div className="relative z-10 flex flex-col gap-2 md:grid md:grid-cols-1 md:gap-4 mt-0 md:mt-auto w-1/2 md:w-auto">
-                    <div className="bg-white/5 p-2 md:p-6 rounded-xl md:rounded-3xl border border-white/10 backdrop-blur-md flex flex-row md:flex-col justify-between items-center md:block">
+                    <div className="bg-white/5 p-2 md:p-6 rounded-xl md:rounded-3xl border border-white/10 backdrop-blur-md flex flex-row md:flex-col justify-between items-center md:block md:hover:bg-white/10 md:transition-colors">
                       <span className="text-white/40 text-[8px] md:text-[10px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] md:mb-2 md:text-center block">Age</span>
                       <div className="text-white font-black text-sm md:text-2xl uppercase tracking-tight md:text-center">{currentPlayer.age || 'N/A'} <span className="hidden md:inline">YRS</span></div>
                     </div>
                     <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-3 md:p-6 rounded-xl md:rounded-3xl border border-yellow-400/20 backdrop-blur-md flex flex-col justify-center h-full md:block">
                       <span className="block text-yellow-400/60 text-[8px] md:text-[10px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] mb-1 md:mb-2 text-center">Base Price</span>
-                      <div className="text-yellow-400 font-black text-lg md:text-4xl font-mono tracking-tighter text-center drop-shadow-lg leading-none">
+                      <div className="text-yellow-400 font-black text-lg md:text-4xl font-mono tracking-tighter text-center drop-shadow-lg leading-none md:leading-normal">
                         ₹{formatIndianNumber(currentPlayer.base_price || 0)}
                       </div>
                     </div>
@@ -332,12 +346,12 @@ function HostDashboard({ user }) {
 
               {/* Right Column: Bid Action - Optimized for Overflow */}
               <div className="col-span-12 md:col-span-4 flex flex-col gap-2 md:gap-6 shrink-0 md:min-h-0 mb-4 md:mb-0 order-3 z-10">
-                <div className={`flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-[3rem] p-3 md:p-4 lg:p-6 shadow-2xl border-[4px] md:border-[12px] border-white items-center justify-between md:justify-center text-blue-900 transition-all duration-500 gap-3 md:gap-0 h-full ${bidFlash ? 'scale-[1.02] rotate-1' : ''}`}>
+                <div className={`flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-[3rem] p-3 md:p-4 lg:p-6 shadow-2xl border-[4px] md:border-[12px] border-white items-center justify-between md:justify-center text-blue-900 transition-all duration-500 gap-3 md:gap-0 h-full md:flex-1 ${bidFlash ? 'scale-[1.02] rotate-1' : ''}`}>
 
                   {/* Mobile Left / Desktop Top: Bid Amount */}
                   <div className="flex flex-col items-start md:items-center w-5/12 md:w-full">
                     <div className="text-blue-900/60 md:text-blue-900/40 text-[10px] md:text-lg lg:text-xl font-black tracking-[0.2em] md:tracking-[0.5em] uppercase md:mb-2 lg:mb-4 text-left md:text-center">Current Bid</div>
-                    <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-left md:text-center break-words w-full
+                    <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-left md:text-center w-full break-words md:mb-6 lg:mb-10
                       ${currentBid.toString().length > 7 ? 'text-2xl md:text-4xl lg:text-6xl' : (currentBid.toString().length > 5 ? 'text-3xl md:text-5xl lg:text-7xl' : 'text-3xl md:text-6xl lg:text-8xl')}
                       ${bidFlash ? 'scale-110' : ''}
                     `}>
@@ -349,7 +363,7 @@ function HostDashboard({ user }) {
                   <div className="block md:hidden w-px h-12 bg-blue-900/20 mx-1"></div>
 
                   {/* Mobile Right / Desktop Bottom: Leading Team */}
-                  <div className="flex flex-col items-end md:items-center w-7/12 md:w-full animate-bounce-slow">
+                  <div className="flex flex-col items-end md:items-center w-7/12 md:w-full animate-bounce-slow md:px-4">
                     {highestBid ? (
                       <>
                         <div className="text-blue-900/60 text-[9px] md:text-xs lg:text-sm font-black uppercase tracking-[0.2em] md:tracking-[0.4em] mb-1 md:mb-4 text-right md:text-center">Leading Team</div>
@@ -363,7 +377,7 @@ function HostDashboard({ user }) {
                       </>
                     ) : (
                       <div className="text-blue-900/50 font-black italic text-sm md:text-2xl lg:text-3xl animate-pulse uppercase tracking-[0.1em] md:tracking-[0.2em] text-right md:text-center w-full">
-                        Awaiting Bid
+                        Awaiting Bid...
                       </div>
                     )}
                   </div>
