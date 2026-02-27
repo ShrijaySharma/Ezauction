@@ -335,7 +335,7 @@ function HostDashboard({ user }) {
                     <img
                       src={getImageUrl(currentPlayer.image)}
                       alt={currentPlayer.name}
-                      className="w-full h-full object-cover filter drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]"
+                      className="w-full h-full object-contain filter drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]"
                       onError={(e) => { e.target.src = '/deafult_player.png'; }}
                     />
                   </div>
@@ -397,10 +397,10 @@ function HostDashboard({ user }) {
         <div className="h-24 lg:h-32 flex flex-col items-center justify-center bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] pb-2 pt-2">
           <div className="text-white/40 text-[10px] sm:text-xs font-black tracking-[0.3em] uppercase mb-3">SPONSORS</div>
           <div className="flex items-center justify-center gap-8 sm:gap-12 lg:gap-20">
-            <img src="/Holy Faith ( sponsor).png" alt="Holy Faith" className="h-12 sm:h-16 lg:h-20 object-contain" />
+            <img src="/Sumeet ( sponsor ).png" alt="Sumeet" className="h-12 sm:h-16 lg:h-20 object-contain" />
             <img src="/Navneet ( sponsor).webp" alt="Navneet" className="h-12 sm:h-16 lg:h-20 object-contain" />
             <img src="/Ratna Sagar ( sponsor ).png" alt="Ratna Sagar" className="h-12 sm:h-16 lg:h-20 object-contain" />
-            <img src="/Sumeet ( sponsor ).png" alt="Sumeet" className="h-12 sm:h-16 lg:h-20 object-contain" />
+            <img src="/Holy Faith ( sponsor).png" alt="Holy Faith" className="h-12 sm:h-16 lg:h-20 object-contain" />
           </div>
         </div>
       </div>
