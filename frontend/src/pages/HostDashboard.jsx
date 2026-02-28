@@ -248,8 +248,6 @@ function HostDashboard({ user }) {
           </div>
 
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <h1 className="text-white font-black text-2xl sm:text-4xl lg:text-5xl uppercase tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">LIVE AUCTION</h1>
-            <div className="h-1 w-12 sm:w-24 bg-yellow-400 mt-1 sm:mt-2 rounded-full shadow-[0_0_15px_rgba(250,204,21,0.5)]"></div>
           </div>
 
           <div className="flex items-center gap-2 md:gap-6">
@@ -399,31 +397,10 @@ function HostDashboard({ user }) {
           )}
         </div>
 
-        {/* Promotional Footer - Enhanced Visibility */}
-        <div className="h-auto md:h-20 lg:h-24 flex flex-col md:flex-row items-center justify-between px-4 md:px-8 bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] py-2 md:py-0 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-1.5 h-6 md:h-10 bg-yellow-400 rounded-full shadow-[0_0_15px_rgba(250,204,21,0.5)] hidden md:block"></div>
-            <div>
-              <div className="text-white/40 text-[8px] sm:text-[10px] font-black tracking-[0.3em] uppercase mb-0.5">Powered By</div>
-              <div className="text-white font-black text-xs sm:text-lg tracking-wider">DevCraft Services</div>
-            </div>
-          </div>
-
-          <div className="text-yellow-400/80 text-[10px] sm:text-sm font-black tracking-[0.2em] md:tracking-[0.4em] uppercase text-center my-2 md:my-0 drop-shadow-[0_0_10px_rgba(250,204,21,0.3)] order-last md:order-none">
-            Welcome To The Grand Stage
-          </div>
-
-          <div className="flex flex-col items-center md:items-end gap-0.5">
-            <div className="text-white/60 text-[8px] sm:text-[10px] font-black tracking-widest uppercase mb-0.5 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">Host Your Own Auction</div>
-            <div className="flex flex-col md:flex-row items-center gap-1 sm:gap-4 md:mr-2">
-              <a href="tel:+917006884617" className="text-white font-black text-[10px] sm:text-sm md:text-base hover:text-yellow-400 transition-colors flex items-center gap-1 sm:gap-2 tracking-wider drop-shadow-lg">
-                <span className="text-yellow-400/80">📱</span> +91 70068 84617
-              </a>
-              <span className="hidden md:block text-white/20">|</span>
-              <a href="tel:+917006283186" className="text-white font-black text-[10px] sm:text-sm md:text-base hover:text-yellow-400 transition-colors flex items-center gap-1 sm:gap-2 tracking-wider drop-shadow-lg">
-                <span className="text-yellow-400/80">📱</span> +91 70062 83186
-              </a>
-            </div>
+        {/* Rental Contact Footer */}
+        <div className="h-auto md:h-20 flex flex-col items-center justify-center px-4 md:px-8 bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] py-4 md:py-0 shrink-0">
+          <div className="text-white font-black text-xs sm:text-base md:text-xl tracking-widest uppercase flex items-center gap-2 drop-shadow-lg text-center">
+            For renting this auction app contact <span className="text-yellow-400">7697544446</span>
           </div>
         </div>
       </div>
