@@ -136,7 +136,8 @@ router.get('/current-info', async (req, res) => {
 
 // Place bid
 router.post('/bid', async (req, res) => {
-    const { amount } = req.body;
+    let { amount } = req.body;
+    amount = parseInt(amount, 10);
     const teamId = req.session.teamId;
     const io = req.app.locals.io;
 

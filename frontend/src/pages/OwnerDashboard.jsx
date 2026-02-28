@@ -263,7 +263,9 @@ function OwnerDashboard({ user }) {
   const handleBid = async (increment) => {
     if (bidding[increment]) return; // Prevent double clicks
 
-    const newBidAmount = currentBid + increment;
+    const parsedCurrentBid = parseInt(currentBid, 10) || 0;
+    const parsedIncrement = parseInt(increment, 10) || 0;
+    const newBidAmount = parsedCurrentBid + parsedIncrement;
 
     setBidding({ ...bidding, [increment]: true });
 
