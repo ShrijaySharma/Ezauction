@@ -134,6 +134,9 @@ router.get('/current-info', async (req, res) => {
     }
 });
 
+// Mutex lock for serializing bids
+let currentBidLock = Promise.resolve();
+
 // Place bid
 router.post('/bid', async (req, res) => {
     let { amount } = req.body;
@@ -145,7 +148,16 @@ router.post('/bid', async (req, res) => {
         return res.status(400).json({ error: 'Invalid bid amount' });
     }
 
+    // Acquire lock to serialize concurrent bids
+    let release;
+    const nextLock = new Promise(resolve => { release = resolve; });
+    const previousLock = currentBidLock;
+    currentBidLock = nextLock;
+
     try {
+        // Wait for any currently processing bid to finish
+        await previousLock;
+
         // 1. Get Auction State (Required first for current_player_id)
         const { data: state, error: stateError } = await supabase.from('auction_state').select('*').eq('id', 1).single();
         if (stateError || !state) return res.status(500).json({ error: 'Auction state error' });
@@ -281,6 +293,8 @@ router.post('/bid', async (req, res) => {
     } catch (err) {
         console.error('Error in owner bid:', err);
         res.status(500).json({ error: 'Server error' });
+    } finally {
+        release();
     }
 });
 
