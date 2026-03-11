@@ -7,6 +7,7 @@ import upload from '../middleware/upload.js';
 import { supabase } from '../supabaseClient.js';
 import path from 'path';
 import sharp from 'sharp';
+import ExcelJS from 'exceljs';
 
 const router = express.Router();
 
@@ -1853,6 +1854,110 @@ router.post('/admin-bid', async (req, res) => {
   } catch (err) {
     console.error('Error in admin bid:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Export Team Squads
+router.get('/export-teams', async (req, res) => {
+  try {
+    const { data: teams, error: teamsError } = await supabase
+      .from('teams')
+      .select('id, name')
+      .order('name');
+    if (teamsError) throw teamsError;
+
+    const { data: players, error: playersError } = await supabase
+      .from('players')
+      .select('name, role, sold_price, serial_number, sold_to_team')
+      .eq('status', 'SOLD')
+      .order('serial_number');
+    if (playersError) throw playersError;
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Team Squads');
+
+    const teamHeaders = [];
+    const subHeaders = [];
+
+    teams.forEach(team => {
+      teamHeaders.push(team.name, '', '');
+      subHeaders.push('Serial #', 'Player Name', 'Price');
+    });
+
+    sheet.addRow(teamHeaders);
+    sheet.addRow(subHeaders);
+
+    let startCol = 1;
+    teams.forEach(team => {
+      sheet.mergeCells(1, startCol, 1, startCol + 2);
+
+      const cell = sheet.getCell(1, startCol);
+      cell.font = { bold: true, size: 12 };
+      cell.alignment = { horizontal: 'center' };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD3D3D3' }
+      };
+
+      for (let i = 0; i < 3; i++) {
+        const subCell = sheet.getCell(2, startCol + i);
+        subCell.font = { bold: true };
+        subCell.border = { bottom: { style: 'thin' } };
+      }
+      startCol += 3;
+    });
+
+    const playersByTeam = {};
+    teams.forEach(t => { playersByTeam[t.id] = []; });
+
+    players.forEach(p => {
+      if (p.sold_to_team && playersByTeam[p.sold_to_team]) {
+        playersByTeam[p.sold_to_team].push(p);
+      }
+    });
+
+    let maxPlayers = 0;
+    Object.values(playersByTeam).forEach(teamPlayers => {
+      if (teamPlayers.length > maxPlayers) maxPlayers = teamPlayers.length;
+    });
+
+    for (let rowIdx = 0; rowIdx < maxPlayers; rowIdx++) {
+      const rowData = [];
+      teams.forEach(team => {
+        const teamPlayers = playersByTeam[team.id];
+        const player = teamPlayers[rowIdx];
+
+        if (player) {
+          rowData.push(
+            player.serial_number || '',
+            player.name || '',
+            player.sold_price || ''
+          );
+        } else {
+          rowData.push('', '', '');
+        }
+      });
+      sheet.addRow(rowData);
+    }
+
+    for (let i = 1; i <= teams.length * 3; i++) {
+      let maxWidth = 10;
+      sheet.getColumn(i).eachCell({ includeEmpty: false }, cell => {
+        const value = cell.value ? cell.value.toString() : '';
+        if (value.length > maxWidth) maxWidth = value.length;
+      });
+      sheet.getColumn(i).width = maxWidth + 2;
+    }
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Team_Squads_Export.xlsx');
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error('Export failed:', error);
+    res.status(500).json({ error: 'Failed to export teams' });
   }
 });
 
