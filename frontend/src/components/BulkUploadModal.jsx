@@ -37,10 +37,12 @@ Ben Stokes,All Rounder,15000000,England,32,55,`;
 const BulkUploadModal = ({ onClose, onSuccess }) => {
     const [csvText, setCsvText] = useState('');
     const [file, setFile] = useState(null);
+    const [photoZip, setPhotoZip] = useState(null);
     const [previewData, setPreviewData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [step, setStep] = useState(1); // 1: Input, 2: Preview
+    const [uploadProgress, setUploadProgress] = useState('');
 
     const handleFileChange = (e) => {
         const selectedFile = e.target.files[0];
@@ -63,6 +65,18 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
         }
     };
 
+    const handleZipChange = (e) => {
+        const selectedFile = e.target.files[0];
+        if (selectedFile) {
+            if (!selectedFile.name.toLowerCase().endsWith('.zip')) {
+                setError('Please select a .zip file');
+                return;
+            }
+            setPhotoZip(selectedFile);
+            setError(null);
+        }
+    };
+
     const handlePreview = () => {
         try {
             const parsed = parseCSV(csvText);
@@ -74,7 +88,6 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
             const valid = parsed.every(p => p.name && p.role && p.base_price);
             if (!valid) {
                 setError('Some rows are missing required fields (name, role, base_price).');
-                // We could still allow preview but show errors. For now, strict.
             }
             setPreviewData(parsed);
             setStep(2);
@@ -87,22 +100,41 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
     const handleUpload = async () => {
         setLoading(true);
         setError(null);
-        try {
-            // Use the parsed data from preview to ensure consistency
-            const result = await adminService.addPlayersBulk(previewData);
 
-            if (result.success) {
-                alert(`Successfully added ${result.count} players!`);
-                onSuccess();
-                onClose();
+        try {
+            if (photoZip && file) {
+                // Use the new bulk import with photos endpoint
+                setUploadProgress('Uploading files and processing images...');
+                const result = await adminService.bulkImportWithPhotos(file, photoZip);
+
+                if (result.success) {
+                    const photoInfo = result.photosMatched
+                        ? ` (${result.photosMatched} photos matched)`
+                        : '';
+                    alert(`Successfully added ${result.count} players!${photoInfo}`);
+                    onSuccess();
+                    onClose();
+                } else {
+                    setError('Upload failed: ' + (result.error || 'Unknown error'));
+                }
             } else {
-                setError('Upload failed: ' + result.error);
+                // Use existing JSON bulk endpoint (original behavior preserved)
+                const result = await adminService.addPlayersBulk(previewData);
+
+                if (result.success) {
+                    alert(`Successfully added ${result.count} players!`);
+                    onSuccess();
+                    onClose();
+                } else {
+                    setError('Upload failed: ' + result.error);
+                }
             }
         } catch (err) {
             console.error(err);
-            setError('Upload error: ' + (err.response?.data?.error || err.message));
+            setError('Upload error: ' + (err.message || err.response?.data?.error || 'Unknown error'));
         } finally {
             setLoading(false);
+            setUploadProgress('');
         }
     };
 
@@ -161,7 +193,7 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                         </div>
                                         <input type="file" className="hidden" accept=".csv,.xlsx,.xls" onChange={handleFileChange} />
                                     </label>
-                                    {file && <p className="mt-2 text-green-400 text-sm">Selected: {file.name}</p>}
+                                    {file && <p className="mt-2 text-green-400 text-sm">✅ Selected: {file.name}</p>}
                                 </div>
 
                                 {/* Method 2: Paste Text */}
@@ -174,6 +206,39 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                         onChange={(e) => setCsvText(e.target.value)}
                                     ></textarea>
                                 </div>
+                            </div>
+
+                            {/* Photo ZIP Upload */}
+                            <div className="bg-gradient-to-r from-[#2a2a2a] to-[#252535] p-6 rounded-lg border border-indigo-500/30">
+                                <div className="flex items-center gap-3 mb-3">
+                                    <span className="text-2xl">📷</span>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-white">Photo ZIP Upload <span className="text-gray-400 text-sm font-normal">(Optional)</span></h3>
+                                        <p className="text-sm text-gray-400">Upload a ZIP file with player photos. Photos are matched by sequence order (1st image → 1st player, etc.)</p>
+                                    </div>
+                                </div>
+                                <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-indigo-500/30 border-dashed rounded-lg cursor-pointer hover:bg-indigo-900/10 transition-colors">
+                                    <div className="flex flex-col items-center justify-center py-4">
+                                        <svg className="w-6 h-6 mb-2 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        <p className="text-sm text-indigo-300"><span className="font-semibold">Click to select photos.zip</span></p>
+                                        <p className="text-xs text-gray-500">Images named 1.jpg, 2.jpg... or any alphabetical order</p>
+                                    </div>
+                                    <input type="file" className="hidden" accept=".zip" onChange={handleZipChange} />
+                                </label>
+                                {photoZip && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <span className="text-green-400 text-sm">✅ {photoZip.name}</span>
+                                        <span className="text-gray-500 text-xs">({(photoZip.size / (1024 * 1024)).toFixed(1)} MB)</span>
+                                        <button
+                                            onClick={() => setPhotoZip(null)}
+                                            className="text-red-400 hover:text-red-300 text-xs ml-2"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex justify-center">
@@ -190,7 +255,14 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <h3 className="text-lg font-semibold text-white">Preview ({previewData.length} players)</h3>
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-lg font-semibold text-white">Preview ({previewData.length} players)</h3>
+                                {photoZip && (
+                                    <span className="text-indigo-400 text-sm flex items-center gap-1">
+                                        📷 Photos ZIP attached — images will be matched by order
+                                    </span>
+                                )}
+                            </div>
                             <div className="overflow-x-auto max-h-[500px] border border-gray-700 rounded-lg">
                                 <table className="w-full text-sm text-left text-gray-400">
                                     <thead className="text-xs text-gray-200 uppercase bg-gray-800">
@@ -198,12 +270,11 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                             <th className="px-6 py-3">#</th>
                                             <th className="px-6 py-3">Name</th>
                                             <th className="px-6 py-3">Role</th>
-                                            <th className="px-6 py-3">Team</th>
+                                            <th className="px-6 py-3">Country</th>
                                             <th className="px-6 py-3">Age</th>
                                             <th className="px-6 py-3">Base Price</th>
                                             <th className="px-6 py-3">Serial</th>
-                                            <th className="px-6 py-3">Image</th>
-                                            <th className="px-6 py-3">Thumb URL</th>
+                                            <th className="px-6 py-3">Photo</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -216,12 +287,33 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                                 <td className="px-6 py-4">{row.age || '-'}</td>
                                                 <td className="px-6 py-4">{row.base_price}</td>
                                                 <td className="px-6 py-4">{row.serial_number || '-'}</td>
-                                                <td className="px-6 py-4">{row.image ? <a href={row.image} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Link</a> : '-'}</td>
-                                                <td className="px-6 py-4">{row.thumb_url ? <a href={row.thumb_url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Link</a> : '-'}</td>
+                                                <td className="px-6 py-4">
+                                                    {photoZip ? (
+                                                        <span className="text-indigo-400">📷 ZIP</span>
+                                                    ) : row.image ? (
+                                                        <a href={row.image} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Link</a>
+                                                    ) : '-'}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Upload Progress */}
+                    {loading && uploadProgress && (
+                        <div className="mt-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                            <div className="flex items-center gap-3">
+                                <svg className="animate-spin h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span className="text-blue-300 text-sm">{uploadProgress}</span>
+                            </div>
+                            <div className="mt-2 w-full bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                                <div className="bg-blue-500 h-1.5 rounded-full animate-pulse" style={{ width: '60%' }}></div>
                             </div>
                         </div>
                     )}
@@ -263,10 +355,12 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                         </svg>
-                                        Importing...
+                                        {photoZip ? 'Processing & Uploading...' : 'Importing...'}
                                     </>
                                 ) : (
-                                    'Import Players'
+                                    <>
+                                        {photoZip ? '📷 Import with Photos' : 'Import Players'}
+                                    </>
                                 )}
                             </button>
                         </>

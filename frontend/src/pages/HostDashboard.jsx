@@ -31,6 +31,9 @@ function HostDashboard({ user }) {
   const [notification, setNotification] = useState(null);
   const [notificationKey, setNotificationKey] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showTeamPurses, setShowTeamPurses] = useState(false);
+  const [teamPurses, setTeamPurses] = useState([]);
 
   const audioElementRef = useRef(null);
 
@@ -63,6 +66,7 @@ function HostDashboard({ user }) {
     loadCurrentInfo();
     loadTeams();
     loadUnsoldPlayers();
+    loadTeamPurses();
 
     newSocket.on('bid-placed', (data) => {
       console.log('Bid placed event:', data);
@@ -140,6 +144,15 @@ function HostDashboard({ user }) {
       setHighestBid(null);
       setCurrentBid(0);
       setAllBids([]);
+      loadTeamPurses();
+    });
+
+    newSocket.on('player-marked', () => {
+      loadTeamPurses();
+    });
+
+    newSocket.on('team-budget-updated', () => {
+      loadTeamPurses();
     });
 
     // Poll for updates every 2 seconds as backup
@@ -189,6 +202,15 @@ function HostDashboard({ user }) {
       console.log(`Preloading ${data?.length || 0} unsold player images for instant rendering`);
     } catch (error) {
       console.error('Error loading unsold players for preloading:', error);
+    }
+  };
+
+  const loadTeamPurses = async () => {
+    try {
+      const data = await hostService.getTeamPurses();
+      setTeamPurses(data || []);
+    } catch (error) {
+      console.error('Error loading team purses:', error);
     }
   };
 
@@ -243,7 +265,17 @@ function HostDashboard({ user }) {
       <div className="relative z-10 h-full w-full flex flex-col">
         {/* Top bar - Simplified & Centered */}
         <div className="h-16 md:h-32 flex items-center justify-between md:justify-end px-4 md:px-8 bg-black/40 backdrop-blur-md border-b border-white/10 relative shrink-0">
-          <div className="md:absolute md:left-4 lg:left-8 md:top-1/2 md:-translate-y-1/2 flex flex-col items-center">
+        <div className="md:absolute md:left-4 lg:left-8 md:top-1/2 md:-translate-y-1/2 flex items-center gap-3">
+            {/* Burger Menu Button */}
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="flex flex-col items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-white/10 hover:bg-white/20 rounded-lg md:rounded-xl border border-white/10 transition-all group"
+              title="Menu"
+            >
+              <span className={`block w-4 md:w-5 h-0.5 bg-white/70 group-hover:bg-white transition-all ${showMenu ? 'rotate-45 translate-y-[3px]' : ''}`}></span>
+              <span className={`block w-4 md:w-5 h-0.5 bg-white/70 group-hover:bg-white my-[3px] transition-all ${showMenu ? 'opacity-0' : ''}`}></span>
+              <span className={`block w-4 md:w-5 h-0.5 bg-white/70 group-hover:bg-white transition-all ${showMenu ? '-rotate-45 -translate-y-[3px]' : ''}`}></span>
+            </button>
             <img src="/ezauction.png" alt="EzAuction Logo" className="h-6 sm:h-12 lg:h-16 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] md:hover:scale-105 transition-transform duration-500" />
           </div>
 
@@ -396,6 +428,130 @@ function HostDashboard({ user }) {
             </div>
           )}
         </div>
+
+        {/* Burger Menu Dropdown */}
+        {showMenu && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)}></div>
+            <div className="fixed top-16 md:top-32 left-2 md:left-4 z-50 bg-gray-900/95 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-w-[200px] animate-slide-in-right">
+              <button
+                onClick={() => { setShowTeamPurses(true); setShowMenu(false); loadTeamPurses(); }}
+                className="w-full flex items-center gap-3 px-5 py-4 text-white hover:bg-white/10 transition-colors text-left"
+              >
+                <span className="text-xl">💰</span>
+                <span className="font-semibold text-sm tracking-wide">Team Purses</span>
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Team Purses Slide-out Panel */}
+        {showTeamPurses && (
+          <div className="fixed inset-0 z-50 flex">
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowTeamPurses(false)}></div>
+
+            {/* Panel */}
+            <div className="relative ml-auto w-full max-w-md h-full bg-gradient-to-b from-gray-900/98 via-gray-900/95 to-black/98 backdrop-blur-3xl border-l border-white/10 shadow-2xl flex flex-col animate-slide-in-right">
+              {/* Panel Header */}
+              <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-gradient-to-r from-yellow-400/5 to-transparent">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-yellow-400/10 rounded-xl border border-yellow-400/20">
+                    <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-white font-black text-xl tracking-tight">Team Purses</h2>
+                </div>
+                <button
+                  onClick={() => setShowTeamPurses(false)}
+                  className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                >
+                  <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Team Cards */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-none">
+                {teamPurses.length > 0 ? (
+                  teamPurses.map((team, index) => {
+                    const budgetPercent = team.budget && team.totalSpent !== undefined
+                      ? Math.max(0, (team.budget / (team.budget + team.totalSpent)) * 100)
+                      : 100;
+                    return (
+                      <div
+                        key={team.id}
+                        className="bg-white/5 rounded-2xl border border-white/10 p-4 hover:bg-white/8 transition-all group"
+                        style={{ animationDelay: `${index * 60}ms` }}
+                      >
+                        <div className="flex items-center gap-3 mb-3">
+                          {team.logo ? (
+                            <img
+                              src={getImageUrl(team.logo)}
+                              alt={team.name}
+                              className="w-10 h-10 rounded-full object-cover border-2 border-white/20 group-hover:border-yellow-400/40 transition-colors"
+                              onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=' + team.name.charAt(0); }}
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400/20 to-orange-400/20 border-2 border-white/20 flex items-center justify-center text-white font-black text-sm">
+                              {team.name.charAt(0)}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-white font-bold text-sm truncate">{team.name}</h3>
+                            <p className="text-white/40 text-xs">{team.playersBought || 0} players bought</p>
+                          </div>
+                        </div>
+
+                        {/* Budget Bar */}
+                        <div className="mb-2">
+                          <div className="flex items-baseline justify-between mb-1">
+                            <span className="text-white/50 text-[10px] font-bold uppercase tracking-widest">Remaining</span>
+                            <span className="text-yellow-400 font-black text-lg font-mono tracking-tight">₹{formatIndianNumber(team.budget || 0)}</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-700 ${
+                                budgetPercent > 60 ? 'bg-gradient-to-r from-green-400 to-emerald-500' :
+                                budgetPercent > 30 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' :
+                                'bg-gradient-to-r from-red-400 to-rose-600'
+                              }`}
+                              style={{ width: `${budgetPercent}%` }}
+                            ></div>
+                          </div>
+                        </div>
+
+                        {team.totalSpent > 0 && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-white/30">Total Spent</span>
+                            <span className="text-rose-400/70 font-mono font-semibold">₹{formatIndianNumber(team.totalSpent)}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="text-4xl mb-3 opacity-40">💰</div>
+                    <p className="text-white/40 text-sm">No teams available</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Panel Footer */}
+              <div className="px-6 py-4 border-t border-white/10 bg-black/30">
+                <button
+                  onClick={loadTeamPurses}
+                  className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all border border-white/10"
+                >
+                  ↻ Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Rental Contact Footer */}
         <div className="h-auto md:h-20 flex flex-col items-center justify-center px-4 md:px-8 bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] py-4 md:py-0 shrink-0">

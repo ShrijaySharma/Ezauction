@@ -8,6 +8,9 @@ import { supabase } from '../supabaseClient.js';
 import path from 'path';
 import sharp from 'sharp';
 import ExcelJS from 'exceljs';
+import AdmZip from 'adm-zip';
+import multer from 'multer';
+import XLSX from 'xlsx';
 
 const router = express.Router();
 
@@ -1118,6 +1121,212 @@ router.post('/players-bulk', async (req, res) => {
     res.status(500).json({ error: 'Database error: ' + err.message });
   }
 });
+
+// Bulk add players with photos (multipart: playerFile + photoZip)
+const bulkUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for ZIP
+});
+
+router.post('/players-bulk-with-photos',
+  bulkUpload.fields([
+    { name: 'playerFile', maxCount: 1 },
+    { name: 'photoZip', maxCount: 1 }
+  ]),
+  async (req, res) => {
+    const io = req.app.locals.io;
+
+    try {
+      // 1. Parse the player file (xlsx or csv)
+      const playerFileArr = req.files['playerFile'];
+      if (!playerFileArr || playerFileArr.length === 0) {
+        return res.status(400).json({ error: 'Player file (xlsx/csv) is required' });
+      }
+      const playerFile = playerFileArr[0];
+      const fileBuffer = playerFile.buffer;
+      const fileName = playerFile.originalname.toLowerCase();
+
+      let playerRows = [];
+
+      if (fileName.endsWith('.csv')) {
+        // Parse CSV
+        const csvText = fileBuffer.toString('utf-8');
+        const lines = csvText.split('\n').filter(l => l.trim() !== '');
+        if (lines.length < 2) {
+          return res.status(400).json({ error: 'CSV file must have a header row and at least one data row' });
+        }
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+          const row = {};
+          headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
+          playerRows.push(row);
+        }
+      } else {
+        // Parse Excel using xlsx library
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+        // Normalize headers to lowercase
+        playerRows = jsonData.map(row => {
+          const normalized = {};
+          Object.keys(row).forEach(key => {
+            normalized[key.trim().toLowerCase()] = row[key];
+          });
+          return normalized;
+        });
+      }
+
+      if (playerRows.length === 0) {
+        return res.status(400).json({ error: 'No player data found in file' });
+      }
+
+      // Validate required fields
+      const validPlayers = [];
+      const errors = [];
+      for (let i = 0; i < playerRows.length; i++) {
+        const p = playerRows[i];
+        if (!p.name || !p.role || !p.base_price) {
+          errors.push({ index: i, error: 'Missing required fields (name, role, base_price)', data: p });
+          continue;
+        }
+        validPlayers.push({
+          name: String(p.name).trim(),
+          role: String(p.role).trim(),
+          base_price: parseFloat(p.base_price),
+          country: p.country ? String(p.country).trim() : null,
+          age: p.age ? parseInt(p.age) : null,
+          serial_number: p.serial_number ? parseInt(p.serial_number) : null,
+          status: 'AVAILABLE',
+          image: null,
+          thumb_url: null
+        });
+      }
+
+      if (validPlayers.length === 0) {
+        return res.status(400).json({ error: 'No valid players found', detailedErrors: errors });
+      }
+
+      // 2. Extract photos from ZIP if provided
+      const photoZipArr = req.files['photoZip'];
+      let imageBuffers = []; // Array of { buffer, ext }
+
+      if (photoZipArr && photoZipArr.length > 0) {
+        try {
+          const zip = new AdmZip(photoZipArr[0].buffer);
+          const entries = zip.getEntries();
+
+          // Filter only image files, ignore directories and __MACOSX
+          const imageEntries = entries.filter(entry => {
+            if (entry.isDirectory) return false;
+            const name = entry.entryName.toLowerCase();
+            if (name.startsWith('__macosx') || name.startsWith('.')) return false;
+            return /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(name);
+          });
+
+          // Sort alphabetically/naturally to establish sequence order
+          imageEntries.sort((a, b) => {
+            const nameA = a.entryName.split('/').pop();
+            const nameB = b.entryName.split('/').pop();
+            return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+          });
+
+          for (const entry of imageEntries) {
+            const ext = path.extname(entry.entryName).toLowerCase();
+            imageBuffers.push({
+              buffer: entry.getData(),
+              ext: ext
+            });
+          }
+
+          console.log(`Extracted ${imageBuffers.length} images from ZIP for ${validPlayers.length} players`);
+        } catch (zipErr) {
+          console.error('Error extracting ZIP:', zipErr);
+          return res.status(400).json({ error: 'Failed to extract photos.zip: ' + zipErr.message });
+        }
+      }
+
+      // 3. Process images and upload to Supabase
+      for (let i = 0; i < validPlayers.length; i++) {
+        if (i < imageBuffers.length) {
+          try {
+            const imgData = imageBuffers[i];
+            const playerName = validPlayers[i].name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '_')
+              .replace(/^_+|_+$/g, '');
+            const uniqueId = Date.now().toString() + '_' + i;
+            const mainFilename = `main/${uniqueId}_${playerName}.webp`;
+            const thumbFilename = `thumb/${uniqueId}_${playerName}.webp`;
+
+            // Process main image (800x1000, WebP, 75 quality)
+            const mainBuffer = await sharp(imgData.buffer)
+              .resize(800, 1000, { fit: 'cover' })
+              .webp({ quality: 75 })
+              .toBuffer();
+
+            // Process thumbnail (400x500, WebP, 70 quality)
+            const thumbBuffer = await sharp(imgData.buffer)
+              .resize(400, 500, { fit: 'cover' })
+              .webp({ quality: 70 })
+              .toBuffer();
+
+            // Upload main image
+            const mainBase64 = mainBuffer.toString('base64');
+            const mainArrayBuffer = decode(mainBase64);
+            const { error: mainError } = await supabase.storage
+              .from('auction-images')
+              .upload(mainFilename, mainArrayBuffer, { contentType: 'image/webp', upsert: true });
+            if (mainError) throw mainError;
+
+            // Upload thumbnail
+            const thumbBase64 = thumbBuffer.toString('base64');
+            const thumbArrayBuffer = decode(thumbBase64);
+            const { error: thumbError } = await supabase.storage
+              .from('auction-images')
+              .upload(thumbFilename, thumbArrayBuffer, { contentType: 'image/webp', upsert: true });
+            if (thumbError) throw thumbError;
+
+            // Get public URLs
+            const { data: mainUrlData } = supabase.storage.from('auction-images').getPublicUrl(mainFilename);
+            const { data: thumbUrlData } = supabase.storage.from('auction-images').getPublicUrl(thumbFilename);
+
+            validPlayers[i].image = mainUrlData.publicUrl;
+            validPlayers[i].thumb_url = thumbUrlData.publicUrl;
+
+            console.log(`Uploaded image for ${validPlayers[i].name}`);
+          } catch (imgErr) {
+            console.error(`Error processing image for player ${validPlayers[i].name}:`, imgErr);
+            // Continue without image for this player
+          }
+        }
+      }
+
+      // 4. Bulk insert all players
+      const { data: inserted, error: insertError } = await supabase
+        .from('players')
+        .insert(validPlayers)
+        .select();
+
+      if (insertError) throw insertError;
+
+      console.log(`Bulk added ${inserted.length} players with photos`);
+      io.emit('player-added', { count: inserted.length });
+
+      res.json({
+        success: true,
+        count: inserted.length,
+        totalProcessed: playerRows.length,
+        photosMatched: Math.min(imageBuffers.length, validPlayers.length),
+        errors: errors.length > 0 ? errors : undefined
+      });
+
+    } catch (err) {
+      console.error('Error in bulk import with photos:', err);
+      res.status(500).json({ error: 'Server error: ' + err.message });
+    }
+  }
+);
 
 // Update player
 router.put('/players/:id', async (req, res) => {

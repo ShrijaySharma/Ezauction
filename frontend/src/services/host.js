@@ -20,3 +20,8 @@ export const getUnsoldPlayers = async () => {
   return response.data;
 };
 
+export const getTeamPurses = async () => {
+  const response = await api.get('/host/team-purses');
+  return response.data;
+};
+

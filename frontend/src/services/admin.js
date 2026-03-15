@@ -69,6 +69,34 @@ export const addPlayersBulk = async (players) => {
   return response.data;
 };
 
+// Bulk import players with photos (multipart)
+export const bulkImportWithPhotos = async (playerFile, photoZip) => {
+  try {
+    const formData = new FormData();
+    formData.append('playerFile', playerFile);
+    if (photoZip) {
+      formData.append('photoZip', photoZip);
+    }
+
+    const API_BASE_URL = getApiBaseUrl();
+    const response = await fetch(`${API_BASE_URL}/admin/players-bulk-with-photos`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Bulk import failed' }));
+      throw new Error(errorData.error || 'Bulk import failed');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error in bulkImportWithPhotos:', error);
+    throw error;
+  }
+};
+
 // Add new player
 export const addPlayer = async (playerData) => {
   const response = await api.post('/admin/players', playerData);

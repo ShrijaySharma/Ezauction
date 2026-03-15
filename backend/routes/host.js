@@ -179,4 +179,41 @@ router.get('/unsold-players', async (req, res) => {
   }
 });
 
+// Get team purses with players bought count (for host purse view)
+router.get('/team-purses', async (req, res) => {
+  try {
+    // Fetch teams
+    const { data: teams, error: teamsError } = await supabase
+      .from('teams')
+      .select('id, name, budget, logo')
+      .order('name');
+
+    if (teamsError) throw teamsError;
+
+    // Fetch sold players grouped by team
+    const { data: soldPlayers, error: playersError } = await supabase
+      .from('players')
+      .select('sold_to_team, sold_price')
+      .eq('status', 'SOLD');
+
+    if (playersError) throw playersError;
+
+    // Build team data with player counts and spend
+    const teamData = (teams || []).map(team => {
+      const teamPlayers = (soldPlayers || []).filter(p => p.sold_to_team === team.id);
+      const totalSpent = teamPlayers.reduce((sum, p) => sum + (parseFloat(p.sold_price) || 0), 0);
+      return {
+        ...team,
+        playersBought: teamPlayers.length,
+        totalSpent: totalSpent
+      };
+    });
+
+    res.json(teamData);
+  } catch (err) {
+    console.error('Error fetching team purses:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.96.0",
+    "adm-zip": "^0.5.16",
     "base64-arraybuffer": "^1.0.2",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",

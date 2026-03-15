@@ -77,6 +77,7 @@ function AdminDashboard({ user }) {
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [showAdminBidding, setShowAdminBidding] = useState(false);
   const [customBidIncrement, setCustomBidIncrement] = useState(1000);
+  const [newBaseBidAmount, setNewBaseBidAmount] = useState(1000);
 
   // Notification State
   const [notification, setNotification] = useState(null);
@@ -342,6 +343,15 @@ function AdminDashboard({ user }) {
           enforceMaxBid: data.enforceMaxBid,
           baseBidAmount: data.baseBidAmount || 1000
         }));
+      }
+      // Sync newBaseBidAmount from server (only if different and user hasn't edited)
+      if (data.baseBidAmount !== undefined) {
+        setNewBaseBidAmount(prev => {
+          if (prev !== data.baseBidAmount && data.baseBidAmount) {
+            return data.baseBidAmount;
+          }
+          return prev;
+        });
       }
     } catch (error) {
       console.error('Error loading auction state:', error);
@@ -2092,12 +2102,12 @@ function AdminDashboard({ user }) {
                           <div className="flex gap-2">
                             <input
                               type="number"
-                              value={auctionState.baseBidAmount || 1000}
-                              onChange={(e) => setAuctionState({ ...auctionState, baseBidAmount: parseInt(e.target.value) || 0 })}
+                              value={newBaseBidAmount}
+                              onChange={(e) => setNewBaseBidAmount(parseInt(e.target.value) || 0)}
                               className="w-24 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-white text-sm"
                             />
                             <button
-                              onClick={() => handleUpdateBaseBidAmount(auctionState.baseBidAmount)}
+                              onClick={() => handleUpdateBaseBidAmount(newBaseBidAmount)}
                               className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
                             >
                               Save
@@ -2106,7 +2116,7 @@ function AdminDashboard({ user }) {
                         </div>
 
                         <p className="text-sm text-gray-400 mt-2">
-                          If <strong>ON</strong>, owners MUST keep enough money for their remaining player slots (Current: ₹{auctionState.baseBidAmount || 1000} per player).<br />
+                          If <strong>ON</strong>, owners MUST keep enough money for their remaining player slots (Current: ₹{newBaseBidAmount} per player).<br />
                           If <strong>OFF</strong>, owners can bid their entire purse on any single player.
                         </p>
                       </div>
