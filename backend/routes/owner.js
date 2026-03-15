@@ -96,7 +96,7 @@ router.get('/current-info', async (req, res) => {
         const playersBought = stats.sold;
         const remainingPlayers = maxPlayersPerTeam - playersBought;
         const enforceMaxBid = state?.enforce_max_bid === 1;
-        const baseBidAmount = state?.base_bid_amount || 1000;
+        const baseBidAmount = state?.bid_increment_3 !== undefined ? state.bid_increment_3 : 1000;
         // The current player being auctioned counts as one of the remaining players, so we deduct 1
         const reservedPlayersCount = Math.max(0, remainingPlayers - 1);
         const minimumAmountToKeep = enforceMaxBid ? (reservedPlayersCount * baseBidAmount) : 0;
@@ -222,7 +222,7 @@ router.post('/bid', async (req, res) => {
         }
 
         const enforceMaxBid = state.enforce_max_bid === 1;
-        const baseBidAmount = state.base_bid_amount || 1000;
+        const baseBidAmount = state.bid_increment_3 !== undefined ? state.bid_increment_3 : 1000;
         // Similar to current-info, we must subtract 1 since we are actively bidding on one of these remaining players
         const reservedPlayersCount = Math.max(0, remainingPlayers - 1);
         const minimumAmountToKeep = enforceMaxBid ? (reservedPlayersCount * baseBidAmount) : 0;

@@ -60,7 +60,7 @@ router.get('/auction-state', async (req, res) => {
         },
         maxPlayersPerTeam: state.max_players_per_team || 10,
         enforceMaxBid: state.enforce_max_bid === 1,
-        baseBidAmount: state.base_bid_amount || 1000
+        baseBidAmount: state.bid_increment_3 !== undefined ? state.bid_increment_3 : 1000
       });
     }
   } catch (err) {
@@ -79,7 +79,7 @@ router.post('/enforce-max-bid', async (req, res) => {
       .from('auction_state')
       .update({
         enforce_max_bid: enforceMaxBid ? 1 : 0,
-        base_bid_amount: baseBidAmount !== undefined ? baseBidAmount : 1000,
+        bid_increment_3: baseBidAmount !== undefined ? baseBidAmount : 1000,
         updated_at: new Date()
       })
       .eq('id', 1);
