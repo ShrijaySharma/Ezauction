@@ -3,6 +3,11 @@ import { getApiUrl } from '../config';
 
 const getApiBaseUrl = getApiUrl;
 
+export const clearAuctionData = async () => {
+  const response = await api.delete('/admin/clear-data');
+  return response.data;
+};
+
 export const getAuctionState = async () => {
   const response = await api.get('/admin/auction-state');
   return response.data;
@@ -141,6 +146,16 @@ export const uploadImage = async (file) => {
 
 export const getAllTeams = async () => {
   const response = await api.get('/admin/teams');
+  return response.data;
+};
+
+export const verifyTeamCredentials = async (teamId, credentials) => {
+  const response = await api.post(`/admin/teams/${teamId}/verify-credentials`, credentials);
+  return response.data;
+};
+
+export const updateTeamCredentials = async (teamId, credentials) => {
+  const response = await api.put(`/admin/teams/${teamId}/credentials`, credentials);
   return response.data;
 };
 

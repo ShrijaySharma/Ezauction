@@ -2206,23 +2206,18 @@ function AdminDashboard({ user }) {
                                   onClick={() => {
                                     if (!credentialForm.username || !credentialForm.password) return alert("Both fields required");
 
-                                    // Call API to update
-                                    fetch(`${API_URL}/admin/teams/${team.id}/credentials`, {
-                                      method: 'PUT',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify(credentialForm)
-                                    })
-                                      .then(res => res.json())
+                                    // Call API to update via service
+                                    adminService.updateTeamCredentials(team.id, credentialForm)
                                       .then(data => {
                                         if (data.success) {
                                           setEditingCredentials(null);
                                           // Update local state
                                           setTeams(teams.map(t => t.id === team.id ? data.team : t));
                                         } else {
-                                          alert(data.error);
+                                          alert(data.error || "Update failed");
                                         }
                                       })
-                                      .catch(err => alert("Error updating: " + err.message));
+                                      .catch(err => alert("Error updating: " + (err.response?.data?.error || err.message)));
                                   }}
                                   className="p-2 bg-green-600 hover:bg-green-500 text-white rounded shadow"
                                   title="Save"
