@@ -274,6 +274,10 @@ function AdminDashboard({ user }) {
 
     newSocket.on('enforce-max-bid-changed', (data) => {
       setEnforceMaxBid(data.enforceMaxBid);
+      if (data.baseBidAmount !== undefined) {
+        setNewBaseBidAmount(data.baseBidAmount);
+        setAuctionState(prev => ({ ...prev, enforceMaxBid: data.enforceMaxBid, baseBidAmount: data.baseBidAmount }));
+      }
     });
 
     newSocket.on('all-players-deleted', () => {
@@ -307,23 +311,27 @@ function AdminDashboard({ user }) {
       const data = await adminService.getAuctionState();
 
       if (JSON.stringify(data) !== JSON.stringify(auctionState)) {
-        setAuctionState(data);
+        setAuctionState(prev => {
+          // If canonical max players changed on server, update its input field
+          if (data.maxPlayersPerTeam !== prev.maxPlayersPerTeam) {
+            setNewMaxPlayersPerTeam(data.maxPlayersPerTeam || 10);
+          }
+          // If canonical base bid amount changed on server, update its input field
+          if (data.baseBidAmount !== prev.baseBidAmount) {
+            setNewBaseBidAmount(data.baseBidAmount || 1000);
+          }
+          // Sync independent state for consistency
+          if (data.enforceMaxBid !== undefined) {
+            setEnforceMaxBid(data.enforceMaxBid);
+          }
+          return data;
+        });
       }
 
       setBidIncrements(prev => {
         if (JSON.stringify(data.bidIncrements) !== JSON.stringify(prev)) {
           setNewIncrements(data.bidIncrements);
           return data.bidIncrements;
-        }
-        return prev;
-      });
-
-      // Load max players config using functional update to avoid stale closure and input resets
-      const maxPlayers = data.maxPlayersPerTeam || 10;
-      setMaxPlayersPerTeam(prev => {
-        if (prev !== maxPlayers) {
-          setNewMaxPlayersPerTeam(maxPlayers);
-          return maxPlayers;
         }
         return prev;
       });
@@ -335,23 +343,6 @@ function AdminDashboard({ user }) {
         }
       } else if (currentPlayer !== null) {
         setCurrentPlayer(null);
-      }
-
-      if (data.enforceMaxBid !== undefined && data.enforceMaxBid !== enforceMaxBid) {
-        setAuctionState(stateData => ({
-          ...stateData,
-          enforceMaxBid: data.enforceMaxBid,
-          baseBidAmount: data.baseBidAmount || 1000
-        }));
-      }
-      // Sync newBaseBidAmount from server (only if different and user hasn't edited)
-      if (data.baseBidAmount !== undefined) {
-        setNewBaseBidAmount(prev => {
-          if (prev !== data.baseBidAmount && data.baseBidAmount) {
-            return data.baseBidAmount;
-          }
-          return prev;
-        });
       }
     } catch (error) {
       console.error('Error loading auction state:', error);
