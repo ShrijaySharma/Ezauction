@@ -334,11 +334,11 @@ function HostDashboard({ user }) {
                     <div className="px-3 py-1.5 md:px-5 md:py-3 bg-white/10 rounded-xl md:rounded-2xl border md:border-2 border-yellow-400/50 backdrop-blur-xl mb-2 md:mb-0 md:self-end md:-mt-16 md:shadow-[0_0_20px_rgba(250,204,21,0.2)]">
                       <span className="text-white font-mono font-black text-lg md:text-3xl drop-shadow-lg"><span className="md:hidden">#</span>{currentPlayer.serial_number}</span>
                     </div>
-                    <div className="text-left md:text-center mt-0 md:mt-auto">
-                      <h2 className="text-white text-xl sm:text-2xl md:text-4xl lg:text-5xl font-black tracking-tighter mb-1 md:mb-4 drop-shadow-2xl leading-[1.1] md:leading-[0.9] line-clamp-2 md:line-clamp-none">
+                    <div className="text-left md:text-center mt-0 md:mt-auto md:w-full flex flex-col items-start md:items-center">
+                      <h2 className="text-white text-2xl sm:text-3xl md:text-5xl lg:text-7xl font-black tracking-normal mb-2 md:mb-6 drop-shadow-2xl leading-tight line-clamp-2 md:line-clamp-none py-2">
                         {currentPlayer.name}
                       </h2>
-                      <div className="inline-block px-3 py-1 md:px-6 md:py-2.5 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm font-black uppercase tracking-widest shadow-lg md:shadow-xl shadow-yellow-400/20 md:hover:scale-105 md:transition-transform">
+                      <div className="inline-block px-4 py-1.5 md:px-8 md:py-3 bg-yellow-400 text-black rounded-full text-xs md:text-base font-black uppercase tracking-widest shadow-lg md:shadow-xl shadow-yellow-400/20 md:hover:scale-105 md:transition-transform">
                         {currentPlayer.role}
                       </div>
                     </div>
@@ -383,7 +383,7 @@ function HostDashboard({ user }) {
                   <div className="flex flex-col items-start md:items-center w-5/12 md:w-full">
                     <div className="text-blue-900/60 md:text-blue-900/40 text-[10px] md:text-lg lg:text-xl font-black tracking-[0.2em] md:tracking-[0.5em] uppercase md:mb-2 lg:mb-4 text-left md:text-center">Current Bid</div>
                     <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-left md:text-center w-full break-words md:mb-6 lg:mb-10
-                      ${currentBid.toString().length > 7 ? 'text-2xl md:text-4xl lg:text-6xl' : (currentBid.toString().length > 5 ? 'text-3xl md:text-5xl lg:text-7xl' : 'text-3xl md:text-6xl lg:text-8xl')}
+                      ${currentBid.toString().length > 7 ? 'text-xl md:text-3xl lg:text-5xl' : (currentBid.toString().length > 5 ? 'text-2xl md:text-4xl lg:text-5xl' : 'text-3xl md:text-5xl lg:text-6xl')}
                       ${bidFlash ? 'scale-110' : ''}
                     `}>
                       ₹{formatIndianNumber(currentBid)}
@@ -447,14 +447,14 @@ function HostDashboard({ user }) {
 
         {/* Team Purses Slide-out Panel */}
         {showTeamPurses && (
-          <div className="fixed inset-0 z-50 flex">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8">
             {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowTeamPurses(false)}></div>
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowTeamPurses(false)}></div>
 
             {/* Panel */}
-            <div className="relative ml-auto w-full max-w-md h-full bg-gradient-to-b from-gray-900/98 via-gray-900/95 to-black/98 backdrop-blur-3xl border-l border-white/10 shadow-2xl flex flex-col animate-slide-in-right">
+            <div className="relative w-full h-full max-w-7xl bg-gradient-to-b from-gray-900/98 via-gray-900/95 to-black/98 backdrop-blur-3xl border border-white/20 shadow-2xl flex flex-col animate-slide-in-right rounded-3xl overflow-hidden">
               {/* Panel Header */}
-              <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-gradient-to-r from-yellow-400/5 to-transparent">
+              <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-gradient-to-r from-yellow-400/5 to-transparent shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-yellow-400/10 rounded-xl border border-yellow-400/20">
                     <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -474,7 +474,7 @@ function HostDashboard({ user }) {
               </div>
 
               {/* Team Cards */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-none">
+              <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-4 md:content-start scrollbar-none">
                 {teamPurses.length > 0 ? (
                   teamPurses.map((team, index) => {
                     const budgetPercent = team.budget && team.totalSpent !== undefined
