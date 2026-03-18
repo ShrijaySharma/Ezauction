@@ -335,10 +335,10 @@ function HostDashboard({ user }) {
                       <span className="text-white font-mono font-black text-lg md:text-3xl drop-shadow-lg"><span className="md:hidden">#</span>{currentPlayer.serial_number}</span>
                     </div>
                     <div className="text-left md:text-center mt-0 md:mt-auto md:w-full flex flex-col items-start md:items-center">
-                      <h2 className="text-white text-2xl sm:text-3xl md:text-5xl lg:text-7xl font-black tracking-normal mb-2 md:mb-6 drop-shadow-2xl leading-tight line-clamp-2 md:line-clamp-none py-2">
+                      <h2 className="text-white text-xl sm:text-3xl md:text-4xl lg:text-5xl lg:max-w-[90%] mx-auto font-black tracking-normal mb-1 md:mb-4 drop-shadow-2xl leading-tight line-clamp-2 md:line-clamp-none py-1 break-words">
                         {currentPlayer.name}
                       </h2>
-                      <div className="inline-block px-4 py-1.5 md:px-8 md:py-3 bg-yellow-400 text-black rounded-full text-xs md:text-base font-black uppercase tracking-widest shadow-lg md:shadow-xl shadow-yellow-400/20 md:hover:scale-105 md:transition-transform">
+                      <div className="inline-block px-3 py-1.5 md:px-6 md:py-2.5 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm font-black uppercase tracking-widest shadow-lg md:shadow-xl shadow-yellow-400/20 md:hover:scale-105 md:transition-transform">
                         {currentPlayer.role}
                       </div>
                     </div>
