@@ -168,9 +168,6 @@ function AdminDashboard({ user }) {
           audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
         }
       }
-      // Still refresh in background to be safe
-      loadCurrentBid();
-      loadAllBids();
     });
 
     newSocket.on('bid-updated', (data) => {
@@ -186,9 +183,8 @@ function AdminDashboard({ user }) {
 
       } else {
         setHighestBid(null);
+        loadCurrentBid();
       }
-      loadCurrentBid();
-      loadAllBids();
     });
     newSocket.on('auction-status-changed', (data) => {
       setAuctionState(prev => ({ ...prev, status: data.status }));
@@ -288,12 +284,14 @@ function AdminDashboard({ user }) {
       alert('All players and bids have been cleared by an admin');
     });
 
-    // Poll for updates every 2 seconds as backup
-    const interval = setInterval(loadData, 2000);
+    newSocket.on('reconnect', () => {
+      console.log('Admin reconnected, reloading data...');
+      loadData();
+      loadTeams();
+    });
 
     return () => {
       newSocket.close();
-      clearInterval(interval);
     };
   }, []);
 

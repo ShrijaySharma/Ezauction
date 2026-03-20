@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { logout } from '../services/auth';
@@ -48,6 +48,17 @@ function OwnerDashboard({ user }) {
   const [notification, setNotification] = useState(null);
   const [notificationKey, setNotificationKey] = useState(0);
 
+  const isLeadingRef = useRef(false);
+  const totalBudgetRef = useRef(0);
+
+  useEffect(() => {
+     isLeadingRef.current = highestBid?.team_id === user.teamId;
+  }, [highestBid, user.teamId]);
+
+  useEffect(() => {
+     totalBudgetRef.current = totalBudget;
+  }, [totalBudget]);
+
   // Financial constraints state
   const [totalAllowedPlayers, setTotalAllowedPlayers] = useState(10);
   const [playersBought, setPlayersBought] = useState(0);
@@ -91,14 +102,20 @@ function OwnerDashboard({ user }) {
       setBidFlash(true);
       setTimeout(() => setBidFlash(false), 500);
 
-
-
       // 3-second bid lockout
       setBidLockout(true);
       setTimeout(() => setBidLockout(false), 3000);
 
-      setPreviousBid(data.bid ? data.bid.amount : currentBid);
-      loadCurrentInfo();
+      if (data.bid) {
+          setHighestBid(data.bid);
+          setCurrentBid(data.bid.amount);
+          setPreviousBid(data.previousBid || data.bid.amount);
+          
+          if (isLeadingRef.current && data.bid.team_id !== user.teamId) {
+             setCommittedAmount(0);
+             setWalletBalance(totalBudgetRef.current);
+          }
+      }
     });
 
     newSocket.on('bid-updated', (data) => {
@@ -109,8 +126,19 @@ function OwnerDashboard({ user }) {
       setBidLockout(true);
       setTimeout(() => setBidLockout(false), 3000);
 
-      setPreviousBid(data.highestBid ? data.highestBid.amount : currentBid);
-      loadCurrentInfo();
+      if (data.highestBid) {
+          setHighestBid(data.highestBid);
+          setCurrentBid(data.highestBid.amount);
+          setPreviousBid(data.previousBid || data.highestBid.amount);
+          
+          if (isLeadingRef.current && data.highestBid.team_id !== user.teamId) {
+             setCommittedAmount(0);
+             setWalletBalance(totalBudgetRef.current);
+          }
+      } else {
+          setHighestBid(null);
+          loadCurrentInfo();
+      }
     });
 
     newSocket.on('auction-status-changed', (data) => {
@@ -153,12 +181,12 @@ function OwnerDashboard({ user }) {
       }
     });
 
-    // Poll for updates every 2 seconds as backup
-    const interval = setInterval(loadCurrentInfo, 2000);
+    newSocket.on('reconnect', () => {
+      loadCurrentInfo();
+    });
 
     return () => {
       newSocket.close();
-      clearInterval(interval);
     };
   }, []);
 
@@ -266,12 +294,13 @@ function OwnerDashboard({ user }) {
     const parsedCurrentBid = parseInt(currentBid, 10) || 0;
     const parsedIncrement = parseInt(increment, 10) || 0;
     const newBidAmount = parsedCurrentBid + parsedIncrement;
+    const expectedHighestBidAmount = highestBid ? highestBid.amount : 0;
 
     setBidding({ ...bidding, [increment]: true });
 
     try {
       console.log('Placing bid:', newBidAmount, 'Current balance:', walletBalance);
-      const response = await ownerService.placeBid(newBidAmount);
+      const response = await ownerService.placeBid(newBidAmount, expectedHighestBidAmount);
       console.log('Bid response:', response);
 
 
@@ -306,12 +335,13 @@ function OwnerDashboard({ user }) {
     if (bidding['base']) return; // Prevent double clicks
 
     const basePriceAmount = currentPlayer.base_price;
+    const expectedHighestBidAmount = highestBid ? highestBid.amount : 0;
 
     setBidding({ ...bidding, base: true });
 
     try {
       console.log('Placing base price bid:', basePriceAmount, 'Current balance:', walletBalance);
-      const response = await ownerService.placeBid(basePriceAmount);
+      const response = await ownerService.placeBid(basePriceAmount, expectedHighestBidAmount);
       console.log('Base price bid response:', response);
 
 

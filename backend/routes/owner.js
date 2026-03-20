@@ -139,7 +139,7 @@ let currentBidLock = Promise.resolve();
 
 // Place bid
 router.post('/bid', async (req, res) => {
-    let { amount } = req.body;
+    let { amount, expectedHighestBidAmount } = req.body;
     amount = parseInt(amount, 10);
     const teamId = req.session.teamId;
     const io = req.app.locals.io;
@@ -188,6 +188,17 @@ router.post('/bid', async (req, res) => {
         const { data: player, error: playerError } = playerResult;
         const { data: currentHighest, error: bidError } = currentBidResult; // bidError usually null with maybeSingle
         const { count: playersBought, error: countError } = soldCountResult;
+
+        // Optimistic Concurrency Control (Stale Bid Prevention)
+        if (expectedHighestBidAmount !== undefined) {
+            const actualHighestBidAmount = currentHighest ? currentHighest.amount : 0;
+            if (expectedHighestBidAmount !== actualHighestBidAmount) {
+                return res.status(409).json({
+                    error: 'The current bid changed while you were bidding. Please review the new bid and try again.',
+                    actualHighestBidAmount
+                });
+            }
+        }
 
         if (teamError || !team) return res.status(404).json({ error: 'Team not found' });
         if (team.bidding_locked === 1) return res.status(400).json({ error: 'Your team is locked from bidding by admin' });

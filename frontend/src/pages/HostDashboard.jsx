@@ -90,7 +90,6 @@ function HostDashboard({ user }) {
           audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
         }
       }
-      loadCurrentInfo();
     });
 
     newSocket.on('bid-updated', (data) => {
@@ -155,12 +154,14 @@ function HostDashboard({ user }) {
       loadTeamPurses();
     });
 
-    // Poll for updates every 2 seconds as backup
-    const interval = setInterval(loadCurrentInfo, 2000);
+    newSocket.on('reconnect', () => {
+      console.log('Host reconnected, reloading data...');
+      loadCurrentInfo();
+      loadTeamPurses();
+    });
 
     return () => {
       newSocket.close();
-      clearInterval(interval);
     };
   }, []);
 

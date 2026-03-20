@@ -5,8 +5,8 @@ export const getCurrentInfo = async () => {
   return response.data;
 };
 
-export const placeBid = async (amount) => {
-  const response = await api.post('/owner/bid', { amount });
+export const placeBid = async (amount, expectedHighestBidAmount) => {
+  const response = await api.post('/owner/bid', { amount, expectedHighestBidAmount });
   return response.data;
 };
 

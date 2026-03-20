@@ -33,13 +33,7 @@ function Overlay() {
         });
         setSocket(newSocket);
 
-        newSocket.on('connect', () => {
-            console.log('Overlay connected to socket');
-            newSocket.emit('request-info');
-        });
-
-        // Polling as fallback
-        const pollInterval = setInterval(async () => {
+        const loadCurrentInfo = async () => {
             try {
                 const response = await fetch(`${API_URL}/host/current-info`);
                 if (response.ok) {
@@ -61,9 +55,22 @@ function Overlay() {
                     }
                 }
             } catch (err) {
-                console.error('Overlay polling error:', err);
+                console.error('Overlay load error:', err);
             }
-        }, 2000);
+        };
+
+        newSocket.on('connect', () => {
+            console.log('Overlay connected to socket');
+            newSocket.emit('request-info');
+        });
+
+        newSocket.on('reconnect', () => {
+            console.log('Overlay reconnected, reloading data...');
+            loadCurrentInfo();
+        });
+
+        // Initial Data Load
+        loadCurrentInfo();
 
         // Since we don't have a service imported that fetches data (to avoid auth deps if possible),
         // we might need to rely on the socket pushing an initial state or just wait.
@@ -110,7 +117,6 @@ function Overlay() {
 
         return () => {
             newSocket.close();
-            clearInterval(pollInterval);
             document.body.classList.remove('bg-transparent');
         };
     }, []); // Removed currentPlayer dependency to prevent socket reconnection cycles
