@@ -34,6 +34,7 @@ function HostDashboard({ user }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showTeamPurses, setShowTeamPurses] = useState(false);
   const [teamPurses, setTeamPurses] = useState([]);
+  const [connectionError, setConnectionError] = useState(false);
 
   const audioElementRef = useRef(null);
 
@@ -55,12 +56,32 @@ function HostDashboard({ user }) {
     audioElementRef.current = audio;
 
     const newSocket = io(getSocketUrl(), {
+      transports: ['websocket'],        // Force WebSocket only — no polling fallback
+      upgrade: false,                    // Don't attempt transport upgrade
       withCredentials: true,
-      transports: ['websocket', 'polling']
+      reconnection: true,
+      reconnectionAttempts: 20,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      timeout: 15000,
     });
     setSocket(newSocket);
 
-    newSocket.on('connect', () => console.log('Host connected to socket'));
+    // === TEMPORARY DEBUG LOGGING ===
+    newSocket.onAny((eventName, ...args) => {
+      console.log(`[Socket:Host] ${eventName}`, JSON.stringify(args).slice(0, 300));
+    });
+    // === END DEBUG LOGGING ===
+
+    newSocket.on('connect', () => {
+      console.log('[Socket:Host] Connected');
+      setConnectionError(false);
+    });
+
+    newSocket.on('reconnect_failed', () => {
+      console.error('[Socket:Host] All reconnection attempts failed');
+      setConnectionError(true);
+    });
 
     // Initial data load
     loadCurrentInfo();
@@ -84,7 +105,7 @@ function HostDashboard({ user }) {
         setHighestBid(data.bid);
         setCurrentBid(data.bid.amount);
 
-        // Play sound ONLY on bid-placed to avoid double trigger with bid-updated
+        // Play sound
         if (audioElementRef.current) {
           audioElementRef.current.currentTime = 0;
           audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
@@ -97,11 +118,10 @@ function HostDashboard({ user }) {
       if (data.highestBid) {
         setHighestBid(data.highestBid);
         setCurrentBid(data.highestBid.amount);
-        // We don't play sound here as it's triggered by bid-placed for new bids
       } else {
         setHighestBid(null);
-        // Refresh to get correct base price
-        loadCurrentInfo();
+        // Reset to base price directly — no API call
+        setCurrentBid(prev => 0); // Will be corrected by player-loaded or reconnect
       }
     });
 
@@ -133,9 +153,10 @@ function HostDashboard({ user }) {
       setStatus(data.status);
     });
 
-    newSocket.on('bidding-reset', () => {
+    newSocket.on('bidding-reset', (data) => {
       setHighestBid(null);
-      loadCurrentInfo();
+      // Use base price from payload — no API call
+      setCurrentBid(data?.basePrice || 0);
     });
 
     newSocket.on('all-players-deleted', () => {
@@ -143,19 +164,21 @@ function HostDashboard({ user }) {
       setHighestBid(null);
       setCurrentBid(0);
       setAllBids([]);
-      loadTeamPurses();
     });
 
-    newSocket.on('player-marked', () => {
-      loadTeamPurses();
+    newSocket.on('player-marked', (data) => {
+      // Team purses panel has manual "Refresh" button
+      console.log('[Socket:Host] player-marked', data);
     });
 
-    newSocket.on('team-budget-updated', () => {
-      loadTeamPurses();
+    newSocket.on('team-budget-updated', (data) => {
+      console.log('[Socket:Host] team-budget-updated', data);
+      // Team purses panel has manual "Refresh" button
     });
 
     newSocket.on('reconnect', () => {
-      console.log('Host reconnected, reloading data...');
+      console.log('[Socket:Host] Reconnected — performing full state resync');
+      setConnectionError(false);
       loadCurrentInfo();
       loadTeamPurses();
     });
@@ -238,6 +261,12 @@ function HostDashboard({ user }) {
 
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-black font-sans selection:bg-yellow-400 selection:text-blue-900">
+      {/* Connection Error Banner */}
+      {connectionError && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-center py-2 text-sm font-bold">
+          Connection lost. Please refresh the page.
+        </div>
+      )}
       {/* Bid Notification Overlay (Removed for now, sound kept) */}
       {false && notification && (
         <BidNotification
@@ -395,7 +424,7 @@ function HostDashboard({ user }) {
                   <div className="block md:hidden w-px h-12 bg-blue-900/20 mx-1"></div>
 
                   {/* Mobile Right / Desktop Bottom: Leading Team */}
-                  <div className="flex flex-col items-end md:items-center w-7/12 md:w-full animate-bounce-slow md:px-4">
+                  <div className="flex flex-col items-end md:items-center w-7/12 md:w-auto animate-bounce-slow md:px-4">
                     {highestBid ? (
                       <>
                         <div className="text-blue-900/60 text-[9px] md:text-xs lg:text-sm font-black uppercase tracking-[0.2em] md:tracking-[0.4em] mb-1 md:mb-4 text-right md:text-center">Leading Team</div>

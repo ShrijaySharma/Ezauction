@@ -1,14 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://ezauction.onrender.com/api/$1"
-    },
-    {
-      "source": "/socket.io/(.*)",
-      "destination": "https://ezauction.onrender.com/socket.io/$1"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

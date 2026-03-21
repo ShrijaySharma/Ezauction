@@ -645,7 +645,7 @@ router.post('/mark-player', async (req, res) => {
       if (updatePlayerError) throw updatePlayerError;
 
       io.emit('player-marked', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam });
-      io.emit('team-budget-updated', { teamId: finalSoldToTeam });
+      io.emit('team-budget-updated', { teamId: finalSoldToTeam, newBudget });
 
     } else {
       // Mark as UNSOLD
@@ -764,7 +764,14 @@ router.post('/reset-bidding', async (req, res) => {
 
     if (deleteError) throw deleteError;
 
-    io.emit('bidding-reset', { playerId: state.current_player_id });
+    // Fetch player base price so frontend can reset bid display without API call
+    const { data: resetPlayer } = await supabase
+      .from('players').select('base_price').eq('id', state.current_player_id).single();
+
+    io.emit('bidding-reset', {
+      playerId: state.current_player_id,
+      basePrice: resetPlayer ? resetPlayer.base_price : 0
+    });
     res.json({ success: true });
   } catch (err) {
     console.error('Error resetting bidding:', err);
@@ -1697,7 +1704,7 @@ router.put('/teams/:id/budget', async (req, res) => {
     const { error } = await supabase.from('teams').update({ budget }).eq('id', id);
     if (error) throw error;
 
-    io.emit('team-budget-updated', { teamId: parseInt(id) });
+    io.emit('team-budget-updated', { teamId: parseInt(id), newBudget: parseFloat(budget) });
     res.json({ success: true, budget });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
@@ -1933,7 +1940,7 @@ router.post('/remove-player-from-team/:playerId', async (req, res) => {
       teamId: teamId,
       player: updatedPlayer
     });
-    io.emit('team-budget-updated', { teamId: teamId });
+    io.emit('team-budget-updated', { teamId: teamId, newBudget: newBudget });
     io.emit('player-updated', { player: updatedPlayer });
 
     res.json({

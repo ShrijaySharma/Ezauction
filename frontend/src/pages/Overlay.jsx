@@ -3,16 +3,6 @@ import { io } from 'socket.io-client';
 import { getImageUrl } from '../utils/imageUtils';
 import { getSocketUrl } from '../config';
 
-// Auto-detect API URL
-const getApiUrl = () => {
-    if (import.meta.env.VITE_API_URL) {
-        return import.meta.env.VITE_API_URL;
-    }
-    return '/api';
-};
-
-const API_URL = getApiUrl();
-
 function Overlay() {
     const [socket, setSocket] = useState(null);
     const [currentPlayer, setCurrentPlayer] = useState(null);
@@ -25,52 +15,34 @@ function Overlay() {
         // Add class to body to allow transparency
         document.body.classList.add('bg-transparent');
 
-        // Connect to the server. 
-        // In production, we need to connect to the backend URL explicitly.
+        // Connect to the server with WebSocket-only transport
         const newSocket = io(getSocketUrl(), {
+            transports: ['websocket'],        // Force WebSocket only
+            upgrade: false,
             withCredentials: true,
-            transports: ['websocket', 'polling']
+            reconnection: true,
+            reconnectionAttempts: 20,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 10000,
+            timeout: 15000,
         });
         setSocket(newSocket);
 
-        const loadCurrentInfo = async () => {
-            try {
-                const response = await fetch(`${API_URL}/host/current-info`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.player) setCurrentPlayer(prev =>
-                        JSON.stringify(prev) !== JSON.stringify(data.player) ? data.player : prev
-                    );
-
-                    if (data.highestBid) {
-                        setHighestBid(data.highestBid);
-                        setCurrentBid(data.highestBid.amount);
-                        setLeadingTeam(data.highestBid.team_name);
-                    } else {
-                        setHighestBid(null);
-                        setLeadingTeam(null);
-                        if (data.player) {
-                            setCurrentBid(data.player.base_price);
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error('Overlay load error:', err);
-            }
-        };
+        // === TEMPORARY DEBUG LOGGING ===
+        newSocket.onAny((eventName, ...args) => {
+            console.log(`[Socket:Overlay] ${eventName}`, JSON.stringify(args).slice(0, 300));
+        });
+        // === END DEBUG LOGGING ===
 
         newSocket.on('connect', () => {
-            console.log('Overlay connected to socket');
-            newSocket.emit('request-info');
+            console.log('[Socket:Overlay] Connected');
+            newSocket.emit('request-info'); // Server sends back player-loaded + bid-updated
         });
 
         newSocket.on('reconnect', () => {
-            console.log('Overlay reconnected, reloading data...');
-            loadCurrentInfo();
+            console.log('[Socket:Overlay] Reconnected — re-requesting state');
+            newSocket.emit('request-info'); // Re-request state via socket, no API call
         });
-
-        // Initial Data Load
-        loadCurrentInfo();
 
         // Since we don't have a service imported that fetches data (to avoid auth deps if possible),
         // we might need to rely on the socket pushing an initial state or just wait.
@@ -145,7 +117,7 @@ function Overlay() {
                 </div>
                 {/* DEBUG INFO */}
                 <div className="absolute bottom-2 right-2 text-xs text-white/50 font-mono bg-black/50 p-1 rounded z-50">
-                    Status: {socket?.connected ? 'Connected' : 'Disconnected'} | Player: Waiting | API: {API_URL} | Socket ID: {socket?.id}
+                    Status: {socket?.connected ? 'Connected' : 'Disconnected'} | Player: Waiting | Socket ID: {socket?.id}
                 </div>
             </div>
         );

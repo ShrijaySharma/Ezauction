@@ -16,23 +16,27 @@ import { supabase } from './supabaseClient.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const ALLOWED_ORIGINS = [
+  'https://ezauction.vercel.app',       // Production Vercel
+  'http://localhost:5173',               // Dev Vite
+  /^http:\/\/192\.168\.\d+\.\d+:\d+$/,  // LAN dev access
+  /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,   // LAN dev access (10.x)
+];
+
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: (origin, callback) => {
-      // Allow all origins for local network access
-      callback(null, true);
-    },
+    origin: ALLOWED_ORIGINS,
     credentials: true
   }
 });
 
 const PORT = process.env.PORT || 4000;
 
-// Middleware - Allow all origins for local network access
+// Middleware
 app.use(cors({
-  origin: true, // Allow all origins for local network
+  origin: ALLOWED_ORIGINS,
   credentials: true
 }));
 app.use(express.json());

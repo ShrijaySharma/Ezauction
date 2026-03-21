@@ -84,6 +84,7 @@ function AdminDashboard({ user }) {
   const [notificationKey, setNotificationKey] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const audioElementRef = useRef(null);
+  const [connectionError, setConnectionError] = useState(false);
 
   const enableAudio = () => {
     if (audioElementRef.current) {
@@ -115,21 +116,39 @@ function AdminDashboard({ user }) {
 
     console.log('AdminDashboard mounted');
     const newSocket = io(getSocketUrl(), {
+      transports: ['websocket'],        // Force WebSocket only — no polling fallback
+      upgrade: false,                    // Don't attempt transport upgrade
       withCredentials: true,
-      transports: ['websocket', 'polling']
+      reconnection: true,
+      reconnectionAttempts: 20,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      timeout: 15000,
     });
     setSocket(newSocket);
 
+    // === TEMPORARY DEBUG LOGGING ===
+    newSocket.onAny((eventName, ...args) => {
+      console.log(`[Socket:Admin] ${eventName}`, JSON.stringify(args).slice(0, 300));
+    });
+    // === END DEBUG LOGGING ===
+
     newSocket.on('connect', () => {
-      console.log('Socket.IO connected');
+      console.log('[Socket:Admin] Connected');
+      setConnectionError(false);
     });
 
     newSocket.on('disconnect', () => {
-      console.log('Socket.IO disconnected');
+      console.log('[Socket:Admin] Disconnected');
+    });
+
+    newSocket.on('reconnect_failed', () => {
+      console.error('[Socket:Admin] All reconnection attempts failed');
+      setConnectionError(true);
     });
 
     newSocket.on('error', (error) => {
-      console.error('Socket.IO error:', error);
+      console.error('[Socket:Admin] Error:', error);
     });
 
     // Load initial data
@@ -175,15 +194,15 @@ function AdminDashboard({ user }) {
         setHighestBid(data.highestBid);
         setPreviousBid(prev => data.previousBid || prev);
 
-        // Play Sound on update too (optional, but good for feedback)
+        // Play Sound on update too
         if (audioElementRef.current) {
           audioElementRef.current.currentTime = 0;
           audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
         }
 
       } else {
+        // Bid undone — reset directly without API call
         setHighestBid(null);
-        loadCurrentBid();
       }
     });
     newSocket.on('auction-status-changed', (data) => {
@@ -210,16 +229,19 @@ function AdminDashboard({ user }) {
       setNewMaxPlayersPerTeam(data.maxPlayersPerTeam);
     });
 
-    newSocket.on('player-marked', () => {
-      loadPlayers();
+    newSocket.on('player-marked', (data) => {
+      // Next player auto-loaded via player-loaded event; no need to refetch
+      console.log('[Socket:Admin] player-marked', data);
     });
 
-    newSocket.on('bidding-reset', () => {
+    newSocket.on('bidding-reset', (data) => {
       setHighestBid(null);
       setAllBids([]);
-      loadCurrentBid();
+      // Use base price from payload — no API call
+      console.log('[Socket:Admin] bidding-reset', data);
     });
 
+    // Management events (not hot-path, acceptable to re-fetch)
     newSocket.on('player-added', () => {
       loadPlayers();
     });
@@ -232,12 +254,25 @@ function AdminDashboard({ user }) {
       loadPlayers();
     });
 
-    newSocket.on('team-budget-updated', () => {
-      loadTeams();
+    newSocket.on('team-budget-updated', (data) => {
+      // Update team budget in-place from payload
+      if (data.teamId && data.newBudget !== undefined) {
+        setTeams(prev => prev.map(t =>
+          t.id === data.teamId ? { ...t, budget: data.newBudget } : t
+        ));
+      } else {
+        loadTeams(); // Fallback if no payload data
+      }
     });
 
-    newSocket.on('team-bidding-locked', () => {
-      loadTeams();
+    newSocket.on('team-bidding-locked', (data) => {
+      if (data.teamId !== undefined && data.locked !== undefined) {
+        setTeams(prev => prev.map(t =>
+          t.id === data.teamId ? { ...t, bidding_locked: data.locked ? 1 : 0 } : t
+        ));
+      } else {
+        loadTeams();
+      }
     });
 
     newSocket.on('team-added', () => {
@@ -285,7 +320,8 @@ function AdminDashboard({ user }) {
     });
 
     newSocket.on('reconnect', () => {
-      console.log('Admin reconnected, reloading data...');
+      console.log('[Socket:Admin] Reconnected — performing full state resync');
+      setConnectionError(false);
       loadData();
       loadTeams();
     });
@@ -881,6 +917,12 @@ function AdminDashboard({ user }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4">
+      {/* Connection Error Banner */}
+      {connectionError && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-center py-2 text-sm font-bold">
+          Connection lost. Please refresh the page.
+        </div>
+      )}
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="bg-gray-800 rounded-lg p-4 mb-4 flex justify-between items-center border border-gray-700">

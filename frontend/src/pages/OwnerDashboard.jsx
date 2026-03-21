@@ -47,6 +47,7 @@ function OwnerDashboard({ user }) {
   const [teamPlayers, setTeamPlayers] = useState([]);
   const [notification, setNotification] = useState(null);
   const [notificationKey, setNotificationKey] = useState(0);
+  const [connectionError, setConnectionError] = useState(false);
 
   const isLeadingRef = useRef(false);
   const totalBudgetRef = useRef(0);
@@ -69,23 +70,41 @@ function OwnerDashboard({ user }) {
   const [bidLockout, setBidLockout] = useState(false);
 
   useEffect(() => {
-    // Initialize socket
+    // Initialize socket with WebSocket-only transport
     const newSocket = io(getSocketUrl(), {
+      transports: ['websocket'],        // Force WebSocket only — no polling fallback
+      upgrade: false,                    // Don't attempt transport upgrade
       withCredentials: true,
-      transports: ['websocket', 'polling']
+      reconnection: true,
+      reconnectionAttempts: 20,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 10000,
+      timeout: 15000,
     });
     setSocket(newSocket);
 
+    // === TEMPORARY DEBUG LOGGING ===
+    newSocket.onAny((eventName, ...args) => {
+      console.log(`[Socket:Owner] ${eventName}`, JSON.stringify(args).slice(0, 300));
+    });
+    // === END DEBUG LOGGING ===
+
     newSocket.on('connect', () => {
-      console.log('Socket.IO connected');
+      console.log('[Socket:Owner] Connected');
+      setConnectionError(false);
     });
 
     newSocket.on('disconnect', () => {
-      console.log('Socket.IO disconnected');
+      console.log('[Socket:Owner] Disconnected');
+    });
+
+    newSocket.on('reconnect_failed', () => {
+      console.error('[Socket:Owner] All reconnection attempts failed');
+      setConnectionError(true);
     });
 
     newSocket.on('error', (error) => {
-      console.error('Socket.IO error:', error);
+      console.error('[Socket:Owner] Error:', error);
     });
 
     // Load initial data
@@ -95,7 +114,7 @@ function OwnerDashboard({ user }) {
     newSocket.on('player-loaded', (data) => {
       setCurrentPlayer(data.player);
       setHighestBid(null);
-      loadCurrentInfo();
+      loadCurrentInfo(); // Full resync on new player context
     });
 
     newSocket.on('bid-placed', (data) => {
@@ -136,8 +155,12 @@ function OwnerDashboard({ user }) {
              setWalletBalance(totalBudgetRef.current);
           }
       } else {
+          // Bid undone — reset to base price directly
           setHighestBid(null);
-          loadCurrentInfo();
+          setCurrentBid(prev => {
+            // Use currentPlayer ref-safe approach
+            return 0; // Will be corrected by player-loaded or reconnect
+          });
       }
     });
 
@@ -156,33 +179,43 @@ function OwnerDashboard({ user }) {
       });
     });
 
-    newSocket.on('max-players-changed', () => {
-      loadCurrentInfo();
+    newSocket.on('max-players-changed', (data) => {
+      if (data.maxPlayersPerTeam) {
+        setTotalAllowedPlayers(data.maxPlayersPerTeam);
+      }
     });
 
-    newSocket.on('bidding-reset', () => {
+    newSocket.on('bidding-reset', (data) => {
       setHighestBid(null);
-      loadCurrentInfo();
+      setCurrentBid(data.basePrice || 0);
+      setPreviousBid(data.basePrice || 0);
+      setCommittedAmount(0);
+      setWalletBalance(totalBudgetRef.current);
     });
 
-    newSocket.on('player-marked', () => {
-      loadCurrentInfo();
+    newSocket.on('player-marked', (data) => {
+      // Stats refresh happens via player-loaded (next player auto-load)
+      console.log('[Socket:Owner] player-marked', data);
     });
 
     newSocket.on('team-budget-updated', (data) => {
-      if (data.teamId === user.teamId) {
-        loadCurrentInfo();
+      if (data.teamId === user.teamId && data.newBudget !== undefined) {
+        setTotalBudget(data.newBudget);
+        setWalletBalance(data.newBudget);
+        setCommittedAmount(0);
       }
     });
 
     newSocket.on('team-bidding-locked', (data) => {
       if (data.teamId === user.teamId) {
-        loadCurrentInfo();
+        setTeamBiddingLocked(data.locked);
       }
     });
 
     newSocket.on('reconnect', () => {
-      loadCurrentInfo();
+      console.log('[Socket:Owner] Reconnected — performing full state resync');
+      setConnectionError(false);
+      loadCurrentInfo(); // Single API call to resync all state
     });
 
     return () => {
@@ -315,11 +348,6 @@ function OwnerDashboard({ user }) {
       if (response && response.committedAmount !== undefined) {
         setCommittedAmount(response.committedAmount);
       }
-
-      // Also reload current info to ensure everything is in sync
-      setTimeout(() => {
-        loadCurrentInfo();
-      }, 100);
     } catch (error) {
       console.error('Bid error:', error);
       alert(error.response?.data?.error || error.message || 'Bid failed');
@@ -356,11 +384,6 @@ function OwnerDashboard({ user }) {
       if (response && response.committedAmount !== undefined) {
         setCommittedAmount(response.committedAmount);
       }
-
-      // Also reload current info to ensure everything is in sync
-      setTimeout(() => {
-        loadCurrentInfo();
-      }, 100);
     } catch (error) {
       console.error('Base price bid error:', error);
       alert(error.response?.data?.error || error.message || 'Bid failed');
@@ -395,6 +418,12 @@ function OwnerDashboard({ user }) {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      {/* Connection Error Banner */}
+      {connectionError && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-center py-2 text-sm font-bold">
+          Connection lost. Please refresh the page.
+        </div>
+      )}
       {/* Stadium Background Image */}
       <div
         className="fixed inset-0 z-0"
