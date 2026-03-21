@@ -17,10 +17,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const ALLOWED_ORIGINS = [
-  'https://ezauction.vercel.app',       // Production Vercel
-  'http://localhost:5173',               // Dev Vite
-  /^http:\/\/192\.168\.\d+\.\d+:\d+$/,  // LAN dev access
-  /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,   // LAN dev access (10.x)
+  'https://app.ezauction.online',                                    // Custom domain
+  'https://ezauction-git-main-shrijaysharmas-projects.vercel.app',   // Vercel main branch
+  /^https:\/\/ezauction-.*-shrijaysharmas-projects\.vercel\.app$/,   // Vercel preview deployments
+  'http://localhost:5173',                                            // Dev Vite
+  /^http:\/\/192\.168\.\d+\.\d+:\d+$/,                               // LAN dev access
+  /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,                                // LAN dev access (10.x)
 ];
 
 const app = express();
