@@ -56,13 +56,16 @@ app.get('/', (req, res) => {
 app.set('trust proxy', 1);
 
 // Session configuration
+// Determine if running in production/hosted environment
+const isProduction = process.env.NODE_ENV !== 'development';
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'cricket-auction-secret-key-2024',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // Only secure in production
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // Lax for local development
+    secure: isProduction, // True for cross-site since Render provides HTTPS
+    sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-site
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
