@@ -6,6 +6,7 @@ import OwnerDashboard from './pages/OwnerDashboard';
 import HostDashboard from './pages/HostDashboard';
 import AppOwnerDashboard from './pages/AppOwnerDashboard';
 import Overlay from './pages/Overlay';
+import PublicLive from './pages/PublicLive';
 import { getCurrentUser } from './services/auth';
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/overlay" element={<Overlay />} />
+        <Route path="/live" element={<PublicLive />} />
         <Route
           path="/login"
           element={user ? <Navigate to={

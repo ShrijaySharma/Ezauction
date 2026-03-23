@@ -11,6 +11,7 @@ import adminRoutes from './routes/admin.js';
 import ownerRoutes from './routes/owner.js';
 import hostRoutes from './routes/host.js';
 import appOwnerRoutes from './routes/appOwner.js';
+import publicRoutes from './routes/public.js';
 import { supabase } from './supabaseClient.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -80,6 +81,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/owner', ownerRoutes);
 app.use('/api/host', hostRoutes);
 app.use('/api/app-owner', appOwnerRoutes);
+app.use('/api/public', publicRoutes);
 
 // Image proxy to bypass ISP DNS blocks in India (e.g. Reliance Jio blocking *.supabase.co)
 app.get('/api/proxy-image', async (req, res) => {
