@@ -1132,7 +1132,7 @@ router.post('/players-bulk', async (req, res) => {
 // Bulk add players with photos (multipart: playerFile + photoZip)
 const bulkUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for ZIP
+  limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit for ZIP
 });
 
 router.post('/players-bulk-with-photos',
@@ -1178,7 +1178,8 @@ router.post('/players-bulk-with-photos',
         playerRows = jsonData.map(row => {
           const normalized = {};
           Object.keys(row).forEach(key => {
-            normalized[key.trim().toLowerCase()] = row[key];
+            const cleanKey = key.replace(/[\r\n\s]+/g, '').toLowerCase();
+            normalized[cleanKey] = row[key];
           });
           return normalized;
         });
