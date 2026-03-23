@@ -216,11 +216,12 @@ function PublicLive() {
                                 {/* Left side - Image */}
                                 <div className="md:w-2/5 md:bg-gray-700/50 p-8 flex items-center justify-center relative overflow-hidden">
                                     <div className={`absolute inset-0 bg-yellow-500/10 blur-3xl rounded-full transition-opacity duration-500 ${bidFlash ? 'opacity-100 scale-150' : 'opacity-0'}`}></div>
-                                    <div className="w-64 h-64 md:w-80 md:h-80 rounded-full border-4 border-gray-600 overflow-hidden shadow-2xl relative z-10 bg-gray-900">
+                                    <div className="w-72 h-72 md:w-[22rem] md:h-[22rem] rounded-full border-4 border-gray-600 shadow-2xl relative z-10 bg-gray-900 flex items-end justify-center overflow-hidden">
                                         <img
                                             src={getImageUrl(currentPlayer.image || currentPlayer.thumb_url)}
                                             alt={currentPlayer.name}
-                                            className="w-full h-full object-cover"
+                                            className="w-[120%] h-[120%] object-contain"
+                                            style={{ objectPosition: 'center bottom' }}
                                             onError={(e) => { e.target.src = '/default_player.png'; }}
                                         />
                                     </div>
@@ -349,11 +350,11 @@ function PublicLive() {
                                     {filteredPlayers.map(player => (
                                         <div key={player.id} className="bg-gray-800 rounded-xl overflow-hidden border border-gray-700 hover:border-gray-500 transition-all hover:shadow-xl hover:-translate-y-1 group">
                                             {/* Image Header */}
-                                            <div className="h-48 bg-gray-900 relative">
+                                            <div className="h-56 bg-gray-900 relative p-2 flex items-end justify-center">
                                                 <img 
                                                     src={getImageUrl(player.thumb_url || player.image)} 
                                                     alt={player.name}
-                                                    className="w-full h-full object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity"
+                                                    className="w-full h-full object-contain opacity-90 group-hover:opacity-100 transition-opacity scale-110 origin-bottom"
                                                     onError={(e) => { e.target.src='/default_player.png'; }}
                                                 />
                                                 <div className="absolute top-2 right-2">
