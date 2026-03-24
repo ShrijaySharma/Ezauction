@@ -76,15 +76,18 @@ function PublicLive() {
         });
 
         newSocket.on('player-marked', (data) => {
-            // Update the live overlay state
-            if (currentPlayer && currentPlayer.id === data.playerId) {
-                setCurrentPlayer({
-                    ...currentPlayer,
-                    status: data.status,
-                    sold_price: data.soldPrice,
-                    sold_to_team: data.soldToTeam
-                });
-            }
+            // Update the live overlay state using functional update
+            setCurrentPlayer(prev => {
+                if (prev && prev.id === data.playerId) {
+                    return {
+                        ...prev,
+                        status: data.status,
+                        sold_price: data.soldPrice,
+                        sold_to_team: data.soldToTeam
+                    };
+                }
+                return prev;
+            });
             
             // Update the catalog in real-time
             setPlayers(prev => prev.map(p => {
@@ -107,7 +110,7 @@ function PublicLive() {
         return () => {
             newSocket.close();
         };
-    }, [currentPlayer]);
+    }, []);
 
     // Load Catalog Data on mount or when switching to catalog view
     useEffect(() => {
