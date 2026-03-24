@@ -13,6 +13,7 @@ import hostRoutes from './routes/host.js';
 import appOwnerRoutes from './routes/appOwner.js';
 import publicRoutes from './routes/public.js';
 import { supabase } from './supabaseClient.js';
+import { refreshAuctionState, getAuctionState } from './auctionState.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -122,11 +123,7 @@ io.on('connection', (socket) => {
   // Handle request for initial state (e.g. from Overlay)
   socket.on('request-info', async () => {
     try {
-      const { data: state } = await supabase
-        .from('auction_state')
-        .select('current_player_id')
-        .eq('id', 1)
-        .maybeSingle();
+      const state = getAuctionState();
 
       if (state && state.current_player_id) {
         // Fetch player
@@ -172,9 +169,9 @@ io.on('connection', (socket) => {
 });
 
 // Start server
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-  console.log(`📱 Access from network: http://<YOUR_LOCAL_IP>:${PORT}`);
+  await refreshAuctionState();
 });
 
 export { io };

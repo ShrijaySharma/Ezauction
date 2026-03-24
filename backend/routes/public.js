@@ -1,5 +1,6 @@
 import express from 'express';
 import { supabase } from '../supabaseClient.js';
+import { getAuctionState } from '../auctionState.js';
 
 const router = express.Router();
 
@@ -38,13 +39,7 @@ router.get('/teams', async (req, res) => {
 // Get current auction state (public)
 router.get('/auction-state', async (req, res) => {
   try {
-    const { data: state, error } = await supabase
-      .from('auction_state')
-      .select('status, current_player_id')
-      .eq('id', 1)
-      .maybeSingle();
-
-    if (error) throw error;
+    const state = getAuctionState();
     res.json(state || { status: 'STOPPED', current_player_id: null });
   } catch (err) {
     console.error('Error getting auction state (public):', err);
@@ -55,11 +50,7 @@ router.get('/auction-state', async (req, res) => {
 // Get current highest bid for the active player (public)
 router.get('/current-bid', async (req, res) => {
   try {
-    const { data: state } = await supabase
-      .from('auction_state')
-      .select('current_player_id')
-      .eq('id', 1)
-      .maybeSingle();
+    const state = getAuctionState();
 
     if (!state || !state.current_player_id) {
       return res.json({ highestBid: null });

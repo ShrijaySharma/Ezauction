@@ -10,7 +10,8 @@ import sharp from 'sharp';
 import ExcelJS from 'exceljs';
 import AdmZip from 'adm-zip';
 import multer from 'multer';
-import XLSX from 'xlsx';
+import SQLite3 from 'sqlite3';
+import { refreshAuctionState, getAuctionState } from '../auctionState.js';
 
 const router = express.Router();
 
@@ -21,16 +22,7 @@ router.use(requireAdmin);
 // Get auction state
 router.get('/auction-state', async (req, res) => {
   try {
-    const { data: state, error } = await supabase
-      .from('auction_state')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Database error fetching auction state:', error);
-      return res.status(500).json({ error: 'Database error' });
-    }
+    const state = getAuctionState();
 
     if (!state) {
       // Initialize if not exists
@@ -89,6 +81,7 @@ router.post('/enforce-max-bid', async (req, res) => {
       return res.status(500).json({ error: 'Database error' });
     }
 
+    await refreshAuctionState(); // Sync Cache
     io.emit('enforce-max-bid-changed', { enforceMaxBid, baseBidAmount });
     res.json({ success: true, enforceMaxBid, baseBidAmount });
   } catch (err) {
@@ -176,6 +169,7 @@ router.delete('/players-all', async (req, res) => {
 
     if (updateStateError) throw updateStateError;
 
+    await refreshAuctionState(); // Sync Cache
     io.emit('all-players-deleted');
     io.emit('team-deleted');
     res.json({ success: true, message: 'All data deleted permanently' });
@@ -202,6 +196,7 @@ router.post('/auction-status', async (req, res) => {
 
     if (error) throw error;
 
+    await refreshAuctionState(); // Sync Cache
     io.emit('auction-status-changed', { status });
     res.json({ success: true, status });
   } catch (err) {
@@ -238,6 +233,8 @@ router.post('/load-player', async (req, res) => {
 
     if (updateError) throw updateError;
 
+    await refreshAuctionState(); // Sync Cache
+
     // 3. Clear bids for this player (if any exist from simpler times? usually empty if new)
     // Actually, if we reload a player, we might want to keep bids? 
     // The original code DELETES bids. I will follow original logic.
@@ -260,13 +257,9 @@ router.post('/load-player', async (req, res) => {
 // Get current highest bid
 router.get('/current-bid', async (req, res) => {
   try {
-    const { data: state, error: stateError } = await supabase
-      .from('auction_state')
-      .select('current_player_id')
-      .eq('id', 1)
-      .maybeSingle();
+    const state = getAuctionState();
 
-    if (stateError || !state || !state.current_player_id) {
+    if (!state || !state.current_player_id) {
       return res.json({ highestBid: null, player: null });
     }
 
@@ -324,11 +317,7 @@ router.get('/current-bid', async (req, res) => {
 // Get all bids for current player
 router.get('/bids', async (req, res) => {
   try {
-    const { data: state } = await supabase
-      .from('auction_state')
-      .select('current_player_id')
-      .eq('id', 1)
-      .maybeSingle();
+    const state = getAuctionState();
 
     if (!state || !state.current_player_id) {
       return res.json({ bids: [] });
@@ -370,11 +359,7 @@ router.post('/undo-bid', async (req, res) => {
   const io = req.app.locals.io;
 
   try {
-    const { data: state } = await supabase
-      .from('auction_state')
-      .select('current_player_id')
-      .eq('id', 1)
-      .maybeSingle();
+    const state = getAuctionState();
 
     if (!state || !state.current_player_id) {
       return res.status(400).json({ error: 'No active player' });
@@ -479,6 +464,7 @@ router.post('/lock-bidding', async (req, res) => {
 
     if (error) throw error;
 
+    await refreshAuctionState(); // Sync Cache
     io.emit('bidding-locked', { locked });
     res.json({ success: true, locked });
   } catch (err) {
@@ -490,13 +476,7 @@ router.post('/lock-bidding', async (req, res) => {
 // Get max players per team
 router.get('/max-players', async (req, res) => {
   try {
-    const { data: state, error } = await supabase
-      .from('auction_state')
-      .select('max_players_per_team')
-      .eq('id', 1)
-      .maybeSingle();
-
-    if (error) throw error;
+    const state = getAuctionState();
     res.json({ maxPlayersPerTeam: state?.max_players_per_team || 10 });
   } catch (err) {
     console.error('Error getting max players:', err);
@@ -524,6 +504,7 @@ router.post('/max-players', async (req, res) => {
 
     if (error) throw error;
 
+    await refreshAuctionState(); // Sync Cache
     io.emit('max-players-changed', { maxPlayersPerTeam });
     res.json({ success: true, maxPlayersPerTeam });
   } catch (err) {
@@ -549,6 +530,7 @@ router.post('/bid-increments', async (req, res) => {
 
     if (error) throw error;
 
+    await refreshAuctionState(); // Sync Cache
     io.emit('bid-increments-changed', { increment1, increment2 });
     res.json({ success: true, increments: { increment1, increment2 } });
   } catch (err) {
@@ -711,6 +693,8 @@ router.post('/mark-player', async (req, res) => {
           })
           .eq('id', 1);
 
+        await refreshAuctionState(); // Sync Cache
+
         // Clear bids
         await supabase.from('bids').delete().eq('player_id', nextPlayer.id);
 
@@ -732,6 +716,7 @@ router.post('/mark-player', async (req, res) => {
         })
         .eq('id', 1);
 
+      await refreshAuctionState(); // Sync Cache
       io.emit('player-loaded', { player: null });
       res.json({ success: true, nextPlayerLoaded: false, message: 'No more available players' });
     }
@@ -747,13 +732,9 @@ router.post('/reset-bidding', async (req, res) => {
   const io = req.app.locals.io;
 
   try {
-    const { data: state, error: stateError } = await supabase
-      .from('auction_state')
-      .select('current_player_id')
-      .eq('id', 1)
-      .maybeSingle();
+    const state = getAuctionState();
 
-    if (stateError || !state || !state.current_player_id) {
+    if (!state || !state.current_player_id) {
       return res.status(400).json({ error: 'No active player' });
     }
 

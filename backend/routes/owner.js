@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth, requireOwner } from '../middleware/auth.js';
 import { supabase } from '../supabaseClient.js';
+import { getAuctionState } from '../auctionState.js';
 
 const router = express.Router();
 
@@ -15,15 +16,9 @@ router.get('/current-info', async (req, res) => {
         const teamId = req.session.teamId;
 
         // 1. Initial independent fetches: Auction State & Current Team
-        const [stateResult, teamResult] = await Promise.all([
-            supabase.from('auction_state').select('*').eq('id', 1).maybeSingle(),
-            supabase.from('teams').select('budget, bidding_locked').eq('id', teamId).single()
-        ]);
+        const state = getAuctionState();
+        const { data: team, error: teamError } = await supabase.from('teams').select('budget, bidding_locked').eq('id', teamId).single();
 
-        const { data: state, error: stateError } = stateResult;
-        const { data: team, error: teamError } = teamResult;
-
-        if (stateError) throw stateError;
         if (teamError || !team) return res.status(404).json({ error: 'Team not found' });
 
         // 2. Prepare second batch of promises
@@ -158,9 +153,9 @@ router.post('/bid', async (req, res) => {
         // Wait for any currently processing bid to finish
         await previousLock;
 
-        // 1. Get Auction State (Required first for current_player_id)
-        const { data: state, error: stateError } = await supabase.from('auction_state').select('*').eq('id', 1).single();
-        if (stateError || !state) return res.status(500).json({ error: 'Auction state error' });
+        // 1. Get Auction State (Using In-Memory Cache)
+        const state = getAuctionState();
+        if (!state) return res.status(500).json({ error: 'Auction state error' });
 
         if (state.status !== 'LIVE') return res.status(400).json({ error: 'Auction is not live' });
         if (state.bidding_locked === 1) return res.status(400).json({ error: 'Bidding is locked' });

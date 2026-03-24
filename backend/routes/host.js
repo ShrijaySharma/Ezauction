@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth, requireHost } from '../middleware/auth.js';
 import { supabase } from '../supabaseClient.js';
+import { getAuctionState } from '../auctionState.js';
 
 const router = express.Router();
 
@@ -12,13 +13,7 @@ router.use(requireHost);
 // Get current public state (player, bid, stats)
 router.get('/current-info', async (req, res) => {
   try {
-    const { data: state, error: stateError } = await supabase
-      .from('auction_state')
-      .select('*')
-      .eq('id', 1)
-      .maybeSingle();
-
-    if (stateError) throw stateError;
+    const state = getAuctionState();
 
     // Default if not exists
     const status = state ? state.status : 'STOPPED';
@@ -112,7 +107,7 @@ router.get('/current-info', async (req, res) => {
 // Get all bids for current player
 router.get('/current-bids', async (req, res) => {
   try {
-    const { data: state } = await supabase.from('auction_state').select('current_player_id').eq('id', 1).maybeSingle();
+    const state = getAuctionState();
 
     if (!state || !state.current_player_id) {
       return res.json([]);
