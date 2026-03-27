@@ -5,6 +5,7 @@ import { logout } from '../services/auth';
 import * as ownerService from '../services/owner';
 import { getImageUrl } from '../utils/imageUtils';
 import { getSocketUrl } from '../config';
+import TradingWindowBanner from '../components/TradingWindowBanner';
 
 
 // Auto-detect API URL based on current host
@@ -418,6 +419,7 @@ function OwnerDashboard({ user }) {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
+      <TradingWindowBanner socket={socket} />
       {/* Connection Error Banner */}
       {connectionError && (
         <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-center py-2 text-sm font-bold">

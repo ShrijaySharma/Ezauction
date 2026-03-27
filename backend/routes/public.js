@@ -1,6 +1,6 @@
 import express from 'express';
 import { supabase } from '../supabaseClient.js';
-import { getAuctionState } from '../auctionState.js';
+import { getAuctionState, getTradingWindowState } from '../auctionState.js';
 
 const router = express.Router();
 
@@ -84,6 +84,17 @@ router.get('/current-bid', async (req, res) => {
   } catch (err) {
     console.error('Error getting current bid (public):', err);
     res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Get trading window status (public, no auth)
+router.get('/trading-window', (req, res) => {
+  try {
+    const state = getTradingWindowState();
+    res.json(state);
+  } catch (err) {
+    console.error('Error getting trading window status (public):', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 

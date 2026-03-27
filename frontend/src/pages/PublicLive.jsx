@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { getSocketUrl } from '../config';
 import { getPublicPlayers, getPublicTeams } from '../services/public';
 import { getImageUrl } from '../utils/imageUtils';
+import TradingWindowBanner from '../components/TradingWindowBanner';
 
 function PublicLive() {
     const [viewMode, setViewMode] = useState('live'); // 'live' or 'catalog'
@@ -169,6 +170,7 @@ function PublicLive() {
 
     return (
         <div className="min-h-screen bg-gray-900 text-white font-sans flex flex-col">
+            <TradingWindowBanner socket={socket} />
             {/* Top Navigation Bar */}
             <nav className="bg-gray-800 border-b border-gray-700 shadow-lg px-6 py-4 flex justify-between items-center sticky top-0 z-50">
                 <div className="flex items-center gap-4">

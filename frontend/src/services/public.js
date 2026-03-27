@@ -25,3 +25,9 @@ export const getPublicCurrentBid = async () => {
     if (!res.ok) throw new Error('Failed to fetch current bid');
     return res.json();
 };
+
+export const getPublicTradingWindowStatus = async () => {
+    const res = await fetch(`${API_URL}/public/trading-window`);
+    if (!res.ok) throw new Error('Failed to fetch trading window status');
+    return res.json();
+};

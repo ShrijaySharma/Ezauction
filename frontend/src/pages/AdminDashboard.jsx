@@ -6,6 +6,7 @@ import * as adminService from '../services/admin';
 import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
 import BulkUploadModal from '../components/BulkUploadModal';
+import TradingWindowBanner from '../components/TradingWindowBanner';
 import { getSocketUrl } from '../config';
 
 // Auto-detect API URL based on current host
@@ -79,6 +80,16 @@ function AdminDashboard({ user }) {
   const [customBidIncrement, setCustomBidIncrement] = useState(1000);
   const [newBaseBidAmount, setNewBaseBidAmount] = useState(1000);
 
+  // Trading Window State
+  const [showTradingModal, setShowTradingModal] = useState(false);
+  const [tradingWindowOpen, setTradingWindowOpen] = useState(false);
+  const [tradingTrades, setTradingTrades] = useState([]);
+  const [tradeSelectedTeam, setTradeSelectedTeam] = useState('');
+  const [tradeSelectedPlayer, setTradeSelectedPlayer] = useState('');
+  const [tradeTargetTeam, setTradeTargetTeam] = useState('');
+  const [tradeAmount, setTradeAmount] = useState('');
+  const [executingTrade, setExecutingTrade] = useState(false);
+
   // Notification State
   const [notification, setNotification] = useState(null);
   const [notificationKey, setNotificationKey] = useState(0);
@@ -98,7 +109,7 @@ function AdminDashboard({ user }) {
 
   // Disable body scroll when any modal is open
   useEffect(() => {
-    if (showHistory || showPlayerModal || showTeamManagement || showTeamModal || showTeamSquads || showPurseMonitoring || showBiddingLogicModal || showCredentialsModal || showAdminBidding) {
+    if (showHistory || showPlayerModal || showTeamManagement || showTeamModal || showTeamSquads || showPurseMonitoring || showBiddingLogicModal || showCredentialsModal || showAdminBidding || showTradingModal) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -106,7 +117,7 @@ function AdminDashboard({ user }) {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showHistory, showPlayerModal, showTeamManagement, showTeamModal, showTeamSquads, showPurseMonitoring, showBiddingLogicModal, showCredentialsModal, showAdminBidding]);
+  }, [showHistory, showPlayerModal, showTeamManagement, showTeamModal, showTeamSquads, showPurseMonitoring, showBiddingLogicModal, showCredentialsModal, showAdminBidding, showTradingModal]);
 
   useEffect(() => {
     // Initialize Audio
@@ -308,6 +319,13 @@ function AdminDashboard({ user }) {
       if (data.baseBidAmount !== undefined) {
         setNewBaseBidAmount(data.baseBidAmount);
         setAuctionState(prev => ({ ...prev, enforceMaxBid: data.enforceMaxBid, baseBidAmount: data.baseBidAmount }));
+      }
+    });
+
+    newSocket.on('trading-window-update', (data) => {
+      if (data) {
+        setTradingWindowOpen(data.isOpen);
+        setTradingTrades(data.trades || []);
       }
     });
 
@@ -915,8 +933,66 @@ function AdminDashboard({ user }) {
 
   const currentBid = highestBid ? highestBid.amount : (currentPlayer ? currentPlayer.base_price : 0);
 
+  // Trading Window handlers
+  const handleOpenTradingWindow = async () => {
+    try {
+      await adminService.openTradingWindow();
+    } catch (error) {
+      alert('Error opening trading window: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleCloseTradingWindow = async () => {
+    if (!confirm('Close the trading window? All viewers will stop seeing the trading banner.')) return;
+    try {
+      await adminService.closeTradingWindow();
+      setTradeSelectedTeam('');
+      setTradeSelectedPlayer('');
+      setTradeTargetTeam('');
+      setTradeAmount('');
+    } catch (error) {
+      alert('Error closing trading window: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleExecuteTrade = async () => {
+    if (!tradeSelectedPlayer || !tradeSelectedTeam || !tradeTargetTeam || !tradeAmount) {
+      alert('Please fill all trade fields');
+      return;
+    }
+    if (!confirm(`Execute trade?\n\nPlayer will be moved from current team to target team for ₹${parseInt(tradeAmount).toLocaleString('en-IN')}`)) return;
+    setExecutingTrade(true);
+    try {
+      await adminService.executeTrade(
+        parseInt(tradeSelectedPlayer),
+        parseInt(tradeSelectedTeam),
+        parseInt(tradeTargetTeam),
+        parseFloat(tradeAmount)
+      );
+      alert('Trade executed successfully!');
+      setTradeSelectedPlayer('');
+      setTradeTargetTeam('');
+      setTradeAmount('');
+      loadTeams();
+      loadPlayers();
+    } catch (error) {
+      alert('Error executing trade: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setExecutingTrade(false);
+    }
+  };
+
+  // Derived trading data
+  const soldPlayersForTeam = tradeSelectedTeam
+    ? players.filter(p => p.status === 'SOLD' && p.sold_to_team === parseInt(tradeSelectedTeam))
+    : [];
+  const availableTargetTeams = tradeSelectedTeam
+    ? teams.filter(t => t.id !== parseInt(tradeSelectedTeam))
+    : [];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4">
+      <TradingWindowBanner socket={socket} />
       {/* Connection Error Banner */}
       {connectionError && (
         <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-center py-2 text-sm font-bold">
@@ -1044,6 +1120,26 @@ function AdminDashboard({ user }) {
                     <div className="text-sm text-orange-100">Bid on behalf of teams (Hybrid)</div>
                   </button>
                 </div>
+
+                <button
+                  onClick={() => {
+                    setShowTradingModal(true);
+                    setShowSidebar(false);
+                    // Load initial trading window status
+                    adminService.getTradingWindowStatus().then(data => {
+                      if (data) {
+                        setTradingWindowOpen(data.isOpen);
+                        setTradingTrades(data.trades || []);
+                      }
+                    }).catch(console.error);
+                  }}
+                  className="w-full px-4 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white rounded-lg transition-colors text-left shadow-lg border border-amber-500"
+                >
+                  <div className="font-bold flex items-center gap-2">
+                    <span>🔄</span> Trading Window
+                  </div>
+                  <div className="text-sm text-amber-100">Trade sold players between teams</div>
+                </button>
 
                 <div className="pt-4 border-t border-gray-700 mt-4">
                   <button
@@ -2513,6 +2609,155 @@ function AdminDashboard({ user }) {
           </div>
         </div>
       )}
+      {/* Trading Window Modal */}
+      {showTradingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto border-2 border-amber-500/50 shadow-2xl shadow-amber-500/10">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-amber-400 flex items-center gap-2">🔄 Trading Window</h2>
+              <button
+                onClick={() => setShowTradingModal(false)}
+                className="text-white hover:text-red-400 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Window Status Toggle */}
+            <div className="mb-6 flex items-center justify-between bg-gray-700/50 rounded-xl p-4 border border-gray-600">
+              <div>
+                <div className="text-white font-semibold">Trading Window Status</div>
+                <div className={`text-sm font-bold ${tradingWindowOpen ? 'text-green-400' : 'text-gray-400'}`}>
+                  {tradingWindowOpen ? '🟢 OPEN — Visible to all viewers' : '⚫ CLOSED'}
+                </div>
+              </div>
+              <button
+                onClick={tradingWindowOpen ? handleCloseTradingWindow : handleOpenTradingWindow}
+                className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-md ${tradingWindowOpen
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+              >
+                {tradingWindowOpen ? 'Close Window' : 'Open Window'}
+              </button>
+            </div>
+
+            {/* Trade Form (only when window is open) */}
+            {tradingWindowOpen && (
+              <div className="space-y-4">
+                <div className="bg-gray-700/30 rounded-xl p-5 border border-gray-600 space-y-4">
+                  <h3 className="text-lg font-bold text-white">Execute Trade</h3>
+
+                  {/* Step 1: Select source team */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-300 mb-1">Source Team (trading FROM)</label>
+                    <select
+                      value={tradeSelectedTeam}
+                      onChange={(e) => {
+                        setTradeSelectedTeam(e.target.value);
+                        setTradeSelectedPlayer('');
+                        setTradeTargetTeam('');
+                        setTradeAmount('');
+                      }}
+                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-amber-500"
+                    >
+                      <option value="">— Select Source Team —</option>
+                      {teams.filter(t => players.some(p => p.status === 'SOLD' && p.sold_to_team === t.id)).map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Step 2: Select player from that team */}
+                  {tradeSelectedTeam && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-1">Player to Trade</label>
+                      <select
+                        value={tradeSelectedPlayer}
+                        onChange={(e) => {
+                          setTradeSelectedPlayer(e.target.value);
+                          const p = players.find(pl => pl.id === parseInt(e.target.value));
+                          if (p) setTradeAmount(p.sold_price?.toString() || '0');
+                        }}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="">— Select Player —</option>
+                        {soldPlayersForTeam.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} ({p.role}) — Sold ₹{p.sold_price?.toLocaleString('en-IN')}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Step 3: Select target team */}
+                  {tradeSelectedPlayer && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-1">Target Team (trading TO)</label>
+                      <select
+                        value={tradeTargetTeam}
+                        onChange={(e) => setTradeTargetTeam(e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-amber-500"
+                      >
+                        <option value="">— Select Target Team —</option>
+                        {availableTargetTeams.map(t => (
+                          <option key={t.id} value={t.id}>{t.name} (Purse: ₹{t.budget?.toLocaleString('en-IN')})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Step 4: Trade amount */}
+                  {tradeTargetTeam && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-300 mb-1">Trade Amount (₹)</label>
+                      <input
+                        type="number"
+                        value={tradeAmount}
+                        onChange={(e) => setTradeAmount(e.target.value)}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-amber-500"
+                        placeholder="Amount to deduct from target purse"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">This amount will be deducted from the target team's purse and added to the source team's purse.</p>
+                    </div>
+                  )}
+
+                  {/* Execute Button */}
+                  {tradeTargetTeam && tradeAmount && (
+                    <button
+                      onClick={handleExecuteTrade}
+                      disabled={executingTrade}
+                      className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-bold text-lg transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" 
+                    >
+                      {executingTrade ? 'Executing...' : '⚡ Execute Trade'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Recent Trades */}
+                {tradingTrades.length > 0 && (
+                  <div className="bg-gray-700/30 rounded-xl p-5 border border-gray-600">
+                    <h3 className="text-lg font-bold text-white mb-3">Recent Trades</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {tradingTrades.map((trade, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-gray-800/50 rounded-lg px-4 py-3 border border-gray-700">
+                          <div className="flex items-center gap-3">
+                            <span className="text-amber-400 font-bold">{trade.player_name}</span>
+                            <span className="text-red-400 line-through text-sm">{trade.from_team_name}</span>
+                            <span className="text-gray-500">→</span>
+                            <span className="text-green-400 font-semibold">{trade.to_team_name}</span>
+                          </div>
+                          <span className="text-yellow-300 font-mono font-bold">₹{parseFloat(trade.amount).toLocaleString('en-IN')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Silent Image Preloader */}
       <div style={{ display: 'none' }}>
         {players.filter(p => (p.status === 'AVAILABLE' || p.status === 'UNSOLD') && (p.thumb_url || p.image)).map(player => (

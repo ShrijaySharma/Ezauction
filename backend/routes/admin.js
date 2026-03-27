@@ -11,7 +11,7 @@ import ExcelJS from 'exceljs';
 import AdmZip from 'adm-zip';
 import multer from 'multer';
 import SQLite3 from 'sqlite3';
-import { refreshAuctionState, getAuctionState } from '../auctionState.js';
+import { refreshAuctionState, getAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState } from '../auctionState.js';
 
 const router = express.Router();
 
@@ -2156,6 +2156,162 @@ router.get('/export-teams', async (req, res) => {
   } catch (error) {
     console.error('Export failed:', error);
     res.status(500).json({ error: 'Failed to export teams' });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TRADING WINDOW ROUTES (completely separate from auction hot-path)
+// ═══════════════════════════════════════════════════════════════
+
+// Get trading window status
+router.get('/trading-window/status', async (req, res) => {
+  try {
+    const state = getTradingWindowState();
+    res.json(state);
+  } catch (err) {
+    console.error('Error getting trading window status:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Open trading window
+router.post('/trading-window/open', async (req, res) => {
+  const io = req.app.locals.io;
+  try {
+    setTradingWindowState({ isOpen: true, trades: [] });
+    const state = getTradingWindowState();
+    io.emit('trading-window-update', state);
+    res.json({ success: true, ...state });
+  } catch (err) {
+    console.error('Error opening trading window:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Close trading window
+router.post('/trading-window/close', async (req, res) => {
+  const io = req.app.locals.io;
+  try {
+    resetTradingWindowState();
+    const state = getTradingWindowState();
+    io.emit('trading-window-update', state);
+    res.json({ success: true, ...state });
+  } catch (err) {
+    console.error('Error closing trading window:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Execute a trade
+router.post('/trading-window/execute', async (req, res) => {
+  const { playerId, fromTeamId, toTeamId, amount } = req.body;
+  const io = req.app.locals.io;
+
+  try {
+    // 1. Validate trading window is open
+    const windowState = getTradingWindowState();
+    if (!windowState.isOpen) {
+      return res.status(400).json({ error: 'Trading window is not open' });
+    }
+
+    // 2. Validate inputs
+    if (!playerId || !fromTeamId || !toTeamId || amount === undefined || amount === null) {
+      return res.status(400).json({ error: 'Missing required fields: playerId, fromTeamId, toTeamId, amount' });
+    }
+    if (fromTeamId === toTeamId) {
+      return res.status(400).json({ error: 'Cannot trade a player to the same team' });
+    }
+    const tradeAmount = parseFloat(amount);
+    if (isNaN(tradeAmount) || tradeAmount < 0) {
+      return res.status(400).json({ error: 'Invalid trade amount' });
+    }
+
+    // 3. Validate player belongs to fromTeam and is SOLD
+    const { data: player, error: playerError } = await supabase
+      .from('players')
+      .select('id, name, status, sold_to_team, sold_price')
+      .eq('id', playerId)
+      .single();
+
+    if (playerError) throw playerError;
+    if (!player) return res.status(404).json({ error: 'Player not found' });
+    if (player.status !== 'SOLD') return res.status(400).json({ error: 'Player is not sold. Only sold players can be traded.' });
+    if (player.sold_to_team !== fromTeamId) return res.status(400).json({ error: 'Player does not belong to the specified source team' });
+
+    // 4. Get both teams
+    const [fromTeamResult, toTeamResult] = await Promise.all([
+      supabase.from('teams').select('id, name, budget').eq('id', fromTeamId).single(),
+      supabase.from('teams').select('id, name, budget').eq('id', toTeamId).single()
+    ]);
+
+    if (fromTeamResult.error) throw fromTeamResult.error;
+    if (toTeamResult.error) throw toTeamResult.error;
+    const fromTeam = fromTeamResult.data;
+    const toTeam = toTeamResult.data;
+    if (!fromTeam) return res.status(404).json({ error: 'Source team not found' });
+    if (!toTeam) return res.status(404).json({ error: 'Target team not found' });
+
+    // 5. Check target team budget
+    if (toTeam.budget < tradeAmount) {
+      return res.status(400).json({ error: `Target team "${toTeam.name}" does not have enough budget (has ₹${toTeam.budget}, needs ₹${tradeAmount})` });
+    }
+
+    // 6. Execute trade: adjust budgets
+    const newFromBudget = fromTeam.budget + tradeAmount;
+    const newToBudget = toTeam.budget - tradeAmount;
+
+    const [updateFromResult, updateToResult, updatePlayerResult] = await Promise.all([
+      supabase.from('teams').update({ budget: newFromBudget }).eq('id', fromTeamId),
+      supabase.from('teams').update({ budget: newToBudget }).eq('id', toTeamId),
+      supabase.from('players').update({ sold_to_team: toTeamId }).eq('id', playerId)
+    ]);
+
+    if (updateFromResult.error) throw updateFromResult.error;
+    if (updateToResult.error) throw updateToResult.error;
+    if (updatePlayerResult.error) throw updatePlayerResult.error;
+
+    // 7. Insert trade record
+    const tradeRecord = {
+      player_id: playerId,
+      player_name: player.name,
+      from_team_id: fromTeamId,
+      from_team_name: fromTeam.name,
+      to_team_id: toTeamId,
+      to_team_name: toTeam.name,
+      amount: tradeAmount
+    };
+
+    const { error: tradeInsertError } = await supabase
+      .from('trades')
+      .insert([tradeRecord]);
+
+    if (tradeInsertError) {
+      console.error('Error inserting trade record (non-fatal):', tradeInsertError);
+      // Non-fatal: the trade itself succeeded, just the audit log failed
+    }
+
+    // 8. Update in-memory state
+    const tradeForBanner = {
+      ...tradeRecord,
+      traded_at: new Date().toISOString()
+    };
+    addTradeToWindow(tradeForBanner);
+
+    // 9. Emit events
+    io.emit('trading-window-update', getTradingWindowState());
+    io.emit('team-budget-updated', { teamId: fromTeamId, newBudget: newFromBudget });
+    io.emit('team-budget-updated', { teamId: toTeamId, newBudget: newToBudget });
+    io.emit('player-removed-from-team'); // Triggers squad refresh on listening clients
+
+    res.json({
+      success: true,
+      trade: tradeForBanner,
+      fromTeamNewBudget: newFromBudget,
+      toTeamNewBudget: newToBudget
+    });
+  } catch (err) {
+    console.error('Error executing trade:', err);
+    res.status(500).json({ error: 'Database error executing trade' });
   }
 });
 

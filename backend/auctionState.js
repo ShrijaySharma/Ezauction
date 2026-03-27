@@ -59,3 +59,37 @@ export function getAuctionState() {
 
 // Export the raw cache for advanced use cases (not recommended for simple reads)
 export { auctionStateCache };
+
+// ─── Trading Window State (completely separate from auction state) ───
+let tradingWindowState = {
+    isOpen: false,
+    trades: [] // recent trades for current session (displayed on live banners)
+};
+
+/**
+ * Returns the current trading window state.
+ */
+export function getTradingWindowState() {
+    return tradingWindowState;
+}
+
+/**
+ * Updates the trading window state.
+ */
+export function setTradingWindowState(newState) {
+    tradingWindowState = { ...tradingWindowState, ...newState };
+}
+
+/**
+ * Adds a trade to the trading window's trade list.
+ */
+export function addTradeToWindow(trade) {
+    tradingWindowState.trades = [trade, ...tradingWindowState.trades];
+}
+
+/**
+ * Resets the trading window state (called when window is closed).
+ */
+export function resetTradingWindowState() {
+    tradingWindowState = { isOpen: false, trades: [] };
+}

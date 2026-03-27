@@ -302,3 +302,25 @@ export const adminPlaceBid = async (teamId, amount) => {
   return response.data;
 };
 
+// ─── Trading Window ───
+
+export const getTradingWindowStatus = async () => {
+  const response = await api.get('/admin/trading-window/status');
+  return response.data;
+};
+
+export const openTradingWindow = async () => {
+  const response = await api.post('/admin/trading-window/open');
+  return response.data;
+};
+
+export const closeTradingWindow = async () => {
+  const response = await api.post('/admin/trading-window/close');
+  return response.data;
+};
+
+export const executeTrade = async (playerId, fromTeamId, toTeamId, amount) => {
+  const response = await api.post('/admin/trading-window/execute', { playerId, fromTeamId, toTeamId, amount });
+  return response.data;
+};
+

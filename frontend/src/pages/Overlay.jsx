@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { getImageUrl } from '../utils/imageUtils';
 import { getSocketUrl } from '../config';
+import TradingWindowBanner from '../components/TradingWindowBanner';
 
 function Overlay() {
     const [socket, setSocket] = useState(null);
@@ -125,6 +126,7 @@ function Overlay() {
 
     return (
         <div className="h-screen w-screen overflow-hidden font-sans bg-green-500/0"> {/* Transparent background mostly */}
+            <TradingWindowBanner socket={socket} />
 
             {/* Lower Third / Overlay Container */}
             <div className="absolute bottom-10 left-10 right-10 h-64 flex items-end justify-between items-center gap-8">

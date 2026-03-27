@@ -5,6 +5,7 @@ import { logout } from '../services/auth';
 import * as hostService from '../services/host';
 import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
+import TradingWindowBanner from '../components/TradingWindowBanner';
 import { getSocketUrl } from '../config';
 
 // Auto-detect API URL based on current host
@@ -261,6 +262,7 @@ function HostDashboard({ user }) {
 
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-black font-sans selection:bg-yellow-400 selection:text-blue-900">
+      <TradingWindowBanner socket={socket} />
       {/* Connection Error Banner */}
       {connectionError && (
         <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white text-center py-2 text-sm font-bold">
