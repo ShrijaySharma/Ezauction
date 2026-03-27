@@ -55,10 +55,10 @@ function TradingWindowBanner({ socket }) {
 
   return (
     <>
-      {/* Fixed top banner */}
-      <div className="fixed top-0 left-0 right-0 z-[200] pointer-events-none">
+      {/* Fixed top banner — fully click-through so it never blocks UI */}
+      <div className="fixed top-0 left-0 right-0 z-[30] pointer-events-none">
         {/* Glowing header bar */}
-        <div className="bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600 text-white py-2 px-4 flex items-center justify-center gap-3 shadow-[0_4px_30px_rgba(245,158,11,0.4)] pointer-events-auto">
+        <div className="bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600 text-white py-2 px-4 flex items-center justify-center gap-3 shadow-[0_4px_30px_rgba(245,158,11,0.4)]">
           <span className="relative flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
@@ -74,7 +74,7 @@ function TradingWindowBanner({ socket }) {
 
         {/* Trade ticker (scrolling feed) */}
         {trades.length > 0 && (
-          <div className="bg-black/90 backdrop-blur-xl border-b border-amber-500/30 overflow-hidden pointer-events-auto">
+          <div className="bg-black/90 backdrop-blur-xl border-b border-amber-500/30 overflow-hidden">
             <div className="flex animate-trading-ticker whitespace-nowrap py-2 px-4">
               {/* Repeat trades for continuous scroll effect */}
               {[...trades, ...trades].map((trade, idx) => (
