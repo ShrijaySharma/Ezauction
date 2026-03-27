@@ -72,22 +72,22 @@ function TradingWindowBanner({ socket }) {
           </span>
         </div>
 
-        {/* Trade ticker (scrolling feed) */}
+        {/* Trade ticker — classic right-to-left marquee */}
         {trades.length > 0 && (
           <div className="bg-black/90 backdrop-blur-xl border-b border-amber-500/30 overflow-hidden">
-            <div className="flex animate-trading-ticker whitespace-nowrap py-2 px-4">
-              {/* Repeat trades for continuous scroll effect */}
-              {[...trades, ...trades].map((trade, idx) => (
-                <span key={idx} className="inline-flex items-center gap-2 mx-6 text-sm shrink-0">
-                  <span className="text-amber-400 font-bold">{trade.player_name}</span>
-                  <span className="text-gray-400">|</span>
-                  <span className="text-red-400 font-semibold line-through opacity-70">{trade.from_team_name}</span>
-                  <span className="text-gray-500">→</span>
-                  <span className="text-green-400 font-bold">{trade.to_team_name}</span>
-                  <span className="text-gray-400">|</span>
-                  <span className="text-yellow-300 font-mono font-bold">₹{formatIndianNumber(trade.amount)}</span>
-                </span>
-              ))}
+            <div className="trading-ticker-track py-2" style={{ '--ticker-duration': `${Math.max(12, trades.length * 10)}s` }}>
+              <div className="trading-ticker-content">
+                {trades.map((trade, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-2 mx-6 text-sm shrink-0">
+                    <span className="bg-amber-500/20 text-amber-400 font-bold px-2 py-0.5 rounded">{trade.player_name}</span>
+                    <span className="text-red-400 font-semibold line-through opacity-70">{trade.from_team_name}</span>
+                    <span className="text-gray-400 text-xs">➜</span>
+                    <span className="text-green-400 font-bold">{trade.to_team_name}</span>
+                    <span className="text-yellow-300 font-mono font-bold">₹{formatIndianNumber(trade.amount)}</span>
+                    <span className="text-gray-600 mx-2">•</span>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -95,12 +95,23 @@ function TradingWindowBanner({ socket }) {
 
       {/* Inject the ticker animation keyframes */}
       <style>{`
-        @keyframes trading-ticker {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+        .trading-ticker-track {
+          width: 100%;
+          overflow: hidden;
+          position: relative;
         }
-        .animate-trading-ticker {
-          animation: trading-ticker ${Math.max(10, trades.length * 8)}s linear infinite;
+        .trading-ticker-content {
+          display: inline-flex;
+          white-space: nowrap;
+          animation: trading-marquee var(--ticker-duration, 15s) linear infinite;
+        }
+        @keyframes trading-marquee {
+          0% {
+            transform: translateX(100vw);
+          }
+          100% {
+            transform: translateX(-100%);
+          }
         }
       `}</style>
     </>
