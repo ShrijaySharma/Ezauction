@@ -11,7 +11,7 @@ import ExcelJS from 'exceljs';
 import AdmZip from 'adm-zip';
 import multer from 'multer';
 import SQLite3 from 'sqlite3';
-import { refreshAuctionState, getAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState } from '../auctionState.js';
+import { refreshAuctionState, getAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState, getAdminAnonymousBid, setAdminAnonymousBid, clearAdminAnonymousBid } from '../auctionState.js';
 
 const router = express.Router();
 
@@ -2335,7 +2335,7 @@ router.post('/admin-bid-v2', async (req, res) => {
     if (state.status !== 'LIVE') return res.status(400).json({ error: 'Auction is not live' });
     if (!state.current_player_id) return res.status(400).json({ error: 'No player is currently being auctioned' });
 
-    // 2. Get current highest bid
+    // 2. Get current highest bid from DB
     const { data: currentHighest } = await supabase
       .from('bids')
       .select('*')
@@ -2349,31 +2349,27 @@ router.post('/admin-bid-v2', async (req, res) => {
     if (!player) return res.status(404).json({ error: 'Player not found' });
 
     // 4. Calculate new bid amount
-    const startAmount = currentHighest ? currentHighest.amount : player.base_price;
+    // Use highest of: DB bid, in-memory anonymous bid, or base_price
+    const anonBid = getAdminAnonymousBid();
+    const dbAmount = currentHighest ? currentHighest.amount : 0;
+    const anonAmount = (anonBid.playerId === state.current_player_id) ? anonBid.amount : 0;
+    const startAmount = Math.max(dbAmount, anonAmount, player.base_price);
     const newBidAmount = startAmount + parseInt(amount);
 
-    // 5. Place anonymous bid (team_id = NULL)
-    const { data: newBid, error: bidError } = await supabase
-      .from('bids')
-      .insert([{
-        player_id: state.current_player_id,
-        team_id: null,
-        amount: newBidAmount,
-        timestamp: new Date()
-      }])
-      .select()
-      .single();
-
-    if (bidError) throw bidError;
+    // 5. Track in memory only (do NOT insert into bids table — team_id NOT NULL constraint)
+    setAdminAnonymousBid(newBidAmount, state.current_player_id);
 
     // 6. Emit with blank team_name so no dashboard shows a team
     const bidToSend = {
-      ...newBid,
-      team_name: ''
+      id: Date.now(), // Virtual ID for frontend
+      player_id: state.current_player_id,
+      team_id: null,
+      amount: newBidAmount,
+      team_name: '',
+      timestamp: new Date()
     };
 
-    const previousBidAmount = currentHighest ? currentHighest.amount : player.base_price;
-    const increment = newBidAmount - previousBidAmount;
+    const increment = newBidAmount - startAmount;
 
     io.emit('bid-placed', {
       bid: bidToSend,
@@ -2382,7 +2378,7 @@ router.post('/admin-bid-v2', async (req, res) => {
     io.emit('bid-updated', {
       highestBid: bidToSend,
       playerId: state.current_player_id,
-      previousBid: previousBidAmount
+      previousBid: startAmount
     });
 
     res.json({ success: true, bid: bidToSend });
@@ -2393,7 +2389,7 @@ router.post('/admin-bid-v2', async (req, res) => {
   }
 });
 
-// Assign team to the current highest anonymous bid
+// Assign team to the current anonymous bid — inserts real bid into DB
 router.post('/admin-assign-team', async (req, res) => {
   const { teamId } = req.body;
   const io = req.app.locals.io;
@@ -2408,40 +2404,40 @@ router.post('/admin-assign-team', async (req, res) => {
     if (!state) return res.status(500).json({ error: 'Auction state error' });
     if (!state.current_player_id) return res.status(400).json({ error: 'No player is currently being auctioned' });
 
-    // 2. Get highest bid for this player
-    const { data: highestBid } = await supabase
-      .from('bids')
-      .select('*')
-      .eq('player_id', state.current_player_id)
-      .order('amount', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!highestBid) {
-      return res.status(400).json({ error: 'No bids found for this player' });
+    // 2. Get the anonymous bid amount from memory
+    const anonBid = getAdminAnonymousBid();
+    if (!anonBid.amount || anonBid.playerId !== state.current_player_id) {
+      return res.status(400).json({ error: 'No anonymous admin bid active for the current player' });
     }
 
     // 3. Get team info and validate budget
     const { data: team } = await supabase.from('teams').select('id, name, budget').eq('id', teamId).single();
     if (!team) return res.status(400).json({ error: 'Team not found' });
 
-    if (team.budget < highestBid.amount) {
-      return res.status(400).json({ error: `Team "${team.name}" budget (₹${team.budget.toLocaleString()}) is less than bid amount (₹${highestBid.amount.toLocaleString()})` });
+    if (team.budget < anonBid.amount) {
+      return res.status(400).json({ error: `Team "${team.name}" budget (₹${team.budget.toLocaleString()}) is less than bid amount (₹${anonBid.amount.toLocaleString()})` });
     }
 
-    // 4. Update ALL bids for this player that have team_id = NULL to the selected team
-    const { error: updateError } = await supabase
+    // 4. Insert the REAL bid into DB with team_id
+    const { data: newBid, error: bidError } = await supabase
       .from('bids')
-      .update({ team_id: teamId })
-      .eq('player_id', state.current_player_id)
-      .is('team_id', null);
+      .insert([{
+        player_id: state.current_player_id,
+        team_id: teamId,
+        amount: anonBid.amount,
+        timestamp: new Date()
+      }])
+      .select()
+      .single();
 
-    if (updateError) throw updateError;
+    if (bidError) throw bidError;
 
-    // 5. Emit bid-updated with real team name
+    // 5. Clear the in-memory anonymous bid
+    clearAdminAnonymousBid();
+
+    // 6. Emit bid-updated with real team name
     const updatedBid = {
-      ...highestBid,
-      team_id: teamId,
+      ...newBid,
       team_name: team.name
     };
 

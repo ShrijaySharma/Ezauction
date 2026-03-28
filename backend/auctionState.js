@@ -93,3 +93,21 @@ export function addTradeToWindow(trade) {
 export function resetTradingWindowState() {
     tradingWindowState = { isOpen: false, trades: [] };
 }
+
+// ─── Admin Bidding 2.0 — Anonymous bid tracking (in-memory only) ───
+let adminAnonymousBid = {
+    amount: 0,        // Current anonymous bid amount (0 = no anonymous bid active)
+    playerId: null     // The player this anonymous bid is for
+};
+
+export function getAdminAnonymousBid() {
+    return adminAnonymousBid;
+}
+
+export function setAdminAnonymousBid(amount, playerId) {
+    adminAnonymousBid = { amount, playerId };
+}
+
+export function clearAdminAnonymousBid() {
+    adminAnonymousBid = { amount: 0, playerId: null };
+}

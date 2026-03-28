@@ -14,6 +14,7 @@ import appOwnerRoutes from './routes/appOwner.js';
 import publicRoutes from './routes/public.js';
 import { supabase } from './supabaseClient.js';
 import { refreshAuctionState, getAuctionState } from './auctionState.js';
+import { getAdminAnonymousBid } from './auctionState.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -167,7 +168,33 @@ io.on('connection', (socket) => {
               };
             }
 
+            // Check if there's a higher in-memory anonymous bid
+            const anonBid = getAdminAnonymousBid();
+            if (anonBid.playerId === state.current_player_id && anonBid.amount > processedBid.amount) {
+              processedBid = {
+                ...processedBid,
+                amount: anonBid.amount,
+                team_id: null,
+                team_name: ''
+              };
+            }
+
             socket.emit('bid-updated', { highestBid: processedBid });
+          } else {
+            // No DB bid — check if there's an in-memory anonymous bid
+            const anonBid = getAdminAnonymousBid();
+            if (anonBid.playerId === state.current_player_id && anonBid.amount > 0) {
+              socket.emit('bid-updated', {
+                highestBid: {
+                  id: Date.now(),
+                  player_id: state.current_player_id,
+                  team_id: null,
+                  amount: anonBid.amount,
+                  team_name: '',
+                  timestamp: new Date()
+                }
+              });
+            }
           }
         }
       }
