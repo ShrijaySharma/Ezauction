@@ -2315,5 +2315,148 @@ router.post('/trading-window/execute', async (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════
+// ADMIN BIDDING MODE 2.0 — Anonymous bidding on behalf of teams
+// ═══════════════════════════════════════════════════════════════
+
+// Admin anonymous bid increment (no team associated)
+router.post('/admin-bid-v2', async (req, res) => {
+  const { amount } = req.body; // amount = the INCREMENT (1000, 2000, 5000)
+  const io = req.app.locals.io;
+
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ error: 'Invalid increment amount' });
+  }
+
+  try {
+    // 1. Check auction state
+    const state = getAuctionState();
+    if (!state) return res.status(500).json({ error: 'Auction state error' });
+    if (state.status !== 'LIVE') return res.status(400).json({ error: 'Auction is not live' });
+    if (!state.current_player_id) return res.status(400).json({ error: 'No player is currently being auctioned' });
+
+    // 2. Get current highest bid
+    const { data: currentHighest } = await supabase
+      .from('bids')
+      .select('*')
+      .eq('player_id', state.current_player_id)
+      .order('amount', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // 3. Get player info
+    const { data: player } = await supabase.from('players').select('base_price').eq('id', state.current_player_id).single();
+    if (!player) return res.status(404).json({ error: 'Player not found' });
+
+    // 4. Calculate new bid amount
+    const startAmount = currentHighest ? currentHighest.amount : player.base_price;
+    const newBidAmount = startAmount + parseInt(amount);
+
+    // 5. Place anonymous bid (team_id = NULL)
+    const { data: newBid, error: bidError } = await supabase
+      .from('bids')
+      .insert([{
+        player_id: state.current_player_id,
+        team_id: null,
+        amount: newBidAmount,
+        timestamp: new Date()
+      }])
+      .select()
+      .single();
+
+    if (bidError) throw bidError;
+
+    // 6. Emit with blank team_name so no dashboard shows a team
+    const bidToSend = {
+      ...newBid,
+      team_name: ''
+    };
+
+    const previousBidAmount = currentHighest ? currentHighest.amount : player.base_price;
+    const increment = newBidAmount - previousBidAmount;
+
+    io.emit('bid-placed', {
+      bid: bidToSend,
+      increment: increment
+    });
+    io.emit('bid-updated', {
+      highestBid: bidToSend,
+      playerId: state.current_player_id,
+      previousBid: previousBidAmount
+    });
+
+    res.json({ success: true, bid: bidToSend });
+
+  } catch (err) {
+    console.error('Error in admin-bid-v2:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Assign team to the current highest anonymous bid
+router.post('/admin-assign-team', async (req, res) => {
+  const { teamId } = req.body;
+  const io = req.app.locals.io;
+
+  if (!teamId) {
+    return res.status(400).json({ error: 'Team ID is required' });
+  }
+
+  try {
+    // 1. Check auction state
+    const state = getAuctionState();
+    if (!state) return res.status(500).json({ error: 'Auction state error' });
+    if (!state.current_player_id) return res.status(400).json({ error: 'No player is currently being auctioned' });
+
+    // 2. Get highest bid for this player
+    const { data: highestBid } = await supabase
+      .from('bids')
+      .select('*')
+      .eq('player_id', state.current_player_id)
+      .order('amount', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!highestBid) {
+      return res.status(400).json({ error: 'No bids found for this player' });
+    }
+
+    // 3. Get team info and validate budget
+    const { data: team } = await supabase.from('teams').select('id, name, budget').eq('id', teamId).single();
+    if (!team) return res.status(400).json({ error: 'Team not found' });
+
+    if (team.budget < highestBid.amount) {
+      return res.status(400).json({ error: `Team "${team.name}" budget (₹${team.budget.toLocaleString()}) is less than bid amount (₹${highestBid.amount.toLocaleString()})` });
+    }
+
+    // 4. Update ALL bids for this player that have team_id = NULL to the selected team
+    const { error: updateError } = await supabase
+      .from('bids')
+      .update({ team_id: teamId })
+      .eq('player_id', state.current_player_id)
+      .is('team_id', null);
+
+    if (updateError) throw updateError;
+
+    // 5. Emit bid-updated with real team name
+    const updatedBid = {
+      ...highestBid,
+      team_id: teamId,
+      team_name: team.name
+    };
+
+    io.emit('bid-updated', {
+      highestBid: updatedBid,
+      playerId: state.current_player_id
+    });
+
+    res.json({ success: true, bid: updatedBid, teamName: team.name });
+
+  } catch (err) {
+    console.error('Error in admin-assign-team:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
 

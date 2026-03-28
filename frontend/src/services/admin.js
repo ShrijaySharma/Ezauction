@@ -324,3 +324,14 @@ export const executeTrade = async (playerId, fromTeamId, toTeamId, amount) => {
   return response.data;
 };
 
+// ─── Admin Bidding Mode 2.0 ───
+
+export const adminBidV2 = async (incrementAmount) => {
+  const response = await api.post('/admin/admin-bid-v2', { amount: incrementAmount });
+  return response.data;
+};
+
+export const adminAssignTeam = async (teamId) => {
+  const response = await api.post('/admin/admin-assign-team', { teamId });
+  return response.data;
+};

@@ -146,17 +146,26 @@ io.on('connection', (socket) => {
             .maybeSingle();
 
           if (bid) {
-            // Fetch team name
-            const { data: team } = await supabase
-              .from('teams')
-              .select('name')
-              .eq('id', bid.team_id)
-              .maybeSingle();
+            let processedBid;
+            if (bid.team_id) {
+              // Normal bid — fetch team name
+              const { data: team } = await supabase
+                .from('teams')
+                .select('name')
+                .eq('id', bid.team_id)
+                .maybeSingle();
 
-            const processedBid = {
-              ...bid,
-              team_name: team ? team.name : null
-            };
+              processedBid = {
+                ...bid,
+                team_name: team ? team.name : ''
+              };
+            } else {
+              // Anonymous admin bid — no team to look up
+              processedBid = {
+                ...bid,
+                team_name: ''
+              };
+            }
 
             socket.emit('bid-updated', { highestBid: processedBid });
           }

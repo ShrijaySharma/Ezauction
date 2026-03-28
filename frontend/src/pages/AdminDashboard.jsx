@@ -79,6 +79,7 @@ function AdminDashboard({ user }) {
   const [showAdminBidding, setShowAdminBidding] = useState(false);
   const [customBidIncrement, setCustomBidIncrement] = useState(1000);
   const [newBaseBidAmount, setNewBaseBidAmount] = useState(1000);
+  const [adminBidTeamId, setAdminBidTeamId] = useState('');
 
   // Trading Window State
   const [showTradingModal, setShowTradingModal] = useState(false);
@@ -933,6 +934,33 @@ function AdminDashboard({ user }) {
 
   const currentBid = highestBid ? highestBid.amount : (currentPlayer ? currentPlayer.base_price : 0);
 
+  // Admin Bidding Mode 2.0 handlers
+  const handleAdminBidV2 = async (increment) => {
+    if (!currentPlayer) {
+      alert('No player loaded');
+      return;
+    }
+    try {
+      await adminService.adminBidV2(increment);
+      // Socket will update UI
+    } catch (error) {
+      alert('Error placing admin bid: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleAdminAssignTeam = async () => {
+    if (!adminBidTeamId) {
+      alert('Please select a team first');
+      return;
+    }
+    try {
+      const result = await adminService.adminAssignTeam(parseInt(adminBidTeamId));
+      alert(`Team "${result.teamName}" assigned to current bid successfully!`);
+    } catch (error) {
+      alert('Error assigning team: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
   // Trading Window handlers
   const handleOpenTradingWindow = async () => {
     try {
@@ -1266,7 +1294,14 @@ function AdminDashboard({ user }) {
                 {/* Player Actions */}
                 <div className="mt-6 flex flex-wrap gap-3">
                   <button
-                    onClick={() => handleMarkPlayer('SOLD')}
+                    onClick={() => {
+                      // Guard: if highest bid has no team assigned, block SOLD
+                      if (highestBid && !highestBid.team_name) {
+                        alert('Please assign a team from Admin Bidding Mode 2.0 before marking as SOLD');
+                        return;
+                      }
+                      handleMarkPlayer('SOLD');
+                    }}
                     className="px-5 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-105"
                   >
                     ✓ Mark as SOLD
@@ -1304,6 +1339,62 @@ function AdminDashboard({ user }) {
               <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-8 border-2 border-dashed border-gray-600 text-center shadow-lg">
                 <div className="text-gray-400 text-lg">🎭 No player loaded</div>
                 <p className="text-gray-500 text-sm mt-2">Select a player from below to start the auction</p>
+              </div>
+            )}
+
+            {/* Admin Bidding Mode 2.0 */}
+            {currentPlayer && (
+              <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-4 border border-orange-500/50 shadow-lg shadow-orange-500/10">
+                <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                  <span className="text-xl">⚡</span>
+                  Admin Bidding Mode 2.0
+                  <span className="text-xs text-orange-400 ml-auto font-normal">Anonymous bidding</span>
+                </h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => handleAdminBidV2(1000)}
+                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-lg transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105 text-sm"
+                  >
+                    +₹1,000
+                  </button>
+                  <button
+                    onClick={() => handleAdminBidV2(2000)}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105 text-sm"
+                  >
+                    +₹2,000
+                  </button>
+                  <button
+                    onClick={() => handleAdminBidV2(5000)}
+                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105 text-sm"
+                  >
+                    +₹5,000
+                  </button>
+                  <div className="flex-1 min-w-[200px] flex gap-2 ml-auto">
+                    <select
+                      value={adminBidTeamId}
+                      onChange={(e) => setAdminBidTeamId(e.target.value)}
+                      className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+                    >
+                      <option value="">Select Team</option>
+                      {teams.map(team => (
+                        <option key={team.id} value={team.id}>
+                          {team.name} (₹{team.budget?.toLocaleString() || '0'})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleAdminAssignTeam}
+                      disabled={!adminBidTeamId}
+                      className={`px-4 py-2 rounded-lg transition-all font-semibold text-sm shadow-md whitespace-nowrap ${
+                        adminBidTeamId
+                          ? 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white hover:shadow-lg transform hover:scale-105'
+                          : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                      }`}
+                    >
+                      Assign Team
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1626,19 +1717,7 @@ function AdminDashboard({ user }) {
           </div>
         </div >
 
-        {showAdminBidding && (
-          <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-            <div className="bg-[#1e1e1e] rounded-xl border border-gray-700 shadow-2xl w-full max-w-md p-6">
-              <h2 className="text-xl font-bold text-white mb-4">Admin Bidding</h2>
-              <p className="text-gray-400 mb-6">Place a bid on behalf of a team.</p>
-
-              {/* Simple form for admin bidding would go here - for now just closable */}
-              <div className="flex justify-end">
-                <button onClick={() => setShowAdminBidding(false)} className="px-4 py-2 bg-gray-700 text-white rounded">Close</button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Old Admin Bidding modal removed — replaced by inline Admin Bidding Mode 2.0 card */}
 
         {showBulkModal && (
           <BulkUploadModal
