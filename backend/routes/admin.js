@@ -245,6 +245,9 @@ router.post('/load-player', async (req, res) => {
 
     if (deleteBidsError) throw deleteBidsError;
 
+    // Admin Bidding 2.0: always clear anonymous bid when a new player is loaded
+    clearAdminAnonymousBid();
+
     io.emit('player-loaded', { player });
     res.json({ success: true, player });
 
@@ -698,6 +701,9 @@ router.post('/mark-player', async (req, res) => {
         // Clear bids
         await supabase.from('bids').delete().eq('player_id', nextPlayer.id);
 
+        // Admin Bidding 2.0: clear anonymous bid so next player starts clean
+        clearAdminAnonymousBid();
+
         console.log('Auto-loaded next player:', nextPlayer.name);
         io.emit('player-loaded', { player: nextPlayer });
         res.json({ success: true, nextPlayerLoaded: true, nextPlayer });
@@ -744,6 +750,9 @@ router.post('/reset-bidding', async (req, res) => {
       .eq('player_id', state.current_player_id);
 
     if (deleteError) throw deleteError;
+
+    // ─── Admin Bidding 2.0: clear in-memory anonymous bid so next bid starts from base price ───
+    clearAdminAnonymousBid();
 
     // Fetch player base price so frontend can reset bid display without API call
     const { data: resetPlayer } = await supabase
