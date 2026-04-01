@@ -305,6 +305,26 @@ router.get('/current-bid', async (req, res) => {
       };
     }
 
+    // ─── Admin Bidding 2.0: check in-memory anonymous bid ───
+    // If an anonymous bid is active for the current player and it's higher
+    // than the DB bid (or there is no DB bid), return it as the highest bid.
+    // This ensures a page refresh still shows the running anonymous bid amount.
+    const anonBid = getAdminAnonymousBid();
+    if (anonBid.amount > 0 && anonBid.playerId === state.current_player_id) {
+      const dbAmount = processedBid ? processedBid.amount : 0;
+      if (anonBid.amount > dbAmount) {
+        // Return anonymous bid as a virtual bid object (team_name blank = anonymous)
+        processedBid = {
+          id: -1, // virtual — not a real DB row
+          player_id: state.current_player_id,
+          team_id: null,
+          amount: anonBid.amount,
+          team_name: '',
+          timestamp: new Date()
+        };
+      }
+    }
+
     res.json({
       highestBid: processedBid,
       player: player || null,
@@ -368,10 +388,41 @@ router.post('/undo-bid', async (req, res) => {
       return res.status(400).json({ error: 'No active player' });
     }
 
-    // Get last bid to delete
+    // ─── Admin Bidding 2.0: check if an anonymous in-memory bid is active ───
+    // If so, undo it first (before touching DB bids).
+    const anonBid = getAdminAnonymousBid();
+    if (anonBid.amount > 0 && anonBid.playerId === state.current_player_id) {
+      clearAdminAnonymousBid();
+
+      // Find the real DB highest bid after clearing anon (to restore display)
+      const { data: remainingBids } = await supabase
+        .from('bids')
+        .select('*')
+        .eq('player_id', state.current_player_id)
+        .order('amount', { ascending: false })
+        .limit(1);
+
+      const dbHighest = remainingBids && remainingBids.length > 0 ? remainingBids[0] : null;
+      let processedHighest = null;
+      if (dbHighest) {
+        const { data: team } = await supabase
+          .from('teams').select('name').eq('id', dbHighest.team_id).maybeSingle();
+        processedHighest = { ...dbHighest, team_name: team ? team.name : null };
+      }
+
+      io.emit('bid-updated', {
+        highestBid: processedHighest,
+        playerId: state.current_player_id,
+        previousBid: null
+      });
+
+      return res.json({ success: true, highestBid: processedHighest, undoneAnonymous: true });
+    }
+
+    // No anonymous bid active — proceed with normal DB bid undo
     const { data: lastBid, error: lastBidError } = await supabase
       .from('bids')
-      .select('id, amount')
+      .select('id, amount, team_id')
       .eq('player_id', state.current_player_id)
       .order('timestamp', { ascending: false })
       .limit(1)
@@ -388,8 +439,7 @@ router.post('/undo-bid', async (req, res) => {
 
     if (deleteError) throw deleteError;
 
-    // Fetch new highest bid AND previous bid (to restore state)
-    // We need top 2 bids now
+    // Fetch new highest bid (top 2 so we also know previous)
     const { data: remainingBids, error: remainingBidsError } = await supabase
       .from('bids')
       .select('*')
@@ -416,32 +466,11 @@ router.post('/undo-bid', async (req, res) => {
       };
     }
 
-    // Need player base price if no bids left
-    let currentBid = 0;
-    if (processedHighest) {
-      currentBid = processedHighest.amount;
-    } else {
-      const { data: player } = await supabase.from('players').select('base_price').eq('id', state.current_player_id).single();
-      if (player) currentBid = player.base_price;
-    }
-
-    // Previous Bid Amount for frontend state
-    const previousBidAmount = newPrevious ? newPrevious.amount : (newHighest ? 0 : 0);
-    // Logic: if we have a highest, the one before it is 'newPrevious'. If no previous, it might be base price.
-    // Actually, AdminDashboard uses: setPreviousBid(data.previousBid || currentBid);
-    // If we send newPrevious.amount, it's correct. If newPrevious is null, we send 0 or undefined.
-
     io.emit('bid-updated', {
       highestBid: processedHighest,
       playerId: state.current_player_id,
       previousBid: newPrevious ? newPrevious.amount : null
     });
-
-    // Try to notify budget update if team reversed
-    // We don't have the teamId of the DELETED bid easily available unless we fetched it.
-    // But we fetched ID only. It's fine, budgets are calculated on fly usually? 
-    // Wait, typical implementation recalculates budget from bids.
-    // If we wanted to update the specific team that LOST the bid (was undone), we should have fetched `team_id` in `lastBid`.
 
     res.json({ success: true, highestBid: processedHighest });
 

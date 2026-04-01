@@ -1,7 +1,7 @@
 import express from 'express';
 import { requireAuth, requireHost } from '../middleware/auth.js';
 import { supabase } from '../supabaseClient.js';
-import { getAuctionState } from '../auctionState.js';
+import { getAuctionState, getAdminAnonymousBid } from '../auctionState.js';
 
 const router = express.Router();
 
@@ -82,6 +82,23 @@ router.get('/current-info', async (req, res) => {
           team_id: b.team_id
         };
         currentBid = b.amount;
+      }
+
+      // ─── Admin Bidding 2.0: check in-memory anonymous bid ───
+      // Show the running anonymous bid amount on the host dashboard too
+      const anonBid = getAdminAnonymousBid();
+      if (anonBid.amount > 0 && anonBid.playerId === currentPlayerId) {
+        if (anonBid.amount > currentBid) {
+          highestBid = {
+            id: -1,
+            player_id: currentPlayerId,
+            team_id: null,
+            amount: anonBid.amount,
+            team_name: '',
+            timestamp: new Date()
+          };
+          currentBid = anonBid.amount;
+        }
       }
     }
 
