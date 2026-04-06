@@ -11,6 +11,7 @@ import ExcelJS from 'exceljs';
 import AdmZip from 'adm-zip';
 import multer from 'multer';
 import SQLite3 from 'sqlite3';
+import * as XLSX from 'xlsx';
 import { refreshAuctionState, getAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState, getAdminAnonymousBid, setAdminAnonymousBid, clearAdminAnonymousBid } from '../auctionState.js';
 
 const router = express.Router();
