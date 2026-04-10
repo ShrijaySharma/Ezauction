@@ -39,6 +39,11 @@ function HostDashboard({ user }) {
   const [connectionError, setConnectionError] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
 
+  // Sponsor Branding State
+  const [showSponsorModal, setShowSponsorModal] = useState(false);
+  const [sponsorName, setSponsorName] = useState('');
+  const [sponsorLogo, setSponsorLogo] = useState('');
+
   const audioElementRef = useRef(null);
 
   const enableAudio = () => {
@@ -53,6 +58,12 @@ function HostDashboard({ user }) {
 
   useEffect(() => {
     console.log('HostDashboard mounted');
+    // Load local sponsor branding
+    const savedName = localStorage.getItem('ezauction_sponsor_name');
+    const savedLogo = localStorage.getItem('ezauction_sponsor_logo');
+    if (savedName) setSponsorName(savedName);
+    if (savedLogo) setSponsorLogo(savedLogo);
+
     // Create audio element for notifications
     const audio = new Audio('/notification_sound.wav');
     audio.preload = 'auto';
@@ -262,6 +273,48 @@ function HostDashboard({ user }) {
     return lastThree;
   };
 
+  const handleSponsorLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        const MAX_HEIGHT = 200;
+        if (height > MAX_HEIGHT) {
+          width = Math.round(width * (MAX_HEIGHT / height));
+          height = MAX_HEIGHT;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/png');
+        
+        if (dataUrl.length > 3 * 1024 * 1024) {
+            alert('Image is too complex/large even after resize. Please use a smaller file.');
+            return;
+        }
+        
+        setSponsorLogo(dataUrl);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="h-screen w-screen relative overflow-hidden bg-black font-sans selection:bg-yellow-400 selection:text-blue-900">
       <TradingWindowBanner socket={socket} />
@@ -313,7 +366,9 @@ function HostDashboard({ user }) {
             <img src="/ezauction.png" alt="EzAuction Logo" className="h-6 sm:h-12 lg:h-16 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] md:hover:scale-105 transition-transform duration-500" />
           </div>
 
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center animate-fade-in z-20">
+            {sponsorLogo && <img src={sponsorLogo} alt="Sponsor" className="h-8 sm:h-12 md:h-16 lg:h-20 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.3)] filter brightness-110" />}
+            {sponsorName && <div className="text-white text-[8px] sm:text-[10px] md:text-xs font-black mt-1 tracking-[0.3em] uppercase drop-shadow-md opacity-80">{sponsorName}</div>}
           </div>
 
           <div className="flex items-center gap-2 md:gap-6">
@@ -470,6 +525,13 @@ function HostDashboard({ user }) {
             <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)}></div>
             <div className="fixed top-16 md:top-32 left-2 md:left-4 z-50 bg-gray-900/95 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-w-[200px] animate-slide-in-right">
               <button
+                onClick={() => { setShowSponsorModal(true); setShowMenu(false); }}
+                className="w-full flex items-center gap-3 px-5 py-4 text-white hover:bg-white/10 transition-colors text-left border-b border-white/10"
+              >
+                <span className="text-xl">✨</span>
+                <span className="font-semibold text-sm tracking-wide">Brand & Sponsor</span>
+              </button>
+              <button
                 onClick={() => { setShowTeamPurses(true); setShowMenu(false); loadTeamPurses(); }}
                 className="w-full flex items-center gap-3 px-5 py-4 text-white hover:bg-white/10 transition-colors text-left"
               >
@@ -588,6 +650,86 @@ function HostDashboard({ user }) {
           </div>
         )}
 
+        {/* Sponsor Settings Modal */}
+        {showSponsorModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowSponsorModal(false)}></div>
+            <div className="relative w-full max-w-sm bg-gray-900 border border-white/20 rounded-3xl shadow-2xl p-6 overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/5 to-transparent pointer-events-none"></div>
+              <h3 className="text-white font-black text-xl mb-6 relative">✨ Sponsor Branding</h3>
+              
+              <div className="space-y-5 relative">
+                <div>
+                  <label className="block text-white/60 text-xs font-bold uppercase tracking-widest mb-1.5">Sponsor Name</label>
+                  <input
+                    type="text"
+                    value={sponsorName}
+                    onChange={(e) => setSponsorName(e.target.value)}
+                    className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-3 text-white outline-none focus:border-yellow-400/50 transition-colors"
+                    placeholder="e.g. Powered by XYZ"
+                  />
+                  <p className="text-white/30 text-[10px] mt-1.5">Leave blank to show no name.</p>
+                </div>
+
+                <div>
+                  <label className="block text-white/60 text-xs font-bold uppercase tracking-widest mb-1.5">Sponsor Logo</label>
+                  
+                  {sponsorLogo && (
+                    <div className="relative w-full h-32 bg-black/50 border border-white/10 rounded-xl mb-3 flex items-center justify-center overflow-hidden group">
+                      <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => setSponsorLogo('')}
+                          className="px-4 py-2 bg-red-500/90 text-white font-bold text-xs uppercase rounded-lg shadow-lg"
+                        >
+                          Remove Logo
+                        </button>
+                      </div>
+                      <img src={sponsorLogo} alt="Preview" className="max-h-full max-w-full object-contain p-2" />
+                    </div>
+                  )}
+
+                  {!sponsorLogo && (
+                    <label className="block w-full border border-dashed border-white/20 hover:border-yellow-400/50 hover:bg-yellow-400/5 transition-all rounded-xl p-6 text-center cursor-pointer mb-2">
+                      <span className="text-2xl mb-2 block opacity-60">🖼️</span>
+                      <span className="text-white/60 text-xs font-bold uppercase">Upload Logo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleSponsorLogoUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                  <p className="text-white/30 text-[10px]">Logo is stored locally on this device. Max width/height ~200px (auto-scaled).</p>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-white/10">
+                  <button
+                    onClick={() => {
+                      localStorage.setItem('ezauction_sponsor_name', sponsorName);
+                      if (sponsorLogo) {
+                        localStorage.setItem('ezauction_sponsor_logo', sponsorLogo);
+                      } else {
+                        localStorage.removeItem('ezauction_sponsor_logo');
+                      }
+                      setShowSponsorModal(false);
+                    }}
+                    className="flex-1 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-black uppercase tracking-widest py-3 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(250,204,21,0.2)]"
+                  >
+                    Save & Apply
+                  </button>
+                  <button
+                    onClick={() => setShowSponsorModal(false)}
+                    className="px-6 bg-white/5 text-white/80 font-bold rounded-xl hover:bg-white/10 transition-colors border border-white/10"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Rental Contact Footer */}
         <div className="h-auto md:h-20 flex flex-col items-center justify-center px-4 md:px-8 bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] py-4 md:py-0 shrink-0">
           <div className="text-white font-black text-xs sm:text-base md:text-xl tracking-widest uppercase flex items-center gap-2 drop-shadow-lg text-center">
@@ -614,7 +756,9 @@ function HostDashboard({ user }) {
 
       <style>{`
         @keyframes slide-in-right { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         .animate-slide-in-right { animation: slide-in-right 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+        .animate-fade-in { animation: fade-in 0.5s ease-out; }
         @keyframes bounce-slow { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
         .animate-bounce-slow { animation: bounce-slow 4s infinite ease-in-out; }
         .scrollbar-none::-webkit-scrollbar { display: none; }
