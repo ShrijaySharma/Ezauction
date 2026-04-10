@@ -4,6 +4,7 @@ import { getSocketUrl } from '../config';
 import { getPublicPlayers, getPublicTeams } from '../services/public';
 import { getImageUrl } from '../utils/imageUtils';
 import TradingWindowBanner from '../components/TradingWindowBanner';
+import ImageModal from '../components/ImageModal';
 
 function PublicLive() {
     const [viewMode, setViewMode] = useState('live'); // 'live' or 'catalog'
@@ -24,6 +25,7 @@ function PublicLive() {
     const [filterStatus, setFilterStatus] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
     const [loadingCatalog, setLoadingCatalog] = useState(true);
+    const [previewImage, setPreviewImage] = useState(null);
 
     useEffect(() => {
         // --- WEBSOCKET CONNECTION ---
@@ -225,8 +227,9 @@ function PublicLive() {
                                         <img
                                             src={getImageUrl(currentPlayer.image || currentPlayer.thumb_url)}
                                             alt={currentPlayer.name}
-                                            className="w-[120%] h-[120%] object-contain"
+                                            className="w-[120%] h-[120%] object-contain cursor-pointer"
                                             style={{ objectPosition: 'center bottom' }}
+                                            onClick={() => setPreviewImage(getImageUrl(currentPlayer.image || currentPlayer.thumb_url))}
                                             onError={(e) => { e.target.src = '/default_player.png'; }}
                                         />
                                     </div>
@@ -359,7 +362,8 @@ function PublicLive() {
                                                 <img 
                                                     src={getImageUrl(player.thumb_url || player.image)} 
                                                     alt={player.name}
-                                                    className="w-full h-full object-contain opacity-90 group-hover:opacity-100 transition-opacity scale-110 origin-bottom"
+                                                    className="w-full h-full object-contain opacity-90 group-hover:opacity-100 transition-opacity scale-110 origin-bottom cursor-pointer"
+                                                    onClick={() => setPreviewImage(getImageUrl(player.image || player.thumb_url))}
                                                     onError={(e) => { e.target.src='/default_player.png'; }}
                                                 />
                                                 <div className="absolute top-2 right-2">
@@ -493,6 +497,11 @@ function PublicLive() {
                     </div>
                 )}
             </div>
+
+            {/* Image Preview Modal */}
+            {previewImage && (
+                <ImageModal src={previewImage} alt="Player" onClose={() => setPreviewImage(null)} />
+            )}
         </div>
     );
 }

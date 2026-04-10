@@ -7,6 +7,7 @@ import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
 import BulkUploadModal from '../components/BulkUploadModal';
 import TradingWindowBanner from '../components/TradingWindowBanner';
+import ImageModal from '../components/ImageModal';
 import { getSocketUrl } from '../config';
 
 // Auto-detect API URL based on current host
@@ -97,6 +98,7 @@ function AdminDashboard({ user }) {
   const [audioEnabled, setAudioEnabled] = useState(false);
   const audioElementRef = useRef(null);
   const [connectionError, setConnectionError] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const enableAudio = () => {
     if (audioElementRef.current) {
@@ -1240,7 +1242,8 @@ function AdminDashboard({ user }) {
                       <img
                         src={getImageUrl(currentPlayer.thumb_url || currentPlayer.image)}
                         alt={currentPlayer.name}
-                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-contain bg-gray-900 hover:scale-105 transition-transform duration-300 cursor-pointer"
+                        onClick={() => setPreviewImage(getImageUrl(currentPlayer.image || currentPlayer.thumb_url))}
                         onError={(e) => {
                           e.target.src = '/deafult_player.png';
                         }}
@@ -1818,7 +1821,7 @@ function AdminDashboard({ user }) {
                           <img
                             src={getImageUrl(imagePreview)}
                             alt="Preview"
-                            className="w-32 h-32 object-cover rounded-lg border border-gray-600"
+                            className="w-32 h-32 object-contain bg-gray-900 rounded-lg border border-gray-600"
                           />
                         </div>
                       )}
@@ -2054,7 +2057,7 @@ function AdminDashboard({ user }) {
                           <img
                             src={teamLogoPreview}
                             alt="Logo preview"
-                            className="w-24 h-24 object-cover rounded-lg border border-gray-600"
+                            className="w-24 h-24 object-contain bg-gray-900 rounded-lg border border-gray-600"
                           />
                         </div>
                       )}
@@ -2153,7 +2156,7 @@ function AdminDashboard({ user }) {
                                   <img
                                     src={getImageUrl(player.image)}
                                     alt={player.name}
-                                    className="w-10 h-10 object-cover rounded"
+                                    className="w-10 h-10 object-contain bg-gray-900 rounded"
                                     onError={(e) => {
                                       e.target.src = 'https://via.placeholder.com/40?text=P';
                                     }}
@@ -2567,7 +2570,8 @@ function AdminDashboard({ user }) {
                       <img
                         src={getImageUrl(currentPlayer.image)}
                         alt={currentPlayer.name}
-                        className="w-full h-full rounded-full object-cover"
+                        className="w-full h-full rounded-full object-contain cursor-pointer"
+                        onClick={() => setPreviewImage(getImageUrl(currentPlayer.image))}
                         onError={(e) => { e.target.src = 'https://via.placeholder.com/200x200?text=Player'; }}
                       />
                     </div>
@@ -2843,6 +2847,11 @@ function AdminDashboard({ user }) {
           <img key={`preload-${player.id}`} src={getImageUrl(player.thumb_url || player.image)} alt="" />
         ))}
       </div>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <ImageModal src={previewImage} alt="Player" onClose={() => setPreviewImage(null)} />
+      )}
 
     </div>
   );

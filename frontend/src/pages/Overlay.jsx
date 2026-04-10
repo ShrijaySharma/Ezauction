@@ -155,7 +155,7 @@ function Overlay() {
                         <img
                             src={getImageUrl(currentPlayer.thumb_url || currentPlayer.image)}
                             alt={currentPlayer.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                             onError={(e) => { e.target.src = '/deafult_player.png'; }}
                         />
                     </div>

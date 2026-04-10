@@ -6,6 +6,7 @@ import * as hostService from '../services/host';
 import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
 import TradingWindowBanner from '../components/TradingWindowBanner';
+import ImageModal from '../components/ImageModal';
 import { getSocketUrl } from '../config';
 
 // Auto-detect API URL based on current host
@@ -36,6 +37,7 @@ function HostDashboard({ user }) {
   const [showTeamPurses, setShowTeamPurses] = useState(false);
   const [teamPurses, setTeamPurses] = useState([]);
   const [connectionError, setConnectionError] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const audioElementRef = useRef(null);
 
@@ -367,7 +369,7 @@ function HostDashboard({ user }) {
                       <span className="text-white font-mono font-black text-lg md:text-3xl drop-shadow-lg"><span className="md:hidden">#</span>{currentPlayer.serial_number}</span>
                     </div>
                     <div className="text-left md:text-center mt-0 md:mt-auto md:w-full flex flex-col items-start md:items-center">
-                      <h2 className="text-white text-xl sm:text-3xl md:text-4xl lg:text-5xl lg:max-w-[90%] mx-auto font-black tracking-normal mb-1 md:mb-4 drop-shadow-2xl leading-tight line-clamp-2 md:line-clamp-none py-1 break-words">
+                      <h2 className="text-white text-xl sm:text-3xl md:text-4xl lg:text-5xl lg:max-w-[90%] mx-auto font-black tracking-normal mb-1 md:mb-4 drop-shadow-2xl leading-tight md:line-clamp-none py-1 overflow-hidden text-ellipsis">
                         {currentPlayer.name}
                       </h2>
                       <div className="inline-block px-3 py-1.5 md:px-6 md:py-2.5 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm font-black uppercase tracking-widest shadow-lg md:shadow-xl shadow-yellow-400/20 md:hover:scale-105 md:transition-transform">
@@ -400,7 +402,8 @@ function HostDashboard({ user }) {
                     <img
                       src={getImageUrl(currentPlayer.image)}
                       alt={currentPlayer.name}
-                      className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] md:drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)]"
+                      className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] md:drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)] cursor-pointer"
+                      onClick={() => setPreviewImage(getImageUrl(currentPlayer.image))}
                       onError={(e) => { e.target.src = '/deafult_player.png'; }}
                     />
                   </div>
@@ -603,6 +606,11 @@ function HostDashboard({ user }) {
           p.image && <link key={p.id} rel="preload" as="image" href={getImageUrl(p.image)} />
         ))}
       </div>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <ImageModal src={previewImage} alt="Player" onClose={() => setPreviewImage(null)} />
+      )}
 
       <style>{`
         @keyframes slide-in-right { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }

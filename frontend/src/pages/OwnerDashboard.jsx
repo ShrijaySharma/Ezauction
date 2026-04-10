@@ -6,6 +6,7 @@ import * as ownerService from '../services/owner';
 import { getImageUrl } from '../utils/imageUtils';
 import { getSocketUrl } from '../config';
 import TradingWindowBanner from '../components/TradingWindowBanner';
+import ImageModal from '../components/ImageModal';
 
 
 // Auto-detect API URL based on current host
@@ -49,6 +50,7 @@ function OwnerDashboard({ user }) {
   const [notification, setNotification] = useState(null);
   const [notificationKey, setNotificationKey] = useState(0);
   const [connectionError, setConnectionError] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const isLeadingRef = useRef(false);
   const totalBudgetRef = useRef(0);
@@ -490,7 +492,8 @@ function OwnerDashboard({ user }) {
                       <img
                         src={getImageUrl(currentPlayer.thumb_url || currentPlayer.image)}
                         alt={currentPlayer.name}
-                        className="w-full h-full rounded-full object-cover"
+                        className="w-full h-full rounded-full object-contain cursor-pointer"
+                        onClick={() => setPreviewImage(getImageUrl(currentPlayer.image || currentPlayer.thumb_url))}
                         onError={(e) => {
                           e.target.src = '/deafult_player.png';
                         }}
@@ -718,7 +721,8 @@ function OwnerDashboard({ user }) {
                     <img
                       src={getImageUrl(player.image)}
                       alt={player.name}
-                      className="w-full h-32 object-cover rounded mb-2"
+                      className="w-full h-32 object-contain bg-gray-900 rounded mb-2 cursor-pointer"
+                      onClick={() => setPreviewImage(getImageUrl(player.image))}
                       onError={(e) => {
                         e.target.src = '/deafult_player.png';
                       }}
@@ -774,7 +778,8 @@ function OwnerDashboard({ user }) {
                     <img
                       src={getImageUrl(player.image)}
                       alt={player.name}
-                      className="w-full h-32 object-cover rounded mb-2"
+                      className="w-full h-32 object-contain bg-gray-900 rounded mb-2 cursor-pointer"
+                      onClick={() => setPreviewImage(getImageUrl(player.image))}
                       onError={(e) => {
                         e.target.src = '/deafult_player.png';
                       }}
@@ -826,7 +831,8 @@ function OwnerDashboard({ user }) {
                     <img
                       src={getImageUrl(player.image)}
                       alt={player.name}
-                      className="w-full h-32 object-cover rounded mb-2"
+                      className="w-full h-32 object-contain bg-gray-900 rounded mb-2 cursor-pointer"
+                      onClick={() => setPreviewImage(getImageUrl(player.image))}
                       onError={(e) => {
                         e.target.src = '/deafult_player.png';
                       }}
@@ -931,6 +937,10 @@ function OwnerDashboard({ user }) {
             )}
           </div>
         </div>
+      )}
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <ImageModal src={previewImage} alt="Player" onClose={() => setPreviewImage(null)} />
       )}
     </div>
   );
