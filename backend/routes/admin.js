@@ -653,6 +653,17 @@ router.post('/mark-player', async (req, res) => {
   }
 
   try {
+    // Fetch the current player upfront — needed for serial_number baseline in sequential mode
+    // and for SOLD path validation. Fetching full record here avoids a second query below.
+    const { data: currentPlayer, error: currentPlayerError } = await supabase
+      .from('players')
+      .select('*')
+      .eq('id', playerId)
+      .single();
+
+    if (currentPlayerError) throw currentPlayerError;
+    if (!currentPlayer) return res.status(404).json({ error: 'Player not found' });
+
     if (status === 'SOLD') {
       // 1. Get highest bid
       const { data: highestBid, error: bidError } = await supabase
@@ -664,16 +675,6 @@ router.post('/mark-player', async (req, res) => {
         .maybeSingle();
 
       if (bidError) throw bidError;
-
-      // 2. Get player base price
-      const { data: player, error: playerError } = await supabase
-        .from('players')
-        .select('base_price')
-        .eq('id', playerId)
-        .single();
-
-      if (playerError) throw playerError;
-      if (!player) return res.status(404).json({ error: 'Player not found' });
 
       // Validations
       if (!highestBid && !soldPrice) {
@@ -751,16 +752,13 @@ router.post('/mark-player', async (req, res) => {
     }
 
     // 6. Auto-load next player (Shared logic)
-    // Find next available or unsold player
-    // Randomly pick from (AVAILABLE, UNSOLD) ordered by was_unsold ASC (prioritize never sold?)
-    // Original logic: ORDER BY was_unsold ASC, RANDOM() LIMIT 1
-
-    // Supabase can't do "ORDER BY RANDOM()" easily without RPC.
-    // We can fetch pending players and pick one in JS.
+    // Find next available or unsold player — EXCLUDE the just-marked player so an
+    // UNSOLD player is never immediately re-served as the next pick.
     const { data: pendingPlayers, error: pendingError } = await supabase
       .from('players')
       .select('*')
       .in('status', ['AVAILABLE', 'UNSOLD'])
+      .neq('id', playerId)                     // <-- never re-serve the just-marked player immediately
       .order('was_unsold', { ascending: true }); // Prioritize fresh players
 
     if (pendingError) {
@@ -772,7 +770,16 @@ router.post('/mark-player', async (req, res) => {
       // Use shared helper — respects sequential_mode; falls back to original
       // random logic (priority0/priority1) when sequential_mode = 0.
       const currentState = getAuctionState();
-      const nextPlayer = pickNextPlayer(pendingPlayers, currentState);
+
+      // For sequential mode: use the CURRENT player's serial_number as the authoritative
+      // baseline (not sequential_last_serial from DB which may be stale or missing).
+      // This means "next player after the one we just sold/unsold" is always correct
+      // even if the DB column doesn't exist yet or had a stale value.
+      const sequentialBaseline = (currentState && currentState.sequential_mode === 1)
+        ? { ...currentState, sequential_last_serial: currentPlayer.serial_number ?? currentState.sequential_last_serial }
+        : currentState;
+
+      const nextPlayer = pickNextPlayer(pendingPlayers, sequentialBaseline);
 
       if (nextPlayer) {
         // Build state update — track last served serial when in sequential mode
