@@ -11,6 +11,8 @@ let auctionStateCache = {
     bid_increment_3: 1000,
     max_players_per_team: 10,
     enforce_max_bid: 0,
+    sequential_mode: 0,           // 0 = random (default), 1 = sequential by serial_number
+    sequential_last_serial: null, // tracks last served serial number for wrap-around
     updated_at: new Date()
 };
 

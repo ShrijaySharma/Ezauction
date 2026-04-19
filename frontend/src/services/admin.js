@@ -335,3 +335,10 @@ export const adminAssignTeam = async (teamId) => {
   const response = await api.post('/admin/admin-assign-team', { teamId });
   return response.data;
 };
+
+// ─── Sequential Auction Mode ───
+
+export const updateSequentialMode = async (enabled) => {
+  const response = await api.post('/admin/sequential-mode', { enabled });
+  return response.data;
+};

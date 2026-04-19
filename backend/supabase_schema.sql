@@ -61,8 +61,14 @@ CREATE TABLE IF NOT EXISTS public.auction_state (
   bid_increment_3 numeric default 5000,
   max_players_per_team integer default 10,
   enforce_max_bid integer default 0,
+  sequential_mode integer default 0,           -- 0 = random, 1 = sequential by serial_number
+  sequential_last_serial integer default NULL, -- last served serial_number (for wrap-around)
   updated_at timestamptz default now()
 );
+
+-- NOTE: If migrating an existing DB, run these:
+-- ALTER TABLE public.auction_state ADD COLUMN IF NOT EXISTS sequential_mode integer DEFAULT 0;
+-- ALTER TABLE public.auction_state ADD COLUMN IF NOT EXISTS sequential_last_serial integer DEFAULT NULL;
 
 -- Add Foreign Keys (Separate constraints to avoid dependency errors during creation)
 ALTER TABLE public.users ADD CONSTRAINT fk_user_team FOREIGN KEY (team_id) REFERENCES public.teams(id);

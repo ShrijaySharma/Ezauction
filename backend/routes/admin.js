@@ -20,6 +20,36 @@ const router = express.Router();
 router.use(requireAuth);
 router.use(requireAdmin);
 
+// ─── Sequential Auction — Helper ─────────────────────────────────────────────
+// Picks the next player from pendingPlayers based on auction mode.
+// When sequential_mode=0 this executes the EXACT same logic as before.
+// When sequential_mode=1 it follows serial_number ascending, wrapping at end.
+function pickNextPlayer(pendingPlayers, state) {
+  if (state && state.sequential_mode === 1 && pendingPlayers.length > 0) {
+    // Only consider players that actually have a serial number
+    const serialPlayers = pendingPlayers.filter(p => p.serial_number != null);
+    serialPlayers.sort((a, b) => a.serial_number - b.serial_number);
+
+    if (serialPlayers.length > 0) {
+      const lastSerial = state.sequential_last_serial || 0;
+      // Next player strictly after last served serial
+      let next = serialPlayers.find(p => p.serial_number > lastSerial);
+      // Wrap around: none found ahead → restart from lowest
+      if (!next) next = serialPlayers[0];
+      if (next) return next;
+    }
+    // No serial-numbered players remain — fall through to random
+  }
+
+  // Original random logic (unchanged) — used when sequential_mode=0 OR as fallback
+  const priority0 = pendingPlayers.filter(p => p.was_unsold === 0);
+  const priority1 = pendingPlayers.filter(p => p.was_unsold === 1);
+  if (priority0.length > 0) return priority0[Math.floor(Math.random() * priority0.length)];
+  if (priority1.length > 0) return priority1[Math.floor(Math.random() * priority1.length)];
+  return null;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Get auction state
 router.get('/auction-state', async (req, res) => {
   try {
@@ -53,11 +83,44 @@ router.get('/auction-state', async (req, res) => {
         },
         maxPlayersPerTeam: state.max_players_per_team || 10,
         enforceMaxBid: state.enforce_max_bid === 1,
-        baseBidAmount: state.bid_increment_3 !== undefined ? state.bid_increment_3 : 1000
+        baseBidAmount: state.bid_increment_3 !== undefined ? state.bid_increment_3 : 1000,
+        sequentialMode: state.sequential_mode === 1,
+        sequentialLastSerial: state.sequential_last_serial || null
       });
     }
   } catch (err) {
     console.error('Unexpected error in auction-state:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─── Sequential Auction Mode ─────────────────────────────────────────────────
+// Toggle sequential player selection on/off.
+// When disabled, resets the last-serial tracker so next enable starts fresh.
+router.post('/sequential-mode', async (req, res) => {
+  const { enabled } = req.body;
+  const io = req.app.locals.io;
+
+  try {
+    const updateData = {
+      sequential_mode: enabled ? 1 : 0,
+      updated_at: new Date()
+    };
+    // Reset tracker when disabling so the next enable starts from serial 1
+    if (!enabled) updateData.sequential_last_serial = null;
+
+    const { error } = await supabase
+      .from('auction_state')
+      .update(updateData)
+      .eq('id', 1);
+
+    if (error) throw error;
+
+    await refreshAuctionState();
+    io.emit('sequential-mode-changed', { enabled: !!enabled });
+    res.json({ success: true, enabled: !!enabled });
+  } catch (err) {
+    console.error('Error updating sequential mode:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -223,13 +286,21 @@ router.post('/load-player', async (req, res) => {
     if (!player) return res.status(404).json({ error: 'Player not found' });
 
     // 2. Update auction state
+    // If sequential mode is active and the player has a serial number,
+    // track it so the next auto-pick knows where to resume from.
+    const stateForLoad = getAuctionState();
+    const loadPayload = {
+      current_player_id: playerId,
+      status: 'LIVE',
+      updated_at: new Date()
+    };
+    if (stateForLoad && stateForLoad.sequential_mode === 1 && player.serial_number != null) {
+      loadPayload.sequential_last_serial = player.serial_number;
+    }
+
     const { error: updateError } = await supabase
       .from('auction_state')
-      .update({
-        current_player_id: playerId,
-        status: 'LIVE',
-        updated_at: new Date()
-      })
+      .update(loadPayload)
       .eq('id', 1);
 
     if (updateError) throw updateError;
@@ -698,32 +769,25 @@ router.post('/mark-player', async (req, res) => {
     }
 
     if (pendingPlayers && pendingPlayers.length > 0) {
-      // Pick random one from the top priority group?
-      // Or just pick a random one from all candidates?
-      // Original logic was: Order by was_unsold ASC, then Random.
-      // So if we have was_unsold=0 players, we strictly pick from them first?
-      // SQL `ORDER BY was_unsold ASC, RANDOM()` does prioritize 0s, but within 0s it's random.
-      // If there are 0s, 1s are at the bottom.
-
-      const priority0 = pendingPlayers.filter(p => p.was_unsold === 0);
-      const priority1 = pendingPlayers.filter(p => p.was_unsold === 1); // previously unsold
-
-      let nextPlayer = null;
-      if (priority0.length > 0) {
-        nextPlayer = priority0[Math.floor(Math.random() * priority0.length)];
-      } else if (priority1.length > 0) {
-        nextPlayer = priority1[Math.floor(Math.random() * priority1.length)];
-      }
+      // Use shared helper — respects sequential_mode; falls back to original
+      // random logic (priority0/priority1) when sequential_mode = 0.
+      const currentState = getAuctionState();
+      const nextPlayer = pickNextPlayer(pendingPlayers, currentState);
 
       if (nextPlayer) {
-        // Update auction state
+        // Build state update — track last served serial when in sequential mode
+        const nextStateUpdate = {
+          current_player_id: nextPlayer.id,
+          status: 'LIVE',
+          updated_at: new Date()
+        };
+        if (currentState && currentState.sequential_mode === 1 && nextPlayer.serial_number != null) {
+          nextStateUpdate.sequential_last_serial = nextPlayer.serial_number;
+        }
+
         await supabase
           .from('auction_state')
-          .update({
-            current_player_id: nextPlayer.id,
-            status: 'LIVE',
-            updated_at: new Date()
-          })
+          .update(nextStateUpdate)
           .eq('id', 1);
 
         await refreshAuctionState(); // Sync Cache

@@ -71,6 +71,7 @@ function AdminDashboard({ user }) {
   const [showTeamSquads, setShowTeamSquads] = useState(false);
   const [teamSquads, setTeamSquads] = useState([]);
   const [enforceMaxBid, setEnforceMaxBid] = useState(false);
+  const [sequentialMode, setSequentialMode] = useState(false);
   const [showPurseMonitoring, setShowPurseMonitoring] = useState(false);
   const [showBiddingLogicModal, setShowBiddingLogicModal] = useState(false);
   const [playerSearch, setPlayerSearch] = useState('');
@@ -325,6 +326,12 @@ function AdminDashboard({ user }) {
       }
     });
 
+    newSocket.on('sequential-mode-changed', (data) => {
+      if (data && data.enabled !== undefined) {
+        setSequentialMode(data.enabled);
+      }
+    });
+
     newSocket.on('trading-window-update', (data) => {
       if (data) {
         setTradingWindowOpen(data.isOpen);
@@ -378,6 +385,9 @@ function AdminDashboard({ user }) {
           // Sync independent state for consistency
           if (data.enforceMaxBid !== undefined) {
             setEnforceMaxBid(data.enforceMaxBid);
+          }
+          if (data.sequentialMode !== undefined) {
+            setSequentialMode(data.sequentialMode);
           }
           return data;
         });
@@ -508,6 +518,15 @@ function AdminDashboard({ user }) {
       alert('Reserve per player amount updated!');
     } catch (error) {
       alert('Error updating reserve amount: ' + error.response?.data?.error);
+    }
+  };
+
+  const handleToggleSequentialMode = async (val) => {
+    try {
+      await adminService.updateSequentialMode(val);
+      // Socket event 'sequential-mode-changed' updates state for all connected tabs
+    } catch (error) {
+      alert('Error updating sequential mode: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -1136,6 +1155,32 @@ function AdminDashboard({ user }) {
                   <div className="text-sm text-yellow-100">Manage max bid constraints</div>
                 </button>
 
+                {/* Sequential Auction sidebar toggle */}
+                <button
+                  onClick={() => {
+                    handleToggleSequentialMode(!sequentialMode);
+                    setShowSidebar(false);
+                  }}
+                  className={`w-full px-4 py-3 rounded-lg transition-colors text-left border ${
+                    sequentialMode
+                      ? 'bg-teal-600 hover:bg-teal-700 border-teal-400 text-white'
+                      : 'bg-gray-700 hover:bg-gray-600 border-gray-500 text-gray-200'
+                  }`}
+                >
+                  <div className="font-semibold flex items-center gap-2">
+                    <span>🔢</span>
+                    Sequential Auction
+                    <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-bold ${
+                      sequentialMode ? 'bg-teal-300 text-teal-900' : 'bg-gray-600 text-gray-300'
+                    }`}>
+                      {sequentialMode ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
+                  <div className={`text-sm mt-0.5 ${sequentialMode ? 'text-teal-100' : 'text-gray-400'}`}>
+                    {sequentialMode ? 'Players follow serial number order' : 'Players picked randomly'}
+                  </div>
+                </button>
+
                 <div className="pt-4 border-t border-gray-700 mt-4">
                   <button
                     onClick={() => {
@@ -1477,6 +1522,30 @@ function AdminDashboard({ user }) {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Sequential Auction Mode compact toggle — always visible */}
+            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-4 border border-gray-700 shadow-lg hover:shadow-xl transition-shadow">
+              <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                <span className="text-xl">🔢</span>
+                Sequential Auction
+              </h3>
+              <button
+                id="sequential-mode-toggle"
+                onClick={() => handleToggleSequentialMode(!sequentialMode)}
+                className={`w-full px-4 py-3 rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-105 ${
+                  sequentialMode
+                    ? 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white'
+                    : 'bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white'
+                }`}
+              >
+                {sequentialMode ? '🔢 Sequential: ON' : '🔀 Sequential: OFF'}
+              </button>
+              <p className="mt-2 text-xs text-gray-400 text-center">
+                {sequentialMode
+                  ? 'Players load in serial number order'
+                  : 'Players are picked randomly'}
+              </p>
             </div>
 
             {/* Team Size Configuration - Less frequently changed */}
