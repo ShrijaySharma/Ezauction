@@ -1306,7 +1306,7 @@ function AdminDashboard({ user }) {
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">🏏 Role:</span> {currentPlayer.role}</p>
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">👤 Age:</span> {currentPlayer.age || 'N/A'}</p>
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">🌍 Country:</span> {currentPlayer.country || 'N/A'}</p>
-                      <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">💰 Base Price:</span> ₹{currentPlayer.base_price?.toLocaleString()}</p>
+                      <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">💰 Base Price:</span> ₹{currentPlayer.base_price?.toLocaleString('en-IN')}</p>
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">📊 Status:</span> <span className="px-2 py-1 bg-blue-600/30 rounded">{currentPlayer.status}</span></p>
                     </div>
                   </div>
@@ -1316,7 +1316,7 @@ function AdminDashboard({ user }) {
                 <div className="mt-6 p-6 bg-gradient-to-br from-green-900/30 to-blue-900/30 rounded-xl border-2 border-green-500/30 shadow-lg">
                   <div className="text-center">
                     <p className="text-gray-400 text-sm mb-2 uppercase tracking-wider">Current Bid</p>
-                    <p className="text-5xl font-bold text-green-400 mb-3 animate-pulse">₹{currentBid.toLocaleString()}</p>
+                    <p className="text-5xl font-bold text-green-400 mb-3 animate-pulse">₹{currentBid.toLocaleString('en-IN')}</p>
                     {highestBid && (
                       <p className="text-xl text-white">
                         Leading: <span className="font-semibold text-green-400">{highestBid.team_name}</span>
@@ -1410,13 +1410,13 @@ function AdminDashboard({ user }) {
                     onClick={() => handleAdminBidV2(bidIncrements.increment1)}
                     className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-lg transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105 text-sm"
                   >
-                    +₹{bidIncrements.increment1.toLocaleString()}
+                    +₹{bidIncrements.increment1.toLocaleString('en-IN')}
                   </button>
                   <button
                     onClick={() => handleAdminBidV2(bidIncrements.increment2)}
                     className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105 text-sm"
                   >
-                    +₹{bidIncrements.increment2.toLocaleString()}
+                    +₹{bidIncrements.increment2.toLocaleString('en-IN')}
                   </button>
                   <div className="flex-1 min-w-[200px] flex gap-2 ml-auto">
                     <select
@@ -1427,7 +1427,7 @@ function AdminDashboard({ user }) {
                       <option value="">Select Team</option>
                       {teams.map(team => (
                         <option key={team.id} value={team.id}>
-                          {team.name} (₹{team.budget?.toLocaleString() || '0'})
+                          {team.name} (₹{team.budget?.toLocaleString('en-IN') || '0'})
                         </option>
                       ))}
                     </select>
@@ -1462,7 +1462,7 @@ function AdminDashboard({ user }) {
                   <option value="">Select a player</option>
                   {players.filter(p => p.status === 'AVAILABLE' || p.status === 'UNSOLD').map(player => (
                     <option key={player.id} value={player.id}>
-                      {player.status === 'UNSOLD' ? '🔄 ' : ''}{player.was_unsold ? '⚠️ ' : ''}{player.serial_number ? `#${player.serial_number} ` : ''}{player.name} - {player.role} (₹{player.base_price?.toLocaleString()})
+                      {player.status === 'UNSOLD' ? '🔄 ' : ''}{player.was_unsold ? '⚠️ ' : ''}{player.serial_number ? `#${player.serial_number} ` : ''}{player.name} - {player.role} (₹{player.base_price?.toLocaleString('en-IN')})
                     </option>
                   ))}
                 </select>
@@ -1513,7 +1513,7 @@ function AdminDashboard({ user }) {
                           <div className="text-white font-semibold text-sm truncate">{bid.team_name}</div>
                           <div className="text-xs text-gray-400">{new Date(bid.timestamp).toLocaleTimeString()}</div>
                         </div>
-                        <div className="text-green-400 font-bold text-lg ml-2">₹{bid.amount.toLocaleString()}</div>
+                        <div className="text-green-400 font-bold text-lg ml-2">₹{bid.amount.toLocaleString('en-IN')}</div>
                       </div>
                     </div>
                   ))
@@ -1685,7 +1685,7 @@ function AdminDashboard({ user }) {
                           {player.status || 'AVAIL'}
                         </span>
                       </div>
-                      <div className="text-gray-400 text-xs mt-0.5">{player.role} • {player.age ? `${player.age} yrs • ` : ''}₹{player.base_price?.toLocaleString()}</div>
+                      <div className="text-gray-400 text-xs mt-0.5">{player.role} • {player.age ? `${player.age} yrs • ` : ''}₹{player.base_price?.toLocaleString('en-IN')}</div>
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
                       {!!player.was_unsold && (
@@ -1737,7 +1737,7 @@ function AdminDashboard({ user }) {
                           </span>
                         )}
                       </div>
-                      <div className="text-gray-400 text-sm">Current Budget: ₹{team.budget?.toLocaleString() || '0'}</div>
+                      <div className="text-gray-400 text-sm">Current Budget: ₹{team.budget?.toLocaleString('en-IN') || '0'}</div>
                     </div>
                   </div>
                   <div className="flex gap-2 flex-wrap">
@@ -1823,9 +1823,9 @@ function AdminDashboard({ user }) {
                       <div key={item.id} className="p-3 bg-gray-700 rounded">
                         <div className="flex justify-between">
                           <span className="text-white font-semibold">{item.player_name}</span>
-                          <span className="text-green-400">₹{item.amount.toLocaleString()}</span>
+                          <span className="text-green-400">₹{item.amount.toLocaleString('en-IN')}</span>
                         </div>
-                        <div className="text-gray-400 text-sm">{item.team_name} • {new Date(item.timestamp).toLocaleString()}</div>
+                        <div className="text-gray-400 text-sm">{item.team_name} • {new Date(item.timestamp).toLocaleString('en-IN')}</div>
                       </div>
                     ))}
                   </div>
@@ -2034,7 +2034,7 @@ function AdminDashboard({ user }) {
                           </div>
                         </div>
                         <div className="text-yellow-400 text-sm mb-3">
-                          Budget: ₹{team.budget?.toLocaleString() || '0'}
+                          Budget: ₹{team.budget?.toLocaleString('en-IN') || '0'}
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -2237,7 +2237,7 @@ function AdminDashboard({ user }) {
                                   <div className="text-gray-400 text-xs">{player.role}</div>
                                 </div>
                                 <div className="text-green-400 font-semibold text-sm">
-                                  ₹{player.sold_price?.toLocaleString() || '0'}
+                                  ₹{player.sold_price?.toLocaleString('en-IN') || '0'}
                                 </div>
                                 <button
                                   onClick={() => handleRemovePlayerFromTeam(player.id, player.name)}
@@ -2307,7 +2307,7 @@ function AdminDashboard({ user }) {
                         </div>
                         <div className="bg-gray-800 p-3 rounded-lg border border-gray-600">
                           <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">REMAINING PURSE</div>
-                          <div className="text-2xl font-bold text-green-400">₹{team.budget?.toLocaleString() || '0'}</div>
+                          <div className="text-2xl font-bold text-green-400">₹{team.budget?.toLocaleString('en-IN') || '0'}</div>
                         </div>
                       </div>
                     ))}
@@ -2407,7 +2407,7 @@ function AdminDashboard({ user }) {
                         {teams.map(team => (
                           <div key={team.id} className="flex justify-between text-xs border-b border-gray-700 pb-1">
                             <span className="text-white truncate mr-2">{team.name}</span>
-                            <span className="text-blue-300 font-mono">Max: ₹{team.budget?.toLocaleString()}</span>
+                            <span className="text-blue-300 font-mono">Max: ₹{team.budget?.toLocaleString('en-IN')}</span>
                           </div>
                         ))}
                       </div>
@@ -2660,7 +2660,7 @@ function AdminDashboard({ user }) {
 
                   <div className="w-full bg-gray-700/50 rounded-xl p-4 mb-6 border border-gray-600">
                     <div className="text-gray-400 text-sm uppercase tracking-wider mb-1">Current Bid</div>
-                    <div className="text-4xl font-bold text-green-400">₹{currentBid.toLocaleString()}</div>
+                    <div className="text-4xl font-bold text-green-400">₹{currentBid.toLocaleString('en-IN')}</div>
                     {highestBid && (
                       <div className="mt-2 text-white text-lg">
                         Leading: <span className="text-yellow-400 font-bold">{highestBid.team_name}</span>
@@ -2668,7 +2668,7 @@ function AdminDashboard({ user }) {
                     )}
                     <div className="mt-3 pt-3 border-t border-gray-600 flex justify-between text-sm">
                       <span className="text-gray-400">Base Price:</span>
-                      <span className="text-white">₹{currentPlayer.base_price?.toLocaleString()}</span>
+                      <span className="text-white">₹{currentPlayer.base_price?.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
 
@@ -2725,7 +2725,7 @@ function AdminDashboard({ user }) {
                           </div>
                           <div className="min-w-0">
                             <div className="font-bold text-white text-lg truncate leading-tight" title={team.name}>{team.name}</div>
-                            <div className="text-green-400 font-mono font-semibold">₹{team.budget?.toLocaleString()}</div>
+                            <div className="text-green-400 font-mono font-semibold">₹{team.budget?.toLocaleString('en-IN')}</div>
                             <div className="text-blue-400 text-xs font-bold mt-0.5">Players: {players.filter(p => p.sold_to_team === team.id && p.status === 'SOLD').length}</div>
                           </div>
                         </div>

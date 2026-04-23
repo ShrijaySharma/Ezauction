@@ -237,14 +237,14 @@ router.post('/bid', async (req, res) => {
         if (amount > maxBidAllowed) {
             if (enforceMaxBid) {
                 return res.status(400).json({
-                    error: `Bid exceeds maximum allowed. You need to keep ${minimumAmountToKeep.toLocaleString()} for ${reservedPlayersCount} remaining player(s).`,
+                    error: `Bid exceeds maximum allowed. You need to keep ${minimumAmountToKeep.toLocaleString('en-IN')} for ${reservedPlayersCount} remaining player(s).`,
                     maxBidAllowed,
                     minimumAmountToKeep,
                     remainingPlayers: reservedPlayersCount
                 });
             } else {
                 return res.status(400).json({
-                    error: `Bid exceeds maximum allowed purse: ${maxBidAllowed.toLocaleString()}`,
+                    error: `Bid exceeds maximum allowed purse: ${maxBidAllowed.toLocaleString('en-IN')}`,
                     maxBidAllowed
                 });
             }

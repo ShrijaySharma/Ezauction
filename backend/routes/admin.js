@@ -2534,7 +2534,7 @@ router.post('/admin-assign-team', async (req, res) => {
     if (!team) return res.status(400).json({ error: 'Team not found' });
 
     if (team.budget < anonBid.amount) {
-      return res.status(400).json({ error: `Team "${team.name}" budget (₹${team.budget.toLocaleString()}) is less than bid amount (₹${anonBid.amount.toLocaleString()})` });
+      return res.status(400).json({ error: `Team "${team.name}" budget (₹${team.budget.toLocaleString('en-IN')}) is less than bid amount (₹${anonBid.amount.toLocaleString('en-IN')})` });
     }
 
     // 4. Insert the REAL bid into DB with team_id

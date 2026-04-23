@@ -140,14 +140,8 @@ function PublicLive() {
     };
 
     const formatIndianNumber = (num) => {
-        if (!num) return '0';
-        const s = num.toString();
-        const lastThree = s.substring(s.length - 3);
-        const otherNumbers = s.substring(0, s.length - 3);
-        if (otherNumbers !== '') {
-            return otherNumbers.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," + lastThree;
-        }
-        return lastThree;
+        if (num === null || num === undefined) return '0';
+        return Number(num).toLocaleString('en-IN');
     };
 
     const roles = ['All', ...Array.from(new Set(players.map(p => p.role)))];
