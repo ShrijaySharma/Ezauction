@@ -2434,7 +2434,7 @@ router.post('/admin-bid-v2', async (req, res) => {
   const { amount } = req.body; // amount = the INCREMENT (1000, 2000, 5000)
   const io = req.app.locals.io;
 
-  if (!amount || amount <= 0) {
+  if (!amount && amount !== 'BASE') {
     return res.status(400).json({ error: 'Invalid increment amount' });
   }
 
@@ -2464,7 +2464,16 @@ router.post('/admin-bid-v2', async (req, res) => {
     const dbAmount = currentHighest ? currentHighest.amount : 0;
     const anonAmount = (anonBid.playerId === state.current_player_id) ? anonBid.amount : 0;
     const startAmount = Math.max(dbAmount, anonAmount, player.base_price);
-    const newBidAmount = startAmount + parseInt(amount);
+    
+    let newBidAmount;
+    if (amount === 'BASE') {
+      if (dbAmount > 0 || anonAmount > 0) {
+        return res.status(400).json({ error: 'Bids already exist. Base price bid not allowed.' });
+      }
+      newBidAmount = player.base_price;
+    } else {
+      newBidAmount = startAmount + parseInt(amount);
+    }
 
     // 5. Track in memory only (do NOT insert into bids table — team_id NOT NULL constraint)
     setAdminAnonymousBid(newBidAmount, state.current_player_id);

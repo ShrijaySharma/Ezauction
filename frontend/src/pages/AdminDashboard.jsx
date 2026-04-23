@@ -1400,22 +1400,23 @@ function AdminDashboard({ user }) {
                 </h3>
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => handleAdminBidV2(1000)}
+                    onClick={() => handleAdminBidV2('BASE')}
+                    disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.amount >= (currentPlayer?.base_price || 0)}
+                    className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 disabled:from-gray-600 disabled:to-gray-700 text-white rounded-lg transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed text-sm"
+                  >
+                    Base Price
+                  </button>
+                  <button
+                    onClick={() => handleAdminBidV2(bidIncrements.increment1)}
                     className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-lg transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105 text-sm"
                   >
-                    +₹1,000
+                    +₹{bidIncrements.increment1.toLocaleString()}
                   </button>
                   <button
-                    onClick={() => handleAdminBidV2(2000)}
+                    onClick={() => handleAdminBidV2(bidIncrements.increment2)}
                     className="px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105 text-sm"
                   >
-                    +₹2,000
-                  </button>
-                  <button
-                    onClick={() => handleAdminBidV2(5000)}
-                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg transition-all font-bold shadow-md hover:shadow-lg transform hover:scale-105 text-sm"
-                  >
-                    +₹5,000
+                    +₹{bidIncrements.increment2.toLocaleString()}
                   </button>
                   <div className="flex-1 min-w-[200px] flex gap-2 ml-auto">
                     <select
