@@ -343,7 +343,7 @@ function HostDashboard() {
       <div className="relative z-10 h-full w-full flex flex-col">
         {/* Clean Header Row — in document flow, no overlap */}
         <div className="shrink-0 flex items-center justify-between px-4 md:px-8 py-3 md:py-4 z-30">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-1">
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="flex flex-col items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-black/30 hover:bg-black/50 backdrop-blur-xl rounded-xl border border-white/10 transition-all group"
@@ -359,7 +359,7 @@ function HostDashboard() {
             {sponsorLogo && <img src={sponsorLogo} alt="Sponsor" className="h-8 sm:h-10 md:h-14 lg:h-16 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" />}
             {sponsorName && <div className="text-white text-[8px] sm:text-[10px] md:text-xs lg:text-sm font-black mt-1 tracking-[0.3em] uppercase drop-shadow-md opacity-80">{sponsorName}</div>}
           </div>
-          <div>
+          <div className="flex-1 flex justify-end">
             {status === 'LIVE' && (
               <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600/20 backdrop-blur-xl rounded-xl border border-red-500/20">
                 <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]"></span>
@@ -370,7 +370,7 @@ function HostDashboard() {
         </div>
 
         {/* Main Grid */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-2 pt-2 md:p-4 md:pt-2 gap-2 md:gap-4 flex flex-col md:grid md:grid-cols-12 md:items-stretch scrollbar-none min-h-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-3 pt-2 md:px-8 md:py-4 md:pb-6 gap-3 md:gap-5 flex flex-col md:grid md:grid-cols-12 md:items-stretch scrollbar-none min-h-0">
           {currentPlayer ? (
             <>
               {/* Left Column: Enhanced Player Profile */}
