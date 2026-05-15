@@ -375,7 +375,7 @@ function HostDashboard() {
             <>
               {/* Left Column: Enhanced Player Profile */}
               <div className="col-span-12 md:col-span-3 flex flex-col flex-none md:h-full overflow-hidden order-2 md:order-1">
-                <div className="flex-1 bg-gray-900/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-4 md:p-5 border border-white/10 shadow-2xl flex flex-row md:flex-col justify-between items-center md:items-stretch relative overflow-hidden gap-4 md:gap-4 md:min-h-0">
+                <div className="flex-1 bg-gray-900/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-4 md:p-5 border border-white/10 shadow-2xl flex flex-row md:flex-col items-center md:items-stretch md:justify-center relative overflow-hidden gap-4 md:gap-5 md:min-h-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
 
 
@@ -383,15 +383,13 @@ function HostDashboard() {
                   {/* Left Side (Mobile) / Top (Desktop) */}
                   <div className="relative z-10 flex flex-col items-start md:items-center gap-2 md:gap-3 w-1/2 md:w-auto justify-center">
                     <div className="px-3 py-1.5 md:px-4 md:py-2 bg-white/10 rounded-xl border border-yellow-400/40 backdrop-blur-xl md:self-end">
-                      <span className="text-white font-mono font-black text-lg md:text-3xl drop-shadow-lg"><span className="md:hidden">#</span>{currentPlayer.serial_number}</span>
+                      <span className="text-white font-mono font-black text-lg md:text-2xl drop-shadow-lg">#{currentPlayer.serial_number}</span>
                     </div>
-                    <div className="text-left md:text-center md:w-full flex flex-col items-start md:items-center">
-                      <h2 className="text-white text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black tracking-tight mb-1 md:mb-2 drop-shadow-2xl leading-tight md:text-center">
-                        {currentPlayer.name}
-                      </h2>
-                      <div className="inline-block px-3 py-1.5 md:px-6 md:py-2.5 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm font-black uppercase tracking-widest shadow-lg md:shadow-xl shadow-yellow-400/20 md:hover:scale-105 md:transition-transform">
-                        {currentPlayer.role}
-                      </div>
+                    <h2 className="text-white text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black tracking-tight drop-shadow-2xl leading-tight md:text-center">
+                      {currentPlayer.name}
+                    </h2>
+                    <div className="inline-block px-3 py-1.5 md:px-5 md:py-2 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm font-black uppercase tracking-widest shadow-lg shadow-yellow-400/20">
+                      {currentPlayer.role}
                     </div>
                   </div>
 
@@ -412,14 +410,13 @@ function HostDashboard() {
               </div>
 
               {/* Center Column: Image */}
-              <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-end relative overflow-hidden group px-0 md:px-0 py-1 md:py-0 order-1 md:order-2">
-                <div className={`relative w-full max-w-[220px] sm:max-w-[280px] md:max-w-none md:h-full aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
-                  <div className="absolute inset-0 bg-yellow-400/10 rounded-2xl md:rounded-[2rem] blur-[50px] md:blur-[80px] animate-pulse"></div>
-                  <div className={`w-full h-full rounded-2xl md:rounded-[2rem] border-2 md:border-[3px] bg-black/20 shadow-2xl flex items-end justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
+              <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-center relative overflow-hidden order-1 md:order-2">
+                <div className={`relative w-full max-w-[220px] sm:max-w-[280px] md:max-w-none md:h-full aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.02]' : 'scale-100'}`}>
+                  <div className={`w-full h-full rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 ${bidFlash ? 'shadow-yellow-400/30' : ''}`}>
                     <img
                       src={getImageUrl(currentPlayer.image)}
                       alt={currentPlayer.name}
-                      className="w-full h-full object-contain object-bottom filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] md:drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)] cursor-pointer"
+                      className="w-full h-full object-cover object-top cursor-pointer"
                       onClick={() => setPreviewImage(getImageUrl(currentPlayer.image))}
                       onError={(e) => { e.target.src = '/deafult_player.png'; }}
                     />
@@ -429,7 +426,7 @@ function HostDashboard() {
 
               {/* Right Column: Bid Action - Optimized for Overflow */}
               <div className="col-span-12 md:col-span-4 flex flex-col gap-2 md:gap-6 shrink-0 md:min-h-0 mb-4 md:mb-0 order-3 z-10">
-                <div className={`flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-[3rem] p-3 md:p-4 lg:p-6 shadow-2xl border-[4px] md:border-[12px] border-white items-center justify-between md:justify-center text-blue-900 transition-all duration-500 gap-3 md:gap-0 h-full md:flex-1 ${bidFlash ? 'scale-[1.02] rotate-1' : ''}`}>
+                <div className={`flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-3xl p-3 md:p-5 lg:p-6 shadow-2xl border-2 md:border-4 border-white/80 items-center justify-between md:justify-center text-blue-900 transition-all duration-500 gap-3 md:gap-0 h-full md:flex-1 ${bidFlash ? 'scale-[1.01]' : ''}`}>
 
                   {/* Mobile Left / Desktop Top: Bid Amount */}
                   <div className="flex flex-col items-start md:items-center w-5/12 md:w-full">
