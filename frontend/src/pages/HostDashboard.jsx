@@ -370,12 +370,12 @@ function HostDashboard() {
         </div>
 
         {/* Main Grid */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-2 pt-2 md:p-4 md:pt-2 gap-2 md:gap-4 flex flex-col md:grid md:grid-cols-12 md:content-stretch scrollbar-none min-h-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-2 pt-2 md:p-4 md:pt-2 gap-2 md:gap-4 flex flex-col md:grid md:grid-cols-12 md:items-stretch scrollbar-none min-h-0">
           {currentPlayer ? (
             <>
               {/* Left Column: Enhanced Player Profile */}
-              <div className="col-span-12 md:col-span-3 flex flex-col flex-none md:h-full overflow-hidden order-2 md:order-1">
-                <div className="flex-1 bg-gray-900/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-4 md:p-5 border border-white/10 shadow-2xl flex flex-row md:flex-col items-center md:items-stretch md:justify-center relative overflow-hidden gap-4 md:gap-5 md:min-h-0">
+              <div className="col-span-12 md:col-span-3 flex flex-col overflow-hidden order-2 md:order-1">
+                <div className="h-full bg-gray-900/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-4 md:p-5 border border-white/10 shadow-2xl flex flex-row md:flex-col items-center md:items-center md:justify-center relative overflow-hidden gap-4 md:gap-5">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
 
 
@@ -383,7 +383,7 @@ function HostDashboard() {
                   {/* Left Side (Mobile) / Top (Desktop) */}
                   <div className="relative z-10 flex flex-col items-start md:items-center gap-2 md:gap-3 w-1/2 md:w-auto justify-center">
                     <div className="px-3 py-1.5 md:px-4 md:py-2 bg-white/10 rounded-xl border border-yellow-400/40 backdrop-blur-xl md:self-end">
-                      <span className="text-white font-mono font-black text-lg md:text-2xl drop-shadow-lg">#{currentPlayer.serial_number}</span>
+                      <span className="text-white font-mono font-black text-lg md:text-2xl drop-shadow-lg">#{currentPlayer.serial_number || currentPlayer.id}</span>
                     </div>
                     <h2 className="text-white text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black tracking-tight drop-shadow-2xl leading-tight md:text-center">
                       {currentPlayer.name}
@@ -394,7 +394,7 @@ function HostDashboard() {
                   </div>
 
                   {/* Right Side (Mobile) / Bottom Grid (Desktop) */}
-                  <div className="relative z-10 flex flex-col gap-2 md:gap-3 mt-0 md:mt-auto w-1/2 md:w-auto">
+                  <div className="relative z-10 flex flex-col gap-2 md:gap-3 w-1/2 md:w-full">
                     <div className="bg-white/5 p-2 md:p-4 rounded-xl md:rounded-2xl border border-white/10 backdrop-blur-md flex flex-row md:flex-col justify-between items-center md:items-center">
                       <span className="text-white/40 text-[8px] md:text-[10px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] md:mb-2 md:text-center block">Age</span>
                       <div className="text-white font-black text-sm md:text-2xl uppercase tracking-tight md:text-center">{currentPlayer.age || 'N/A'} <span className="hidden md:inline">YRS</span></div>
@@ -425,8 +425,8 @@ function HostDashboard() {
               </div>
 
               {/* Right Column: Bid Action - Optimized for Overflow */}
-              <div className="col-span-12 md:col-span-4 flex flex-col gap-2 md:gap-6 shrink-0 md:min-h-0 mb-4 md:mb-0 order-3 z-10">
-                <div className={`flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-3xl p-3 md:p-5 lg:p-6 shadow-2xl border-2 md:border-4 border-white/80 items-center justify-between md:justify-center text-blue-900 transition-all duration-500 gap-3 md:gap-0 h-full md:flex-1 ${bidFlash ? 'scale-[1.01]' : ''}`}>
+              <div className="col-span-12 md:col-span-4 flex flex-col gap-2 shrink-0 mb-3 md:mb-0 order-3 z-10">
+                <div className={`flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-3xl p-3 md:p-5 lg:p-6 shadow-2xl border-2 md:border-4 border-white/80 items-center justify-between md:justify-center text-blue-900 transition-all duration-500 gap-3 md:gap-0 h-full ${bidFlash ? 'scale-[1.01]' : ''}`}>
 
                   {/* Mobile Left / Desktop Top: Bid Amount */}
                   <div className="flex flex-col items-start md:items-center w-5/12 md:w-full">
