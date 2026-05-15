@@ -41,6 +41,7 @@ function App() {
       <Routes>
         <Route path="/overlay" element={<Overlay />} />
         <Route path="/live" element={<PublicLive />} />
+        <Route path="/host" element={<HostDashboard />} />
         <Route
           path="/login"
           element={user ? <Navigate to={
@@ -61,10 +62,6 @@ function App() {
         <Route
           path="/owner"
           element={user?.role === 'owner' ? <OwnerDashboard user={user} /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/host"
-          element={user?.role === 'host' ? <HostDashboard user={user} /> : <Navigate to="/login" />}
         />
         <Route path="/" element={<Navigate to="/login" />} />
       </Routes>

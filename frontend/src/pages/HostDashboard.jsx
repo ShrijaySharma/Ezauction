@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { logout } from '../services/auth';
 import * as hostService from '../services/host';
 import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
@@ -19,8 +17,7 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
-function HostDashboard({ user }) {
-  const navigate = useNavigate();
+function HostDashboard() {
   const [socket, setSocket] = useState(null);
   const [status, setStatus] = useState('STOPPED');
   const [currentPlayer, setCurrentPlayer] = useState(null);
@@ -38,6 +35,7 @@ function HostDashboard({ user }) {
   const [teamPurses, setTeamPurses] = useState([]);
   const [connectionError, setConnectionError] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
+  const [soldAnimation, setSoldAnimation] = useState(null); // { playerName, teamName, price }
 
   // Sponsor Branding State
   const [showSponsorModal, setShowSponsorModal] = useState(false);
@@ -181,8 +179,15 @@ function HostDashboard({ user }) {
     });
 
     newSocket.on('player-marked', (data) => {
-      // Team purses panel has manual "Refresh" button
       console.log('[Socket:Host] player-marked', data);
+      if (data.status === 'SOLD') {
+        setSoldAnimation({
+          playerName: currentPlayer?.name || 'Player',
+          teamName: data.soldToTeam ? '' : '',
+          price: data.soldPrice || 0
+        });
+        setTimeout(() => setSoldAnimation(null), 2500);
+      }
     });
 
     newSocket.on('team-budget-updated', (data) => {
@@ -252,15 +257,7 @@ function HostDashboard({ user }) {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      window.location.href = '/login';
-    } catch (error) {
-      console.error('Logout failed:', error);
-      window.location.href = '/login';
-    }
-  };
+  // Logout removed — host dashboard is now public
 
   const formatIndianNumber = (num) => {
     if (num === null || num === undefined) return '0';
@@ -344,53 +341,41 @@ function HostDashboard({ user }) {
       </div>
 
       <div className="relative z-10 h-full w-full flex flex-col">
-        {/* Top bar - Simplified & Centered */}
-        <div className="h-16 md:h-32 flex items-center justify-between md:justify-end px-4 md:px-8 bg-black/40 backdrop-blur-md border-b border-white/10 relative shrink-0">
-        <div className="md:absolute md:left-4 lg:left-8 md:top-1/2 md:-translate-y-1/2 flex items-center gap-3">
-            {/* Burger Menu Button */}
+        {/* Floating Top Elements — No bar, directly on the cinematic background */}
+        <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
+          {/* Left: Menu + Logo */}
+          <div className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-3 pointer-events-auto">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="flex flex-col items-center justify-center w-8 h-8 md:w-10 md:h-10 bg-white/10 hover:bg-white/20 rounded-lg md:rounded-xl border border-white/10 transition-all group"
+              className="flex flex-col items-center justify-center w-10 h-10 md:w-14 md:h-14 bg-black/40 hover:bg-black/60 backdrop-blur-xl rounded-xl md:rounded-2xl border border-white/15 transition-all group shadow-lg"
               title="Menu"
             >
-              <span className={`block w-4 md:w-5 h-0.5 bg-white/70 group-hover:bg-white transition-all ${showMenu ? 'rotate-45 translate-y-[3px]' : ''}`}></span>
-              <span className={`block w-4 md:w-5 h-0.5 bg-white/70 group-hover:bg-white my-[3px] transition-all ${showMenu ? 'opacity-0' : ''}`}></span>
-              <span className={`block w-4 md:w-5 h-0.5 bg-white/70 group-hover:bg-white transition-all ${showMenu ? '-rotate-45 -translate-y-[3px]' : ''}`}></span>
+              <span className={`block w-5 md:w-7 h-0.5 md:h-[3px] bg-white/80 group-hover:bg-white transition-all ${showMenu ? 'rotate-45 translate-y-[5px]' : ''}`}></span>
+              <span className={`block w-5 md:w-7 h-0.5 md:h-[3px] bg-white/80 group-hover:bg-white my-[4px] md:my-[5px] transition-all ${showMenu ? 'opacity-0' : ''}`}></span>
+              <span className={`block w-5 md:w-7 h-0.5 md:h-[3px] bg-white/80 group-hover:bg-white transition-all ${showMenu ? '-rotate-45 -translate-y-[5px]' : ''}`}></span>
             </button>
-            <img src="/ezauction.png" alt="EzAuction Logo" className="h-6 sm:h-12 lg:h-16 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.2)] md:hover:scale-105 transition-transform duration-500" />
+            <img src="/ezauction.png" alt="EzAuction Logo" className="h-8 sm:h-14 lg:h-20 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.25)] hover:scale-105 transition-transform duration-500" />
           </div>
 
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center animate-fade-in z-20">
-            {sponsorLogo && <img src={sponsorLogo} alt="Sponsor" className="h-8 sm:h-12 md:h-16 lg:h-20 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.3)] filter brightness-110" />}
-            {sponsorName && <div className="text-white text-[8px] sm:text-[10px] md:text-xs font-black mt-1 tracking-[0.3em] uppercase drop-shadow-md opacity-80">{sponsorName}</div>}
+          {/* Center: Sponsor Branding */}
+          <div className="absolute top-4 md:top-6 left-1/2 -translate-x-1/2 flex flex-col items-center justify-center animate-fade-in pointer-events-auto">
+            {sponsorLogo && <img src={sponsorLogo} alt="Sponsor" className="h-10 sm:h-16 md:h-20 lg:h-24 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.3)] filter brightness-110" />}
+            {sponsorName && <div className="text-white text-[10px] sm:text-xs md:text-sm lg:text-base font-black mt-1.5 tracking-[0.3em] uppercase drop-shadow-md opacity-80">{sponsorName}</div>}
           </div>
 
-          <div className="flex items-center gap-2 md:gap-6">
-            {/* Audio Unlock Indicator */}
-            {!audioEnabled && (
-              <button
-                onClick={enableAudio}
-                className="flex items-center gap-1.5 md:gap-2 px-2 py-1 md:px-4 md:py-2 bg-yellow-400 text-black rounded-lg md:rounded-xl font-black text-[10px] md:text-sm uppercase tracking-widest animate-pulse md:shadow-[0_0_20px_rgba(250,204,21,0.4)]"
-              >
-                <span>🔊</span> <span className="hidden sm:inline">Sound</span>
-              </button>
-            )}
-            {audioEnabled && (
-              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-green-500/20 text-green-400 rounded-xl font-black text-xs md:text-sm uppercase tracking-widest border border-green-500/30">
-                <span>🔔</span> <span className="hidden sm:inline">Sound Active</span>
+          {/* Right: Live indicator */}
+          <div className="absolute top-4 right-4 md:top-6 md:right-6 pointer-events-auto">
+            {status === 'LIVE' && (
+              <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-red-600/30 backdrop-blur-xl rounded-xl border border-red-500/30 shadow-lg">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]"></span>
+                <span className="text-red-400 text-[10px] md:text-xs font-black uppercase tracking-widest">Live</span>
               </div>
             )}
-            <button
-              onClick={handleLogout}
-              className="text-white/60 hover:text-white transition-all text-[10px] md:text-sm font-black uppercase tracking-widest px-2 py-1 md:px-4 md:py-2 bg-white/5 hover:bg-white/10 rounded-lg md:rounded-xl border border-white/10"
-            >
-              Logout
-            </button>
           </div>
         </div>
 
         {/* Main Grid */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-2 md:p-6 gap-2 md:gap-6 flex flex-col md:grid md:grid-cols-12 md:content-stretch scrollbar-none">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-2 pt-16 md:p-6 md:pt-6 gap-2 md:gap-6 flex flex-col md:grid md:grid-cols-12 md:content-stretch scrollbar-none">
           {currentPlayer ? (
             <>
               {/* Left Column: Enhanced Player Profile */}
@@ -444,14 +429,14 @@ function HostDashboard({ user }) {
               </div>
 
               {/* Center Column: Image */}
-              <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-center relative overflow-hidden group px-1 md:px-6 py-1 md:py-0 order-1 md:order-2">
-                <div className={`relative w-full max-w-[220px] sm:max-w-[280px] md:max-w-none md:h-full md:max-h-[70vh] aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
-                  <div className="absolute inset-0 bg-yellow-400/10 rounded-[2rem] md:rounded-[4rem] blur-[50px] md:blur-[100px] animate-pulse"></div>
-                  <div className={`w-full h-full rounded-3xl md:rounded-[3rem] border-[4px] md:border-[12px] bg-black/50 backdrop-blur-3xl shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
+              <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-center relative overflow-hidden group px-0 md:px-2 py-1 md:py-0 order-1 md:order-2">
+                <div className={`relative w-full max-w-[220px] sm:max-w-[280px] md:max-w-none md:h-full md:max-h-[85vh] aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
+                  <div className="absolute inset-0 bg-yellow-400/10 rounded-2xl md:rounded-[2.5rem] blur-[50px] md:blur-[80px] animate-pulse"></div>
+                  <div className={`w-full h-full rounded-2xl md:rounded-[2.5rem] border-2 md:border-4 bg-black/30 backdrop-blur-sm shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
                     <img
                       src={getImageUrl(currentPlayer.image)}
                       alt={currentPlayer.name}
-                      className="w-full h-full object-contain filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] md:drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)] cursor-pointer"
+                      className="w-full h-full object-cover filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] md:drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)] cursor-pointer"
                       onClick={() => setPreviewImage(getImageUrl(currentPlayer.image))}
                       onError={(e) => { e.target.src = '/deafult_player.png'; }}
                     />
@@ -517,7 +502,7 @@ function HostDashboard({ user }) {
         {showMenu && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)}></div>
-            <div className="fixed top-16 md:top-32 left-2 md:left-4 z-50 bg-gray-900/95 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-w-[200px] animate-slide-in-right">
+            <div className="fixed top-16 md:top-20 left-2 md:left-6 z-50 bg-gray-900/95 backdrop-blur-2xl rounded-2xl border border-white/10 shadow-2xl overflow-hidden min-w-[200px] animate-slide-in-right">
               <button
                 onClick={() => { setShowSponsorModal(true); setShowMenu(false); }}
                 className="w-full flex items-center gap-3 px-5 py-4 text-white hover:bg-white/10 transition-colors text-left border-b border-white/10"
@@ -723,13 +708,6 @@ function HostDashboard({ user }) {
             </div>
           </div>
         )}
-
-        {/* Rental Contact Footer */}
-        <div className="h-auto md:h-20 flex flex-col items-center justify-center px-4 md:px-8 bg-black/95 border-t-2 border-white/10 relative z-20 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] py-4 md:py-0 shrink-0">
-          <div className="text-white font-black text-xs sm:text-base md:text-xl tracking-widest uppercase flex items-center gap-2 drop-shadow-lg text-center">
-            For renting this auction app contact <span className="text-yellow-400">7697544446</span>
-          </div>
-        </div>
       </div>
 
       {/* Silent Image Preloader for Main Images */}
@@ -748,6 +726,47 @@ function HostDashboard({ user }) {
         <ImageModal src={previewImage} alt="Player" onClose={() => setPreviewImage(null)} />
       )}
 
+      {/* ===== SOLD CELEBRATION ANIMATION ===== */}
+      {soldAnimation && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none sold-overlay">
+          {/* Dark flash backdrop */}
+          <div className="absolute inset-0 bg-black/60 sold-backdrop"></div>
+
+          {/* Confetti particles */}
+          <div className="absolute inset-0 overflow-hidden">
+            {Array.from({ length: 40 }).map((_, i) => (
+              <div
+                key={i}
+                className="confetti-particle"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 0.5}s`,
+                  animationDuration: `${1.5 + Math.random() * 1.5}s`,
+                  backgroundColor: ['#FFD700', '#FF6B35', '#FF1744', '#00E676', '#2979FF', '#AA00FF', '#FFEA00', '#F50057'][i % 8],
+                  width: `${6 + Math.random() * 10}px`,
+                  height: `${6 + Math.random() * 10}px`,
+                  borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                  transform: `rotate(${Math.random() * 360}deg)`
+                }}
+              />
+            ))}
+          </div>
+
+          {/* SOLD Stamp */}
+          <div className="sold-stamp relative flex flex-col items-center gap-4">
+            <div className="text-6xl md:text-8xl lg:text-[10rem] sold-gavel">🔨</div>
+            <div className="bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-500 text-blue-900 font-black text-5xl md:text-8xl lg:text-9xl px-8 md:px-16 py-3 md:py-6 rounded-2xl md:rounded-3xl border-4 md:border-8 border-white shadow-[0_0_80px_rgba(250,204,21,0.6)] tracking-wider uppercase">
+              SOLD!
+            </div>
+            {soldAnimation.price > 0 && (
+              <div className="text-white text-2xl md:text-5xl font-black font-mono tracking-tight drop-shadow-2xl mt-2 sold-price">
+                ₹{formatIndianNumber(soldAnimation.price)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes slide-in-right { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -757,6 +776,56 @@ function HostDashboard({ user }) {
         .animate-bounce-slow { animation: bounce-slow 4s infinite ease-in-out; }
         .scrollbar-none::-webkit-scrollbar { display: none; }
         .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* ===== SOLD CELEBRATION ANIMATIONS ===== */
+        .sold-overlay { animation: sold-overlay-lifecycle 2.5s ease-out forwards; }
+        @keyframes sold-overlay-lifecycle {
+          0% { opacity: 0; }
+          8% { opacity: 1; }
+          75% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        .sold-backdrop { animation: sold-flash 0.3s ease-out; }
+        @keyframes sold-flash {
+          0% { background-color: rgba(250,204,21,0.4); }
+          100% { background-color: rgba(0,0,0,0.6); }
+        }
+        .sold-stamp {
+          animation: sold-stamp-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+          transform: scale(0) rotate(-15deg);
+        }
+        @keyframes sold-stamp-in {
+          0% { transform: scale(0) rotate(-15deg); opacity: 0; }
+          60% { transform: scale(1.15) rotate(3deg); opacity: 1; }
+          100% { transform: scale(1) rotate(-2deg); opacity: 1; }
+        }
+        .sold-gavel {
+          animation: gavel-slam 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+          transform-origin: bottom right;
+        }
+        @keyframes gavel-slam {
+          0% { transform: rotate(-45deg) scale(0.5); opacity: 0; }
+          50% { transform: rotate(10deg) scale(1.2); }
+          70% { transform: rotate(-5deg) scale(1); }
+          100% { transform: rotate(0deg) scale(1); opacity: 1; }
+        }
+        .sold-price {
+          animation: price-pop 0.4s 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+        @keyframes price-pop {
+          0% { transform: scale(0) translateY(20px); opacity: 0; }
+          100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .confetti-particle {
+          position: absolute;
+          top: 100%;
+          animation: confetti-rise 2s ease-out forwards;
+        }
+        @keyframes confetti-rise {
+          0% { top: 100%; opacity: 1; transform: translateX(0) rotate(0deg); }
+          25% { opacity: 1; }
+          100% { top: -10%; opacity: 0; transform: translateX(calc((var(--random, 0.5) - 0.5) * 200px)) rotate(720deg); }
+        }
       `}</style>
     </div>
   );

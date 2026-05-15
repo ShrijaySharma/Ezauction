@@ -1,13 +1,11 @@
 import express from 'express';
-import { requireAuth, requireHost } from '../middleware/auth.js';
 import { supabase } from '../supabaseClient.js';
 import { getAuctionState, getAdminAnonymousBid } from '../auctionState.js';
 
 const router = express.Router();
 
-// All host routes require authentication and host role
-router.use(requireAuth);
-router.use(requireHost);
+// Host routes are now public — no auth required
+// All routes are read-only so this is safe
 
 // Get current public state (player, bid, stats)
 // Get current public state (player, bid, stats)
