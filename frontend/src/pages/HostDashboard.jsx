@@ -341,32 +341,27 @@ function HostDashboard() {
       </div>
 
       <div className="relative z-10 h-full w-full flex flex-col">
-        {/* Floating Top Elements — No bar, directly on the cinematic background */}
-        <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none">
-          {/* Left: Menu + Logo */}
-          <div className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-3 pointer-events-auto">
+        {/* Clean Header Row — in document flow, no overlap */}
+        <div className="shrink-0 flex items-center justify-between px-4 md:px-8 py-3 md:py-4 z-30">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="flex flex-col items-center justify-center w-10 h-10 md:w-14 md:h-14 bg-black/40 hover:bg-black/60 backdrop-blur-xl rounded-xl md:rounded-2xl border border-white/15 transition-all group shadow-lg"
+              className="flex flex-col items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-black/30 hover:bg-black/50 backdrop-blur-xl rounded-xl border border-white/10 transition-all group"
               title="Menu"
             >
-              <span className={`block w-5 md:w-7 h-0.5 md:h-[3px] bg-white/80 group-hover:bg-white transition-all ${showMenu ? 'rotate-45 translate-y-[5px]' : ''}`}></span>
-              <span className={`block w-5 md:w-7 h-0.5 md:h-[3px] bg-white/80 group-hover:bg-white my-[4px] md:my-[5px] transition-all ${showMenu ? 'opacity-0' : ''}`}></span>
-              <span className={`block w-5 md:w-7 h-0.5 md:h-[3px] bg-white/80 group-hover:bg-white transition-all ${showMenu ? '-rotate-45 -translate-y-[5px]' : ''}`}></span>
+              <span className={`block w-5 md:w-6 h-0.5 md:h-[2px] bg-white/80 group-hover:bg-white transition-all ${showMenu ? 'rotate-45 translate-y-[5px]' : ''}`}></span>
+              <span className={`block w-5 md:w-6 h-0.5 md:h-[2px] bg-white/80 group-hover:bg-white my-[4px] transition-all ${showMenu ? 'opacity-0' : ''}`}></span>
+              <span className={`block w-5 md:w-6 h-0.5 md:h-[2px] bg-white/80 group-hover:bg-white transition-all ${showMenu ? '-rotate-45 -translate-y-[5px]' : ''}`}></span>
             </button>
-            <img src="/ezauction.png" alt="EzAuction Logo" className="h-8 sm:h-14 lg:h-20 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.25)] hover:scale-105 transition-transform duration-500" />
+            <img src="/ezauction.png" alt="EzAuction Logo" className="h-8 sm:h-10 md:h-14 lg:h-16 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]" />
           </div>
-
-          {/* Center: Sponsor Branding */}
-          <div className="absolute top-4 md:top-6 left-1/2 -translate-x-1/2 flex flex-col items-center justify-center animate-fade-in pointer-events-auto">
-            {sponsorLogo && <img src={sponsorLogo} alt="Sponsor" className="h-10 sm:h-16 md:h-20 lg:h-24 object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.3)] filter brightness-110" />}
-            {sponsorName && <div className="text-white text-[10px] sm:text-xs md:text-sm lg:text-base font-black mt-1.5 tracking-[0.3em] uppercase drop-shadow-md opacity-80">{sponsorName}</div>}
+          <div className="absolute left-1/2 top-3 md:top-4 -translate-x-1/2 flex flex-col items-center animate-fade-in z-20">
+            {sponsorLogo && <img src={sponsorLogo} alt="Sponsor" className="h-8 sm:h-12 md:h-16 lg:h-20 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" />}
+            {sponsorName && <div className="text-white text-[8px] sm:text-[10px] md:text-xs lg:text-sm font-black mt-1 tracking-[0.3em] uppercase drop-shadow-md opacity-80">{sponsorName}</div>}
           </div>
-
-          {/* Right: Live indicator */}
-          <div className="absolute top-4 right-4 md:top-6 md:right-6 pointer-events-auto">
+          <div>
             {status === 'LIVE' && (
-              <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-red-600/30 backdrop-blur-xl rounded-xl border border-red-500/30 shadow-lg">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600/20 backdrop-blur-xl rounded-xl border border-red-500/20">
                 <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]"></span>
                 <span className="text-red-400 text-[10px] md:text-xs font-black uppercase tracking-widest">Live</span>
               </div>
@@ -375,23 +370,23 @@ function HostDashboard() {
         </div>
 
         {/* Main Grid */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-2 pt-16 md:p-4 md:pt-24 gap-2 md:gap-4 flex flex-col md:grid md:grid-cols-12 md:content-stretch scrollbar-none">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-2 pt-2 md:p-4 md:pt-2 gap-2 md:gap-4 flex flex-col md:grid md:grid-cols-12 md:content-stretch scrollbar-none min-h-0">
           {currentPlayer ? (
             <>
               {/* Left Column: Enhanced Player Profile */}
               <div className="col-span-12 md:col-span-3 flex flex-col flex-none md:h-full overflow-hidden order-2 md:order-1">
-                <div className="flex-1 bg-gray-900/90 backdrop-blur-2xl rounded-2xl md:rounded-[2.5rem] p-4 md:p-8 border md:border-2 border-white/20 shadow-xl md:shadow-2xl flex flex-row md:flex-col justify-between items-center md:items-stretch relative overflow-hidden group gap-4 md:gap-0 md:min-h-0">
+                <div className="flex-1 bg-gray-900/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-4 md:p-5 border border-white/10 shadow-2xl flex flex-row md:flex-col justify-between items-center md:items-stretch relative overflow-hidden gap-4 md:gap-4 md:min-h-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
 
 
 
                   {/* Left Side (Mobile) / Top (Desktop) */}
-                  <div className="relative z-10 flex flex-col items-start gap-2 md:gap-0 md:justify-between w-1/2 md:w-auto h-full justify-center">
-                    <div className="px-3 py-1.5 md:px-5 md:py-3 bg-white/10 rounded-xl md:rounded-2xl border md:border-2 border-yellow-400/50 backdrop-blur-xl mb-2 md:mb-0 md:self-end md:-mt-16 md:shadow-[0_0_20px_rgba(250,204,21,0.2)]">
+                  <div className="relative z-10 flex flex-col items-start md:items-center gap-2 md:gap-3 w-1/2 md:w-auto justify-center">
+                    <div className="px-3 py-1.5 md:px-4 md:py-2 bg-white/10 rounded-xl border border-yellow-400/40 backdrop-blur-xl md:self-end">
                       <span className="text-white font-mono font-black text-lg md:text-3xl drop-shadow-lg"><span className="md:hidden">#</span>{currentPlayer.serial_number}</span>
                     </div>
-                    <div className="text-left md:text-center mt-0 md:mt-auto md:w-full flex flex-col items-start md:items-center">
-                      <h2 className="text-white text-xl sm:text-3xl md:text-4xl lg:text-5xl lg:max-w-[90%] mx-auto font-black tracking-normal mb-1 md:mb-4 drop-shadow-2xl leading-tight md:line-clamp-none py-1 overflow-hidden text-ellipsis">
+                    <div className="text-left md:text-center md:w-full flex flex-col items-start md:items-center">
+                      <h2 className="text-white text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black tracking-tight mb-1 md:mb-2 drop-shadow-2xl leading-tight md:text-center">
                         {currentPlayer.name}
                       </h2>
                       <div className="inline-block px-3 py-1.5 md:px-6 md:py-2.5 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm font-black uppercase tracking-widest shadow-lg md:shadow-xl shadow-yellow-400/20 md:hover:scale-105 md:transition-transform">
@@ -401,14 +396,14 @@ function HostDashboard() {
                   </div>
 
                   {/* Right Side (Mobile) / Bottom Grid (Desktop) */}
-                  <div className="relative z-10 flex flex-col gap-2 md:grid md:grid-cols-1 md:gap-4 mt-0 md:mt-auto w-1/2 md:w-auto">
-                    <div className="bg-white/5 p-2 md:p-6 rounded-xl md:rounded-3xl border border-white/10 backdrop-blur-md flex flex-row md:flex-col justify-between items-center md:block md:hover:bg-white/10 md:transition-colors">
+                  <div className="relative z-10 flex flex-col gap-2 md:gap-3 mt-0 md:mt-auto w-1/2 md:w-auto">
+                    <div className="bg-white/5 p-2 md:p-4 rounded-xl md:rounded-2xl border border-white/10 backdrop-blur-md flex flex-row md:flex-col justify-between items-center md:items-center">
                       <span className="text-white/40 text-[8px] md:text-[10px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] md:mb-2 md:text-center block">Age</span>
                       <div className="text-white font-black text-sm md:text-2xl uppercase tracking-tight md:text-center">{currentPlayer.age || 'N/A'} <span className="hidden md:inline">YRS</span></div>
                     </div>
-                    <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-3 md:p-6 rounded-xl md:rounded-3xl border border-yellow-400/20 backdrop-blur-md flex flex-col justify-center h-full md:block">
-                      <span className="block text-yellow-400/60 text-[8px] md:text-[10px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] mb-1 md:mb-2 text-center">Base Price</span>
-                      <div className="text-yellow-400 font-black text-lg md:text-4xl font-mono tracking-tighter text-center drop-shadow-lg leading-none md:leading-normal">
+                    <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-2.5 md:p-4 rounded-xl md:rounded-2xl border border-yellow-400/20 backdrop-blur-md flex flex-col justify-center items-center h-full">
+                      <span className="block text-yellow-400/60 text-[8px] md:text-[10px] font-black uppercase tracking-widest mb-1 text-center">Base Price</span>
+                      <div className="text-yellow-400 font-black text-lg md:text-3xl font-mono tracking-tighter text-center drop-shadow-lg leading-none md:leading-normal">
                         ₹{formatIndianNumber(currentPlayer.base_price || 0)}
                       </div>
                     </div>
