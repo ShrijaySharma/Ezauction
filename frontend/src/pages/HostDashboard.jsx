@@ -374,14 +374,14 @@ function HostDashboard() {
           {currentPlayer ? (
             <>
               {/* Left Column: Enhanced Player Profile */}
-              <div className="col-span-12 md:col-span-3 flex flex-col overflow-hidden order-2 md:order-1">
-                <div className="h-full bg-gray-900/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-4 md:p-5 border border-white/10 shadow-2xl flex flex-row md:flex-col items-center md:items-center md:justify-evenly relative overflow-hidden gap-4 md:gap-0">
+              <div className="col-span-12 md:col-span-3 flex flex-col overflow-hidden order-2 md:order-1 md:justify-center">
+                <div className="w-full bg-gray-900/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-4 md:p-6 lg:p-8 border border-white/10 shadow-2xl flex flex-row md:flex-col items-center relative overflow-hidden gap-4 md:gap-6 lg:gap-8">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
 
 
 
                   {/* Left Side (Mobile) / Top (Desktop) */}
-                  <div className="relative z-10 flex flex-col items-start md:items-center gap-2 md:gap-3 w-1/2 md:w-auto justify-center">
+                  <div className="relative z-10 flex flex-col items-start md:items-center gap-2 md:gap-4 w-1/2 md:w-full justify-center">
                     <div className="px-3 py-1.5 md:px-4 md:py-2 bg-white/10 rounded-xl border border-yellow-400/40 backdrop-blur-xl md:self-end">
                       <span className="text-white font-mono font-black text-lg md:text-2xl drop-shadow-lg">#{currentPlayer.serial_number || currentPlayer.id}</span>
                     </div>
@@ -425,8 +425,8 @@ function HostDashboard() {
               </div>
 
               {/* Right Column: Bid Action - Optimized for Overflow */}
-              <div className="col-span-12 md:col-span-4 flex flex-col gap-2 shrink-0 mb-3 md:mb-0 order-3 z-10">
-                <div className={`flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-3xl p-3 md:p-5 lg:p-6 shadow-2xl border-2 md:border-4 border-white/80 items-center justify-between md:justify-evenly text-blue-900 transition-all duration-500 gap-3 md:gap-0 h-full ${bidFlash ? 'scale-[1.01]' : ''}`}>
+              <div className="col-span-12 md:col-span-4 flex flex-col gap-2 shrink-0 mb-3 md:mb-0 order-3 z-10 md:justify-center">
+                <div className={`w-full flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-3xl p-3 md:p-6 lg:p-8 shadow-2xl border-2 md:border-4 border-white/80 items-center justify-between md:justify-center text-blue-900 transition-all duration-500 gap-3 md:gap-6 lg:gap-8 ${bidFlash ? 'scale-[1.01]' : ''}`}>
 
                   {/* Mobile Left / Desktop Top: Bid Amount */}
                   <div className="flex flex-col items-start md:items-center w-5/12 md:w-full">
