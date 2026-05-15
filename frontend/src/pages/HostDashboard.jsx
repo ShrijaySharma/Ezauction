@@ -375,7 +375,7 @@ function HostDashboard() {
             <>
               {/* Left Column: Enhanced Player Profile */}
               <div className="col-span-12 md:col-span-3 flex flex-col overflow-hidden order-2 md:order-1">
-                <div className="h-full bg-gray-900/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-4 md:p-5 border border-white/10 shadow-2xl flex flex-row md:flex-col items-center md:items-center md:justify-center relative overflow-hidden gap-4 md:gap-5">
+                <div className="h-full bg-gray-900/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-4 md:p-5 border border-white/10 shadow-2xl flex flex-row md:flex-col items-center md:items-center md:justify-evenly relative overflow-hidden gap-4 md:gap-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
 
 
@@ -426,12 +426,12 @@ function HostDashboard() {
 
               {/* Right Column: Bid Action - Optimized for Overflow */}
               <div className="col-span-12 md:col-span-4 flex flex-col gap-2 shrink-0 mb-3 md:mb-0 order-3 z-10">
-                <div className={`flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-3xl p-3 md:p-5 lg:p-6 shadow-2xl border-2 md:border-4 border-white/80 items-center justify-between md:justify-center text-blue-900 transition-all duration-500 gap-3 md:gap-0 h-full ${bidFlash ? 'scale-[1.01]' : ''}`}>
+                <div className={`flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-3xl p-3 md:p-5 lg:p-6 shadow-2xl border-2 md:border-4 border-white/80 items-center justify-between md:justify-evenly text-blue-900 transition-all duration-500 gap-3 md:gap-0 h-full ${bidFlash ? 'scale-[1.01]' : ''}`}>
 
                   {/* Mobile Left / Desktop Top: Bid Amount */}
                   <div className="flex flex-col items-start md:items-center w-5/12 md:w-full">
-                    <div className="text-blue-900/60 md:text-blue-900/40 text-[10px] md:text-lg lg:text-xl font-black tracking-[0.2em] md:tracking-[0.5em] uppercase md:mb-2 lg:mb-4 text-left md:text-center">Current Bid</div>
-                    <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-left md:text-center w-full break-words md:mb-6 lg:mb-10
+                    <div className="text-blue-900/60 md:text-blue-900/40 text-[10px] md:text-lg lg:text-xl font-black tracking-[0.2em] md:tracking-[0.5em] uppercase md:mb-2 text-left md:text-center">Current Bid</div>
+                    <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-left md:text-center w-full break-words
                       ${currentBid.toString().length > 7 ? 'text-xl md:text-3xl lg:text-5xl' : (currentBid.toString().length > 5 ? 'text-2xl md:text-4xl lg:text-5xl' : 'text-3xl md:text-5xl lg:text-6xl')}
                       ${bidFlash ? 'scale-110' : ''}
                     `}>
@@ -439,7 +439,7 @@ function HostDashboard() {
                     </div>
                   </div>
 
-                  <div className="hidden md:block h-1.5 w-32 bg-blue-900/10 mb-8 rounded-full"></div>
+                  <div className="hidden md:block h-1.5 w-32 bg-blue-900/10 rounded-full mx-auto"></div>
                   <div className="block md:hidden w-px h-12 bg-blue-900/20 mx-1"></div>
 
                   {/* Mobile Right / Desktop Bottom: Leading Team */}
