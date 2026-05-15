@@ -355,8 +355,8 @@ function HostDashboard() {
             </button>
             <img src="/ezauction.png" alt="EzAuction Logo" className="h-8 sm:h-10 md:h-14 lg:h-16 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]" />
           </div>
-          <div className="absolute left-1/2 top-3 md:top-4 -translate-x-1/2 flex flex-col items-center animate-fade-in z-20">
-            {sponsorLogo && <img src={sponsorLogo} alt="Sponsor" className="h-8 sm:h-12 md:h-16 lg:h-20 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" />}
+          <div className="flex flex-col items-center animate-fade-in z-20">
+            {sponsorLogo && <img src={sponsorLogo} alt="Sponsor" className="h-8 sm:h-10 md:h-14 lg:h-16 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" />}
             {sponsorName && <div className="text-white text-[8px] sm:text-[10px] md:text-xs lg:text-sm font-black mt-1 tracking-[0.3em] uppercase drop-shadow-md opacity-80">{sponsorName}</div>}
           </div>
           <div>
