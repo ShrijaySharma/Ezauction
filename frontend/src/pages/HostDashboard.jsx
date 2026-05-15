@@ -375,7 +375,7 @@ function HostDashboard() {
         </div>
 
         {/* Main Grid */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-2 pt-16 md:p-6 md:pt-6 gap-2 md:gap-6 flex flex-col md:grid md:grid-cols-12 md:content-stretch scrollbar-none">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-2 pt-16 md:p-4 md:pt-24 gap-2 md:gap-4 flex flex-col md:grid md:grid-cols-12 md:content-stretch scrollbar-none">
           {currentPlayer ? (
             <>
               {/* Left Column: Enhanced Player Profile */}
@@ -383,19 +383,7 @@ function HostDashboard() {
                 <div className="flex-1 bg-gray-900/90 backdrop-blur-2xl rounded-2xl md:rounded-[2.5rem] p-4 md:p-8 border md:border-2 border-white/20 shadow-xl md:shadow-2xl flex flex-row md:flex-col justify-between items-center md:items-stretch relative overflow-hidden group gap-4 md:gap-0 md:min-h-0">
                   <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
 
-                  {/* Desktop Category Badge (hidden on mobile) */}
-                  <div className="hidden md:flex relative z-10 justify-between items-start mb-4">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-yellow-400 rounded-xl shadow-lg shadow-yellow-400/20">
-                          <svg className="w-6 h-6 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                          </svg>
-                        </div>
-                        <span className="text-yellow-400 font-bold uppercase tracking-widest text-xs">Profile</span>
-                      </div>
-                    </div>
-                  </div>
+
 
                   {/* Left Side (Mobile) / Top (Desktop) */}
                   <div className="relative z-10 flex flex-col items-start gap-2 md:gap-0 md:justify-between w-1/2 md:w-auto h-full justify-center">
@@ -429,14 +417,14 @@ function HostDashboard() {
               </div>
 
               {/* Center Column: Image */}
-              <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-center relative overflow-hidden group px-0 md:px-2 py-1 md:py-0 order-1 md:order-2">
-                <div className={`relative w-full max-w-[220px] sm:max-w-[280px] md:max-w-none md:h-full md:max-h-[85vh] aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
-                  <div className="absolute inset-0 bg-yellow-400/10 rounded-2xl md:rounded-[2.5rem] blur-[50px] md:blur-[80px] animate-pulse"></div>
-                  <div className={`w-full h-full rounded-2xl md:rounded-[2.5rem] border-2 md:border-4 bg-black/30 backdrop-blur-sm shadow-2xl flex items-center justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
+              <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-end relative overflow-hidden group px-0 md:px-0 py-1 md:py-0 order-1 md:order-2">
+                <div className={`relative w-full max-w-[220px] sm:max-w-[280px] md:max-w-none md:h-full aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.03]' : 'scale-100'}`}>
+                  <div className="absolute inset-0 bg-yellow-400/10 rounded-2xl md:rounded-[2rem] blur-[50px] md:blur-[80px] animate-pulse"></div>
+                  <div className={`w-full h-full rounded-2xl md:rounded-[2rem] border-2 md:border-[3px] bg-black/20 shadow-2xl flex items-end justify-center overflow-hidden transition-all duration-300 ${bidFlash ? 'border-yellow-400 shadow-yellow-400/40' : 'border-white/10'}`}>
                     <img
                       src={getImageUrl(currentPlayer.image)}
                       alt={currentPlayer.name}
-                      className="w-full h-full object-cover filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] md:drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)] cursor-pointer"
+                      className="w-full h-full object-contain object-bottom filter drop-shadow-[0_10px_20px_rgba(0,0,0,0.8)] md:drop-shadow-[0_25px_50px_rgba(0,0,0,0.8)] cursor-pointer"
                       onClick={() => setPreviewImage(getImageUrl(currentPlayer.image))}
                       onError={(e) => { e.target.src = '/deafult_player.png'; }}
                     />
