@@ -44,6 +44,14 @@ function HostDashboard() {
 
   const audioElementRef = useRef(null);
 
+  // Refs for socket callbacks to access latest state
+  const currentPlayerRef = useRef(null);
+  const teamsRef = useRef([]);
+
+  // Sync state to refs
+  useEffect(() => { currentPlayerRef.current = currentPlayer; }, [currentPlayer]);
+  useEffect(() => { teamsRef.current = teams; }, [teams]);
+
   const enableAudio = () => {
     if (audioElementRef.current) {
       audioElementRef.current.play().then(() => {
@@ -181,12 +189,19 @@ function HostDashboard() {
     newSocket.on('player-marked', (data) => {
       console.log('[Socket:Host] player-marked', data);
       if (data.status === 'SOLD') {
+        let winningTeam = null;
+        if (data.soldToTeam) {
+          // soldToTeam might be ID or name, we check both
+          winningTeam = teamsRef.current.find(t => t.id === data.soldToTeam || t.name === data.soldToTeam);
+        }
+        
         setSoldAnimation({
-          playerName: currentPlayer?.name || 'Player',
-          teamName: data.soldToTeam ? '' : '',
+          playerName: currentPlayerRef.current?.name || 'Player',
+          teamName: winningTeam ? winningTeam.name : (data.soldToTeam || ''),
+          teamLogo: winningTeam ? winningTeam.logo : null,
           price: data.soldPrice || 0
         });
-        setTimeout(() => setSoldAnimation(null), 2500);
+        setTimeout(() => setSoldAnimation(null), 3000);
       }
     });
 
@@ -382,26 +397,26 @@ function HostDashboard() {
 
                   {/* Left Side (Mobile) / Top (Desktop) */}
                   <div className="relative z-10 flex flex-col items-start md:items-center gap-2 md:gap-4 w-1/2 md:w-full justify-center">
-                    <div className="px-3 py-1.5 md:px-4 md:py-2 bg-white/10 rounded-xl border border-yellow-400/40 backdrop-blur-xl md:self-end">
-                      <span className="text-white font-mono font-black text-lg md:text-2xl drop-shadow-lg">#{currentPlayer.serial_number || currentPlayer.id}</span>
+                    <div className="px-3 py-1.5 md:px-5 md:py-3 bg-white/10 rounded-xl border border-yellow-400/40 backdrop-blur-xl md:self-end shadow-lg">
+                      <span className="text-white font-mono font-black text-lg md:text-3xl xl:text-4xl drop-shadow-lg">#{currentPlayer.serial_number || currentPlayer.id}</span>
                     </div>
-                    <h2 className="text-white text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black tracking-tight drop-shadow-2xl leading-tight md:text-center">
+                    <h2 className="text-white text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight drop-shadow-2xl leading-tight md:text-center">
                       {currentPlayer.name}
                     </h2>
-                    <div className="inline-block px-3 py-1.5 md:px-5 md:py-2 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm font-black uppercase tracking-widest shadow-lg shadow-yellow-400/20">
+                    <div className="inline-block px-3 py-1.5 md:px-6 md:py-2.5 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm lg:text-base font-black uppercase tracking-widest shadow-[0_0_20px_rgba(250,204,21,0.3)]">
                       {currentPlayer.role}
                     </div>
                   </div>
 
                   {/* Right Side (Mobile) / Bottom Grid (Desktop) */}
-                  <div className="relative z-10 flex flex-col gap-2 md:gap-3 w-1/2 md:w-full">
-                    <div className="bg-white/5 p-2 md:p-4 rounded-xl md:rounded-2xl border border-white/10 backdrop-blur-md flex flex-row md:flex-col justify-between items-center md:items-center">
-                      <span className="text-white/40 text-[8px] md:text-[10px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] md:mb-2 md:text-center block">Age</span>
-                      <div className="text-white font-black text-sm md:text-2xl uppercase tracking-tight md:text-center">{currentPlayer.age || 'N/A'} <span className="hidden md:inline">YRS</span></div>
+                  <div className="relative z-10 flex flex-col gap-2 md:gap-4 w-1/2 md:w-full">
+                    <div className="bg-white/5 p-2 md:p-5 rounded-xl md:rounded-2xl border border-white/10 backdrop-blur-md flex flex-row md:flex-col justify-between items-center md:items-center">
+                      <span className="text-white/40 text-[8px] md:text-xs lg:text-sm font-black uppercase tracking-[0.1em] md:tracking-[0.2em] md:mb-2 md:text-center block">Age</span>
+                      <div className="text-white font-black text-sm md:text-3xl lg:text-4xl uppercase tracking-tight md:text-center">{currentPlayer.age || 'N/A'} <span className="hidden md:inline text-xl lg:text-2xl text-white/50 ml-1">YRS</span></div>
                     </div>
-                    <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-2.5 md:p-4 rounded-xl md:rounded-2xl border border-yellow-400/20 backdrop-blur-md flex flex-col justify-center items-center h-full">
-                      <span className="block text-yellow-400/60 text-[8px] md:text-[10px] font-black uppercase tracking-widest mb-1 text-center">Base Price</span>
-                      <div className="text-yellow-400 font-black text-lg md:text-3xl font-mono tracking-tighter text-center drop-shadow-lg leading-none md:leading-normal">
+                    <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-2.5 md:p-6 rounded-xl md:rounded-2xl border border-yellow-400/20 backdrop-blur-md flex flex-col justify-center items-center h-full">
+                      <span className="block text-yellow-400/60 text-[8px] md:text-xs lg:text-sm font-black uppercase tracking-widest mb-1 md:mb-2 text-center">Base Price</span>
+                      <div className="text-yellow-400 font-black text-lg md:text-4xl lg:text-5xl font-mono tracking-tighter text-center drop-shadow-lg leading-none md:leading-normal">
                         ₹{formatIndianNumber(currentPlayer.base_price || 0)}
                       </div>
                     </div>
@@ -430,9 +445,9 @@ function HostDashboard() {
 
                   {/* Mobile Left / Desktop Top: Bid Amount */}
                   <div className="flex flex-col items-start md:items-center w-5/12 md:w-full">
-                    <div className="text-blue-900/60 md:text-blue-900/40 text-[10px] md:text-lg lg:text-xl font-black tracking-[0.2em] md:tracking-[0.5em] uppercase md:mb-2 text-left md:text-center">Current Bid</div>
+                    <div className="text-blue-900/60 md:text-blue-900/40 text-[10px] md:text-lg lg:text-xl xl:text-2xl font-black tracking-[0.2em] md:tracking-[0.5em] uppercase md:mb-2 text-left md:text-center">Current Bid</div>
                     <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-left md:text-center w-full break-words
-                      ${currentBid.toString().length > 7 ? 'text-xl md:text-3xl lg:text-5xl' : (currentBid.toString().length > 5 ? 'text-2xl md:text-4xl lg:text-5xl' : 'text-3xl md:text-5xl lg:text-6xl')}
+                      ${currentBid.toString().length > 7 ? 'text-xl md:text-3xl lg:text-5xl xl:text-6xl' : (currentBid.toString().length > 5 ? 'text-2xl md:text-4xl lg:text-6xl xl:text-7xl' : 'text-3xl md:text-5xl lg:text-7xl xl:text-8xl')}
                       ${bidFlash ? 'scale-110' : ''}
                     `}>
                       ₹{formatIndianNumber(currentBid)}
@@ -446,17 +461,24 @@ function HostDashboard() {
                   <div className="flex flex-col items-end md:items-center w-7/12 md:w-auto animate-bounce-slow md:px-4">
                     {highestBid ? (
                       <>
-                        <div className="text-blue-900/60 text-[9px] md:text-xs lg:text-sm font-black uppercase tracking-[0.2em] md:tracking-[0.4em] mb-1 md:mb-4 text-right md:text-center">Leading Team</div>
-                        <div className="bg-blue-900 text-yellow-400 w-full px-3 py-2 md:px-6 md:py-4 lg:py-6 rounded-xl md:rounded-[2rem] shadow-xl md:shadow-2xl border-2 md:border-4 border-white/20 flex flex-col items-center justify-center text-center gap-1 md:gap-2">
+                        <div className="text-blue-900/60 text-[9px] md:text-xs lg:text-sm xl:text-base font-black uppercase tracking-[0.2em] md:tracking-[0.4em] mb-1 md:mb-4 text-right md:text-center">Leading Team</div>
+                        <div className="bg-blue-900 text-yellow-400 w-full px-3 py-2 md:px-6 md:py-4 lg:py-6 xl:py-8 rounded-xl md:rounded-[2rem] shadow-xl md:shadow-2xl border-2 md:border-4 border-white/20 flex flex-col md:flex-row items-center justify-center text-center md:text-left gap-2 md:gap-4 lg:gap-6">
+                          {(() => {
+                            const wTeam = teams.find(t => t.name === highestBid.team_name);
+                            if (wTeam && wTeam.logo) {
+                              return <img src={getImageUrl(wTeam.logo)} alt={wTeam.name} className="w-8 h-8 md:w-16 md:h-16 lg:w-20 lg:h-20 xl:w-24 xl:h-24 rounded-full object-cover border-2 border-white/20 shadow-lg drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] shrink-0" onError={(e) => { e.target.style.display = 'none'; }} />;
+                            }
+                            return null;
+                          })()}
                           <span className={`font-black leading-tight break-words w-full truncate md:overflow-visible md:whitespace-normal
-                            ${highestBid.team_name.length > 15 ? 'text-sm md:text-xl lg:text-2xl' : 'text-base md:text-2xl lg:text-4xl'}
+                            ${highestBid.team_name.length > 15 ? 'text-sm md:text-xl lg:text-3xl xl:text-4xl' : 'text-base md:text-2xl lg:text-4xl xl:text-5xl'}
                           `}>
                             {highestBid.team_name}
                           </span>
                         </div>
                       </>
                     ) : (
-                      <div className="text-blue-900/50 font-black italic text-sm md:text-2xl lg:text-3xl animate-pulse uppercase tracking-[0.1em] md:tracking-[0.2em] text-right md:text-center w-full">
+                      <div className="text-blue-900/50 font-black italic text-sm md:text-2xl lg:text-3xl xl:text-4xl animate-pulse uppercase tracking-[0.1em] md:tracking-[0.2em] text-right md:text-center w-full">
                         Awaiting Bid...
                       </div>
                     )}
@@ -510,27 +532,31 @@ function HostDashboard() {
             {/* Panel */}
             <div className="relative w-full h-full max-w-7xl bg-gradient-to-b from-gray-900/98 via-gray-900/95 to-black/98 backdrop-blur-3xl border border-white/20 shadow-2xl flex flex-col animate-slide-in-right rounded-3xl overflow-hidden">
               {/* Panel Header */}
-              <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-gradient-to-r from-yellow-400/5 to-transparent shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-yellow-400/10 rounded-xl border border-yellow-400/20">
-                    <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <div className="flex items-center justify-between px-6 md:px-10 py-5 md:py-8 border-b border-white/10 bg-gradient-to-r from-yellow-400/10 via-yellow-400/5 to-transparent shrink-0 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 to-transparent"></div>
+                <div className="flex items-center gap-4 md:gap-6 relative z-10">
+                  <div className="p-3 md:p-4 bg-yellow-400/20 rounded-xl md:rounded-2xl border border-yellow-400/30 shadow-[0_0_20px_rgba(250,204,21,0.2)]">
+                    <svg className="w-6 h-6 md:w-8 md:h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <h2 className="text-white font-black text-xl tracking-tight">Team Purses</h2>
+                  <div>
+                    <h2 className="text-white font-black text-2xl md:text-4xl tracking-tighter drop-shadow-lg">TEAM PURSES</h2>
+                    <p className="text-yellow-400/80 text-xs md:text-sm font-bold uppercase tracking-[0.3em] mt-1">Live Budget Tracking</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowTeamPurses(false)}
-                  className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+                  className="p-3 hover:bg-white/10 rounded-2xl transition-all hover:scale-110 active:scale-95 bg-white/5 border border-white/10 relative z-10"
                 >
-                  <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  <svg className="w-6 h-6 md:w-8 md:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
 
               {/* Team Cards */}
-              <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-3 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-4 md:content-start scrollbar-none">
+              <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 space-y-4 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 md:gap-6 lg:gap-8 md:content-start scrollbar-none">
                 {teamPurses.length > 0 ? (
                   teamPurses.map((team, index) => {
                     const budgetPercent = team.budget && team.totalSpent !== undefined
@@ -539,40 +565,40 @@ function HostDashboard() {
                     return (
                       <div
                         key={team.id}
-                        className="bg-white/5 rounded-2xl border border-white/10 p-4 hover:bg-white/8 transition-all group"
+                        className="bg-white/5 rounded-2xl md:rounded-3xl border border-white/10 p-4 md:p-6 lg:p-8 hover:bg-white/10 transition-all group hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(255,255,255,0.05)]"
                         style={{ animationDelay: `${index * 60}ms` }}
                       >
-                        <div className="flex items-center gap-3 mb-3">
+                        <div className="flex items-center gap-3 md:gap-5 mb-4 md:mb-6">
                           {team.logo ? (
                             <img
                               src={getImageUrl(team.logo)}
                               alt={team.name}
-                              className="w-10 h-10 rounded-full object-cover border-2 border-white/20 group-hover:border-yellow-400/40 transition-colors"
+                              className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 rounded-full object-cover border-2 md:border-4 border-white/20 group-hover:border-yellow-400/60 transition-colors shadow-lg"
                               onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=' + team.name.charAt(0); }}
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400/20 to-orange-400/20 border-2 border-white/20 flex items-center justify-center text-white font-black text-sm">
+                            <div className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 rounded-full bg-gradient-to-br from-yellow-400/20 to-orange-400/20 border-2 md:border-4 border-white/20 flex items-center justify-center text-white font-black text-lg md:text-2xl shadow-lg">
                               {team.name.charAt(0)}
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-white font-bold text-sm truncate">{team.name}</h3>
-                            <p className="text-white/40 text-xs">{team.playersBought || 0} players bought</p>
+                            <h3 className="text-white font-black text-base md:text-xl lg:text-2xl truncate drop-shadow-md">{team.name}</h3>
+                            <p className="text-white/60 text-sm md:text-base lg:text-lg font-medium mt-0.5 md:mt-1">{team.playersBought || 0} players bought</p>
                           </div>
                         </div>
 
                         {/* Budget Bar */}
-                        <div className="mb-2">
-                          <div className="flex items-baseline justify-between mb-1">
-                            <span className="text-white/50 text-[10px] font-bold uppercase tracking-widest">Remaining</span>
-                            <span className="text-yellow-400 font-black text-lg font-mono tracking-tight">₹{formatIndianNumber(team.budget || 0)}</span>
+                        <div className="mb-3 md:mb-4">
+                          <div className="flex items-baseline justify-between mb-1.5 md:mb-2 gap-2">
+                            <span className="text-white/50 text-xs md:text-sm font-bold uppercase tracking-[0.15em] shrink-0">Remaining</span>
+                            <span className="text-yellow-400 font-black text-base md:text-xl lg:text-2xl font-mono tracking-tighter drop-shadow-lg text-right whitespace-nowrap">₹{formatIndianNumber(team.budget || 0)}</span>
                           </div>
-                          <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div className="w-full h-2 md:h-3 bg-white/10 rounded-full overflow-hidden shadow-inner">
                             <div
-                              className={`h-full rounded-full transition-all duration-700 ${
-                                budgetPercent > 60 ? 'bg-gradient-to-r from-green-400 to-emerald-500' :
-                                budgetPercent > 30 ? 'bg-gradient-to-r from-yellow-400 to-orange-500' :
-                                'bg-gradient-to-r from-red-400 to-rose-600'
+                              className={`h-full rounded-full transition-all duration-700 shadow-[0_0_10px_currentColor] ${
+                                budgetPercent > 60 ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-emerald-500' :
+                                budgetPercent > 30 ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-yellow-500' :
+                                'bg-gradient-to-r from-red-400 to-rose-600 text-rose-500'
                               }`}
                               style={{ width: `${budgetPercent}%` }}
                             ></div>
@@ -580,9 +606,9 @@ function HostDashboard() {
                         </div>
 
                         {team.totalSpent > 0 && (
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-white/30">Total Spent</span>
-                            <span className="text-rose-400/70 font-mono font-semibold">₹{formatIndianNumber(team.totalSpent)}</span>
+                          <div className="flex items-center justify-between text-xs md:text-sm lg:text-base mt-4 md:mt-6 pt-3 md:pt-4 border-t border-white/10">
+                            <span className="text-white/40 font-bold uppercase tracking-wider">Total Spent</span>
+                            <span className="text-rose-400/90 font-mono font-black tracking-tight text-sm md:text-lg lg:text-xl">₹{formatIndianNumber(team.totalSpent)}</span>
                           </div>
                         )}
                       </div>
@@ -690,14 +716,17 @@ function HostDashboard() {
         )}
       </div>
 
-      {/* Silent Image Preloader for Main Images */}
-      {/* We are preloading ALL unsold main images here so the browser caches them during random selection */}
+      {/* Silent Image Preloader for Main Images and Logos */}
+      {/* We are preloading ALL unsold main images and team logos here so the browser caches them during random selection */}
       <div style={{ display: 'none' }}>
         {currentPlayer && currentPlayer.image && (
           <link rel="preload" as="image" href={getImageUrl(currentPlayer.image)} />
         )}
         {unsoldPlayers.map((p) => (
-          p.image && <link key={p.id} rel="preload" as="image" href={getImageUrl(p.image)} />
+          p.image && <link key={`player-${p.id}`} rel="preload" as="image" href={getImageUrl(p.image)} />
+        ))}
+        {teams.map((t) => (
+          t.logo && <link key={`team-${t.id}`} rel="preload" as="image" href={getImageUrl(t.logo)} />
         ))}
       </div>
 
@@ -733,16 +762,37 @@ function HostDashboard() {
           </div>
 
           {/* SOLD Stamp */}
-          <div className="sold-stamp relative flex flex-col items-center gap-4">
-            <div className="text-6xl md:text-8xl lg:text-[10rem] sold-gavel">🔨</div>
-            <div className="bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-500 text-blue-900 font-black text-5xl md:text-8xl lg:text-9xl px-8 md:px-16 py-3 md:py-6 rounded-2xl md:rounded-3xl border-4 md:border-8 border-white shadow-[0_0_80px_rgba(250,204,21,0.6)] tracking-wider uppercase">
+          <div className="sold-stamp relative flex flex-col items-center gap-4 md:gap-6 z-10 w-11/12 max-w-4xl">
+            <div className="text-6xl md:text-8xl lg:text-[10rem] sold-gavel drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]">🔨</div>
+            
+            <div className="bg-gradient-to-r from-yellow-400 via-yellow-300 to-yellow-500 text-blue-900 font-black text-5xl md:text-8xl lg:text-9xl px-8 md:px-16 py-3 md:py-6 rounded-2xl md:rounded-3xl border-4 md:border-8 border-white shadow-[0_0_80px_rgba(250,204,21,0.6)] tracking-wider uppercase text-center flex flex-col items-center">
               SOLD!
             </div>
-            {soldAnimation.price > 0 && (
-              <div className="text-white text-2xl md:text-5xl font-black font-mono tracking-tight drop-shadow-2xl mt-2 sold-price">
-                ₹{formatIndianNumber(soldAnimation.price)}
+            
+            {/* Player details pop */}
+            <div className="sold-player-details flex flex-col items-center bg-black/50 backdrop-blur-md px-6 md:px-12 py-4 md:py-8 rounded-3xl border border-white/20 shadow-2xl mt-2 md:mt-4 text-center">
+              <h3 className="text-white text-3xl md:text-5xl lg:text-6xl font-black drop-shadow-lg mb-2">{soldAnimation.playerName}</h3>
+              
+              <div className="flex items-center gap-4 my-2 md:my-4">
+                <span className="text-white/60 text-lg md:text-2xl font-bold uppercase tracking-widest">TO</span>
               </div>
-            )}
+              
+              <div className="flex items-center gap-3 md:gap-6">
+                {soldAnimation.teamLogo && (
+                  <img src={getImageUrl(soldAnimation.teamLogo)} alt="Team" className="w-12 h-12 md:w-20 md:h-20 lg:w-24 lg:h-24 rounded-full object-cover border-4 border-white/20 shadow-[0_0_30px_rgba(255,255,255,0.2)]" />
+                )}
+                <span className="text-yellow-400 text-3xl md:text-5xl lg:text-7xl font-black drop-shadow-2xl">{soldAnimation.teamName || 'A TEAM'}</span>
+              </div>
+              
+              {soldAnimation.price > 0 && (
+                <div className="mt-6 md:mt-10 bg-white/10 px-8 py-3 rounded-full border border-white/30">
+                  <span className="text-white/80 text-sm md:text-xl font-bold uppercase tracking-widest mr-4">For</span>
+                  <span className="text-white text-4xl md:text-6xl lg:text-7xl font-black font-mono tracking-tight drop-shadow-2xl text-rose-400">
+                    ₹{formatIndianNumber(soldAnimation.price)}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
