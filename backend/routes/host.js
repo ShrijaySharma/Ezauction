@@ -157,6 +157,22 @@ router.get('/current-bids', async (req, res) => {
   }
 });
 
+// Get all teams (id, name, logo — used for logo lookups on host dashboard)
+router.get('/teams', async (req, res) => {
+  try {
+    const { data: teams, error } = await supabase
+      .from('teams')
+      .select('id, name, logo')
+      .order('name');
+
+    if (error) throw error;
+    res.json(teams || []);
+  } catch (err) {
+    console.error('Error fetching teams for host:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Get team budgets (for host view)
 router.get('/team-budgets', async (req, res) => {
   try {

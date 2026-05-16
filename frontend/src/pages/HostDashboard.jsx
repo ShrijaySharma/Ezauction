@@ -189,19 +189,26 @@ function HostDashboard() {
     newSocket.on('player-marked', (data) => {
       console.log('[Socket:Host] player-marked', data);
       if (data.status === 'SOLD') {
-        let winningTeam = null;
-        if (data.soldToTeam) {
-          // soldToTeam might be ID or name, we check both
-          winningTeam = teamsRef.current.find(t => t.id === data.soldToTeam || t.name === data.soldToTeam);
+        // Backend now sends soldToTeamName and soldToTeamLogo directly
+        // Fallback to local lookup if not present (backward compat)
+        let teamName = data.soldToTeamName || '';
+        let teamLogo = data.soldToTeamLogo || null;
+        
+        if (!teamName && data.soldToTeam) {
+          const winningTeam = teamsRef.current.find(t => t.id === data.soldToTeam || t.name === data.soldToTeam);
+          if (winningTeam) {
+            teamName = winningTeam.name;
+            teamLogo = winningTeam.logo;
+          }
         }
         
         setSoldAnimation({
           playerName: currentPlayerRef.current?.name || 'Player',
-          teamName: winningTeam ? winningTeam.name : (data.soldToTeam || ''),
-          teamLogo: winningTeam ? winningTeam.logo : null,
+          teamName: teamName,
+          teamLogo: teamLogo,
           price: data.soldPrice || 0
         });
-        setTimeout(() => setSoldAnimation(null), 3000);
+        setTimeout(() => setSoldAnimation(null), 4000);
       }
     });
 
@@ -808,11 +815,11 @@ function HostDashboard() {
         .scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
         /* ===== SOLD CELEBRATION ANIMATIONS ===== */
-        .sold-overlay { animation: sold-overlay-lifecycle 2.5s ease-out forwards; }
+        .sold-overlay { animation: sold-overlay-lifecycle 3.8s ease-out forwards; }
         @keyframes sold-overlay-lifecycle {
           0% { opacity: 0; }
-          8% { opacity: 1; }
-          75% { opacity: 1; }
+          5% { opacity: 1; }
+          80% { opacity: 1; }
           100% { opacity: 0; }
         }
         .sold-backdrop { animation: sold-flash 0.3s ease-out; }
@@ -845,6 +852,13 @@ function HostDashboard() {
         @keyframes price-pop {
           0% { transform: scale(0) translateY(20px); opacity: 0; }
           100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .sold-player-details {
+          animation: details-slide-up 0.5s 0.4s cubic-bezier(0.23, 1, 0.32, 1) both;
+        }
+        @keyframes details-slide-up {
+          0% { transform: translateY(30px); opacity: 0; }
+          100% { transform: translateY(0); opacity: 1; }
         }
         .confetti-particle {
           position: absolute;

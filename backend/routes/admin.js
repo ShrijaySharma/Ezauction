@@ -694,10 +694,10 @@ router.post('/mark-player', async (req, res) => {
         return res.status(400).json({ error: 'No team selected for sale' });
       }
 
-      // 3. Check team budget
+      // 3. Check team budget (also fetch name + logo for the socket emit)
       const { data: team, error: teamError } = await supabase
         .from('teams')
-        .select('budget')
+        .select('budget, name, logo')
         .eq('id', finalSoldToTeam)
         .single();
 
@@ -731,7 +731,7 @@ router.post('/mark-player', async (req, res) => {
 
       if (updatePlayerError) throw updatePlayerError;
 
-      io.emit('player-marked', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam });
+      io.emit('player-marked', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam, soldToTeamName: team.name, soldToTeamLogo: team.logo });
       io.emit('team-budget-updated', { teamId: finalSoldToTeam, newBudget });
 
     } else {
