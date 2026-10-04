@@ -1345,63 +1345,7 @@ router.post('/players-bulk-with-photos',
         }
       }
 
-      // 3. Process images and upload to Supabase
-      for (let i = 0; i < validPlayers.length; i++) {
-        if (i < imageBuffers.length) {
-          try {
-            const imgData = imageBuffers[i];
-            const playerName = validPlayers[i].name
-              .toLowerCase()
-              .replace(/[^a-z0-9]+/g, '_')
-              .replace(/^_+|_+$/g, '');
-            const uniqueId = Date.now().toString() + '_' + i;
-            const mainFilename = `main/${uniqueId}_${playerName}.webp`;
-            const thumbFilename = `thumb/${uniqueId}_${playerName}.webp`;
-
-            // Process main image (800x1000, WebP, 75 quality)
-            const mainBuffer = await sharp(imgData.buffer)
-              .resize(800, 1000, { fit: 'cover' })
-              .webp({ quality: 75 })
-              .toBuffer();
-
-            // Process thumbnail (400x500, WebP, 70 quality)
-            const thumbBuffer = await sharp(imgData.buffer)
-              .resize(400, 500, { fit: 'cover' })
-              .webp({ quality: 70 })
-              .toBuffer();
-
-            // Upload main image
-            const mainBase64 = mainBuffer.toString('base64');
-            const mainArrayBuffer = decode(mainBase64);
-            const { error: mainError } = await supabase.storage
-              .from('auction-images')
-              .upload(mainFilename, mainArrayBuffer, { contentType: 'image/webp', upsert: true });
-            if (mainError) throw mainError;
-
-            // Upload thumbnail
-            const thumbBase64 = thumbBuffer.toString('base64');
-            const thumbArrayBuffer = decode(thumbBase64);
-            const { error: thumbError } = await supabase.storage
-              .from('auction-images')
-              .upload(thumbFilename, thumbArrayBuffer, { contentType: 'image/webp', upsert: true });
-            if (thumbError) throw thumbError;
-
-            // Get public URLs
-            const { data: mainUrlData } = supabase.storage.from('auction-images').getPublicUrl(mainFilename);
-            const { data: thumbUrlData } = supabase.storage.from('auction-images').getPublicUrl(thumbFilename);
-
-            validPlayers[i].image = mainUrlData.publicUrl;
-            validPlayers[i].thumb_url = thumbUrlData.publicUrl;
-
-            console.log(`Uploaded image for ${validPlayers[i].name}`);
-          } catch (imgErr) {
-            console.error(`Error processing image for player ${validPlayers[i].name}:`, imgErr);
-            // Continue without image for this player
-          }
-        }
-      }
-
-      // 4. Bulk insert all players
+      // 3. Bulk insert all players first to get IDs and avoid timeouts
       const { data: inserted, error: insertError } = await supabase
         .from('players')
         .insert(validPlayers)
@@ -1409,16 +1353,88 @@ router.post('/players-bulk-with-photos',
 
       if (insertError) throw insertError;
 
-      console.log(`Bulk added ${inserted.length} players with photos`);
+      console.log(`Bulk added ${inserted.length} players without photos initially`);
       io.emit('player-added', { count: inserted.length });
 
+      // Return success response IMMEDIATELY to prevent timeout
       res.json({
         success: true,
         count: inserted.length,
         totalProcessed: playerRows.length,
         photosMatched: Math.min(imageBuffers.length, validPlayers.length),
-        errors: errors.length > 0 ? errors : undefined
+        errors: errors.length > 0 ? errors : undefined,
+        message: 'Players inserted. Photos are being processed in the background.'
       });
+
+      // 4. Process images and update to Supabase in the background
+      (async () => {
+        try {
+          for (let i = 0; i < inserted.length; i++) {
+            if (i < imageBuffers.length) {
+              try {
+                const player = inserted[i];
+                const imgData = imageBuffers[i];
+                const playerName = player.name
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '_')
+                  .replace(/^_+|_+$/g, '');
+                const uniqueId = Date.now().toString() + '_' + player.id;
+                const mainFilename = `main/${uniqueId}_${playerName}.webp`;
+                const thumbFilename = `thumb/${uniqueId}_${playerName}.webp`;
+
+                // Process main image (800x1000, WebP, 75 quality)
+                const mainBuffer = await sharp(imgData.buffer)
+                  .resize(800, 1000, { fit: 'cover' })
+                  .webp({ quality: 75 })
+                  .toBuffer();
+
+                // Process thumbnail (400x500, WebP, 70 quality)
+                const thumbBuffer = await sharp(imgData.buffer)
+                  .resize(400, 500, { fit: 'cover' })
+                  .webp({ quality: 70 })
+                  .toBuffer();
+
+                // Upload main image
+                const mainBase64 = mainBuffer.toString('base64');
+                const mainArrayBuffer = decode(mainBase64);
+                const { error: mainError } = await supabase.storage
+                  .from('auction-images')
+                  .upload(mainFilename, mainArrayBuffer, { contentType: 'image/webp', upsert: true });
+                if (mainError) throw mainError;
+
+                // Upload thumbnail
+                const thumbBase64 = thumbBuffer.toString('base64');
+                const thumbArrayBuffer = decode(thumbBase64);
+                const { error: thumbError } = await supabase.storage
+                  .from('auction-images')
+                  .upload(thumbFilename, thumbArrayBuffer, { contentType: 'image/webp', upsert: true });
+                if (thumbError) throw thumbError;
+
+                // Get public URLs
+                const { data: mainUrlData } = supabase.storage.from('auction-images').getPublicUrl(mainFilename);
+                const { data: thumbUrlData } = supabase.storage.from('auction-images').getPublicUrl(thumbFilename);
+
+                // Update player in database
+                await supabase
+                  .from('players')
+                  .update({
+                    image: mainUrlData.publicUrl,
+                    thumb_url: thumbUrlData.publicUrl
+                  })
+                  .eq('id', player.id);
+
+                console.log(`Uploaded and linked image for ${player.name}`);
+              } catch (imgErr) {
+                console.error(`Error processing background image for player ${inserted[i].name}:`, imgErr);
+              }
+            }
+          }
+          console.log(`Finished processing all background images for ${inserted.length} players`);
+          io.emit('photos-processed', { count: inserted.length });
+        } catch (bgErr) {
+          console.error('Fatal error in background photo processing:', bgErr);
+        }
+      })();
 
     } catch (err) {
       console.error('Error in bulk import with photos:', err);
