@@ -1,6 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
 import fs from 'fs';
+import os from 'os';
 import { decode } from 'base64-arraybuffer';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import upload from '../middleware/upload.js';
@@ -1313,8 +1314,6 @@ router.post('/players-bulk-with-photos',
 
       if (photoZipArr && photoZipArr.length > 0) {
         try {
-          const fs = require('fs');
-          const os = require('os');
           extractDir = path.join(os.tmpdir(), `upload_${Date.now()}`);
           fs.mkdirSync(extractDir, { recursive: true });
 
@@ -1378,7 +1377,6 @@ router.post('/players-bulk-with-photos',
       // 4. Process images from disk and update to Supabase in the background
       (async () => {
         try {
-          const fs = require('fs');
           // Disable sharp cache to prevent libvips from hoarding memory
           sharp.cache(false);
 
