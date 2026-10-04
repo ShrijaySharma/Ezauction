@@ -1308,7 +1308,7 @@ router.post('/players-bulk-with-photos',
 
       // 2. Extract photos from ZIP if provided
       const photoZipArr = req.files['photoZip'];
-      let imageBuffers = []; // Array of { buffer, ext }
+      let imageEntries = []; // Array of AdmZip entries
 
       if (photoZipArr && photoZipArr.length > 0) {
         try {
@@ -1316,7 +1316,7 @@ router.post('/players-bulk-with-photos',
           const entries = zip.getEntries();
 
           // Filter only image files, ignore directories and __MACOSX
-          const imageEntries = entries.filter(entry => {
+          imageEntries = entries.filter(entry => {
             if (entry.isDirectory) return false;
             const name = entry.entryName.toLowerCase();
             if (name.startsWith('__macosx') || name.startsWith('.')) return false;
@@ -1330,17 +1330,9 @@ router.post('/players-bulk-with-photos',
             return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
           });
 
-          for (const entry of imageEntries) {
-            const ext = path.extname(entry.entryName).toLowerCase();
-            imageBuffers.push({
-              buffer: entry.getData(),
-              ext: ext
-            });
-          }
-
-          console.log(`Extracted ${imageBuffers.length} images from ZIP for ${validPlayers.length} players`);
+          console.log(`Found ${imageEntries.length} images from ZIP for ${validPlayers.length} players`);
         } catch (zipErr) {
-          console.error('Error extracting ZIP:', zipErr);
+          console.error('Error parsing ZIP:', zipErr);
           return res.status(400).json({ error: 'Failed to extract photos.zip: ' + zipErr.message });
         }
       }
@@ -1361,19 +1353,21 @@ router.post('/players-bulk-with-photos',
         success: true,
         count: inserted.length,
         totalProcessed: playerRows.length,
-        photosMatched: Math.min(imageBuffers.length, validPlayers.length),
+        photosMatched: Math.min(imageEntries.length, validPlayers.length),
         errors: errors.length > 0 ? errors : undefined,
-        message: 'Players inserted. Photos are being processed in the background.'
+        message: 'Players inserted. Photos are being processed in the background to prevent memory limits.'
       });
 
-      // 4. Process images and update to Supabase in the background
+      // 4. Process images and update to Supabase in the background sequentially to save memory
       (async () => {
         try {
           for (let i = 0; i < inserted.length; i++) {
-            if (i < imageBuffers.length) {
+            if (i < imageEntries.length) {
               try {
                 const player = inserted[i];
-                const imgData = imageBuffers[i];
+                // Get buffer just for this one image, allowing GC to clean up previous iterations
+                const imgDataBuffer = imageEntries[i].getData(); 
+                
                 const playerName = player.name
                   .toLowerCase()
                   .replace(/[^a-z0-9]+/g, '_')
@@ -1383,13 +1377,13 @@ router.post('/players-bulk-with-photos',
                 const thumbFilename = `thumb/${uniqueId}_${playerName}.webp`;
 
                 // Process main image (800x1000, WebP, 75 quality)
-                const mainBuffer = await sharp(imgData.buffer)
+                const mainBuffer = await sharp(imgDataBuffer)
                   .resize(800, 1000, { fit: 'cover' })
                   .webp({ quality: 75 })
                   .toBuffer();
 
                 // Process thumbnail (400x500, WebP, 70 quality)
-                const thumbBuffer = await sharp(imgData.buffer)
+                const thumbBuffer = await sharp(imgDataBuffer)
                   .resize(400, 500, { fit: 'cover' })
                   .webp({ quality: 70 })
                   .toBuffer();
