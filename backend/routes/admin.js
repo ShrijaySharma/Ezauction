@@ -1306,17 +1306,23 @@ router.post('/players-bulk-with-photos',
         return res.status(400).json({ error: 'No valid players found', detailedErrors: errors });
       }
 
-      // 2. Extract photos from ZIP if provided
+      // 2. Extract photos from ZIP to disk if provided
       const photoZipArr = req.files['photoZip'];
-      let imageEntries = []; // Array of AdmZip entries
+      let imagePaths = []; // Array of temp disk paths
+      let extractDir = null;
 
       if (photoZipArr && photoZipArr.length > 0) {
         try {
+          const fs = require('fs');
+          const os = require('os');
+          extractDir = path.join(os.tmpdir(), `upload_${Date.now()}`);
+          fs.mkdirSync(extractDir, { recursive: true });
+
           const zip = new AdmZip(photoZipArr[0].buffer);
           const entries = zip.getEntries();
 
           // Filter only image files, ignore directories and __MACOSX
-          imageEntries = entries.filter(entry => {
+          let validEntries = entries.filter(entry => {
             if (entry.isDirectory) return false;
             const name = entry.entryName.toLowerCase();
             if (name.startsWith('__macosx') || name.startsWith('.')) return false;
@@ -1324,13 +1330,24 @@ router.post('/players-bulk-with-photos',
           });
 
           // Sort alphabetically/naturally to establish sequence order
-          imageEntries.sort((a, b) => {
+          validEntries.sort((a, b) => {
             const nameA = a.entryName.split('/').pop();
             const nameB = b.entryName.split('/').pop();
             return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
           });
 
-          console.log(`Found ${imageEntries.length} images from ZIP for ${validPlayers.length} players`);
+          // Extract just these entries to disk
+          for (let i = 0; i < validEntries.length; i++) {
+            const entry = validEntries[i];
+            const ext = path.extname(entry.entryName).toLowerCase();
+            const diskPath = path.join(extractDir, `img_${i}${ext}`);
+            fs.writeFileSync(diskPath, entry.getData());
+            imagePaths.push(diskPath);
+            // Help GC by removing the uncompressed buffer from AdmZip cache
+            entry.setData(null);
+          }
+
+          console.log(`Found and extracted ${imagePaths.length} images to disk for ${validPlayers.length} players`);
         } catch (zipErr) {
           console.error('Error parsing ZIP:', zipErr);
           return res.status(400).json({ error: 'Failed to extract photos.zip: ' + zipErr.message });
@@ -1353,20 +1370,23 @@ router.post('/players-bulk-with-photos',
         success: true,
         count: inserted.length,
         totalProcessed: playerRows.length,
-        photosMatched: Math.min(imageEntries.length, validPlayers.length),
+        photosMatched: Math.min(imagePaths.length, validPlayers.length),
         errors: errors.length > 0 ? errors : undefined,
-        message: 'Players inserted. Photos are being processed in the background to prevent memory limits.'
+        message: 'Players inserted. Photos are being processed in the background.'
       });
 
-      // 4. Process images and update to Supabase in the background sequentially to save memory
+      // 4. Process images from disk and update to Supabase in the background
       (async () => {
         try {
+          const fs = require('fs');
+          // Disable sharp cache to prevent libvips from hoarding memory
+          sharp.cache(false);
+
           for (let i = 0; i < inserted.length; i++) {
-            if (i < imageEntries.length) {
+            if (i < imagePaths.length) {
               try {
                 const player = inserted[i];
-                // Get buffer just for this one image, allowing GC to clean up previous iterations
-                const imgDataBuffer = imageEntries[i].getData(); 
+                const diskPath = imagePaths[i];
                 
                 const playerName = player.name
                   .toLowerCase()
@@ -1377,13 +1397,13 @@ router.post('/players-bulk-with-photos',
                 const thumbFilename = `thumb/${uniqueId}_${playerName}.webp`;
 
                 // Process main image (800x1000, WebP, 75 quality)
-                const mainBuffer = await sharp(imgDataBuffer)
+                const mainBuffer = await sharp(diskPath)
                   .resize(800, 1000, { fit: 'cover' })
                   .webp({ quality: 75 })
                   .toBuffer();
 
                 // Process thumbnail (400x500, WebP, 70 quality)
-                const thumbBuffer = await sharp(imgDataBuffer)
+                const thumbBuffer = await sharp(diskPath)
                   .resize(400, 500, { fit: 'cover' })
                   .webp({ quality: 70 })
                   .toBuffer();
@@ -1423,8 +1443,14 @@ router.post('/players-bulk-with-photos',
               }
             }
           }
+          
           console.log(`Finished processing all background images for ${inserted.length} players`);
           io.emit('photos-processed', { count: inserted.length });
+          
+          // Cleanup tmp files
+          if (extractDir) {
+            fs.rmSync(extractDir, { recursive: true, force: true });
+          }
         } catch (bgErr) {
           console.error('Fatal error in background photo processing:', bgErr);
         }
