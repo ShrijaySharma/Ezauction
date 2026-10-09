@@ -13,7 +13,8 @@ function Overlay() {
     const [leadingTeam, setLeadingTeam] = useState(null);
 
     useEffect(() => {
-        // Add class to body to allow transparency
+        // Force the body background to be transparent by overriding inline style
+        document.body.style.setProperty('background', 'transparent', 'important');
         document.body.classList.add('bg-transparent');
 
         // Connect to the server with WebSocket-only transport
@@ -90,6 +91,7 @@ function Overlay() {
 
         return () => {
             newSocket.close();
+            document.body.style.removeProperty('background');
             document.body.classList.remove('bg-transparent');
         };
     }, []); // Removed currentPlayer dependency to prevent socket reconnection cycles
@@ -106,7 +108,7 @@ function Overlay() {
 
     if (!currentPlayer) {
         return (
-            <div className="h-screen w-screen flex items-center justify-center bg-black/80">
+            <div className="h-screen w-screen flex items-center justify-center bg-transparent">
                 <div className="text-white text-4xl font-bold uppercase tracking-widest animate-pulse">
                     Waiting for Auction...
                 </div>
