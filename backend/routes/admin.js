@@ -28,6 +28,7 @@ function getAuctionIo(req) {
   return {
     emit: (event, ...args) => {
       baseIo.of(`/auction/${auctionId}`).emit(event, ...args);
+      baseIo.emit(event, ...args);
     }
   };
 }
@@ -2123,14 +2124,10 @@ router.post('/admin-bid', async (req, res) => {
     if (state.status !== 'LIVE') return res.status(400).json({ error: 'Auction is not live' });
     if (!state.current_player_id) return res.status(400).json({ error: 'No player is currently being auctioned' });
 
-    // 2. Get current highest bid
-    const { data: currentHighest } = await supabase
-      .from('bids')
-      .select('*')
-      .eq('player_id', state.current_player_id)
-      .order('amount', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // 2. Get current highest bid scoped to auction
+    let bidQ = supabase.from('bids').select('*').eq('player_id', state.current_player_id).order('amount', { ascending: false }).limit(1);
+    if (auctionId) bidQ = bidQ.eq('auction_id', auctionId);
+    const { data: currentHighest } = await bidQ.maybeSingle();
 
     // 3. Get player info
     const { data: player } = await supabase.from('players').select('base_price').eq('id', state.current_player_id).single();
@@ -2184,6 +2181,7 @@ router.post('/admin-bid', async (req, res) => {
     const { data: newBid, error: bidError } = await supabase
       .from('bids')
       .insert([{
+        auction_id: auctionId,
         player_id: state.current_player_id,
         team_id: teamId,
         amount: amount,
@@ -2533,7 +2531,8 @@ router.post('/admin-bid-v2', async (req, res) => {
     }
 
     // 5. Track in memory only (do NOT insert into bids table — team_id NOT NULL constraint)
-    setAdminAnonymousBid(newBidAmount, state.current_player_id);
+    const auctionId = getAuctionId(req);
+    setAdminAnonymousBid(auctionId, newBidAmount, state.current_player_id);
 
     // 6. Emit with blank team_name so no dashboard shows a team
     const bidToSend = {
@@ -2595,9 +2594,11 @@ router.post('/admin-assign-team', async (req, res) => {
     }
 
     // 4. Insert the REAL bid into DB with team_id
+    const auctionId = getAuctionId(req);
     const { data: newBid, error: bidError } = await supabase
       .from('bids')
       .insert([{
+        auction_id: auctionId,
         player_id: state.current_player_id,
         team_id: teamId,
         amount: anonBid.amount,
