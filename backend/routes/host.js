@@ -2,47 +2,52 @@ import express from 'express';
 import { supabase } from '../supabaseClient.js';
 import { getAuctionState, getAdminAnonymousBid } from '../auctionState.js';
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 
-// Host routes are now public — no auth required
-// All routes are read-only so this is safe
+function getAuctionId(req) {
+  return req.params.auctionId || req.headers['x-auction-id'] || null;
+}
 
-// Get current public state (player, bid, stats)
+// Host routes are public — no auth required
+
 // Get current public state (player, bid, stats)
 router.get('/current-info', async (req, res) => {
   try {
-    const state = getAuctionState();
+    const auctionId = getAuctionId(req);
+    const state = getAuctionState(auctionId);
 
-    // Default if not exists
     const status = state ? state.status : 'STOPPED';
     const currentPlayerId = state ? state.current_player_id : null;
     const biddingLocked = state ? state.bidding_locked === 1 : false;
 
-    // Prepare promises for parallel execution
-    // Always fetch stats
-    const promises = [
-      supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'SOLD'),
-      supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'UNSOLD'),
-      supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'AVAILABLE')
-    ];
+    // Build scoped stats queries
+    let qSold = supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'SOLD');
+    let qUnsold = supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'UNSOLD');
+    let qAvail = supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'AVAILABLE');
 
-    // If player active, fetch player and bid
-    if (currentPlayerId) {
-      promises.push(supabase.from('players').select('*').eq('id', currentPlayerId).single());
-      promises.push(
-        supabase.from('bids')
-          .select('*')
-          .eq('player_id', currentPlayerId)
-          .order('amount', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-      );
+    if (auctionId) {
+      qSold = qSold.eq('auction_id', auctionId);
+      qUnsold = qUnsold.eq('auction_id', auctionId);
+      qAvail = qAvail.eq('auction_id', auctionId);
     }
 
-    // Execute all
+    const promises = [qSold, qUnsold, qAvail];
+
+    if (currentPlayerId) {
+      let qPlayer = supabase.from('players').select('*').eq('id', currentPlayerId);
+      let qBid = supabase.from('bids').select('*').eq('player_id', currentPlayerId).order('amount', { ascending: false }).limit(1).maybeSingle();
+
+      if (auctionId) {
+        qPlayer = qPlayer.eq('auction_id', auctionId);
+        qBid = qBid.eq('auction_id', auctionId);
+      }
+
+      promises.push(qPlayer.single());
+      promises.push(qBid);
+    }
+
     const results = await Promise.all(promises);
 
-    // Stats results are always first 3
     const soldResult = results[0];
     const unsoldResult = results[1];
     const availableResult = results[2];
@@ -57,7 +62,6 @@ router.get('/current-info', async (req, res) => {
     let highestBid = null;
     let currentBid = 0;
 
-    // If we had player/bid promises
     if (currentPlayerId) {
       const playerResult = results[3];
       const bidResult = results[4];
@@ -71,7 +75,6 @@ router.get('/current-info', async (req, res) => {
 
       if (bidResult && bidResult.data) {
         const b = bidResult.data;
-        // Fetch team name separately (lightweight single lookup)
         const { data: bidTeam } = await supabase.from('teams').select('name').eq('id', b.team_id).maybeSingle();
 
         highestBid = {
@@ -82,9 +85,8 @@ router.get('/current-info', async (req, res) => {
         currentBid = b.amount;
       }
 
-      // ─── Admin Bidding 2.0: check in-memory anonymous bid ───
-      // Show the running anonymous bid amount on the host dashboard too
-      const anonBid = getAdminAnonymousBid();
+      // Check running anonymous bid
+      const anonBid = getAdminAnonymousBid(auctionId);
       if (anonBid.amount > 0 && anonBid.playerId === currentPlayerId) {
         if (anonBid.amount > currentBid) {
           highestBid = {
@@ -122,21 +124,24 @@ router.get('/current-info', async (req, res) => {
 // Get all bids for current player
 router.get('/current-bids', async (req, res) => {
   try {
-    const state = getAuctionState();
+    const auctionId = getAuctionId(req);
+    const state = getAuctionState(auctionId);
 
     if (!state || !state.current_player_id) {
       return res.json([]);
     }
 
-    const { data: bids, error } = await supabase
+    let query = supabase
       .from('bids')
       .select('*')
       .eq('player_id', state.current_player_id)
       .order('amount', { ascending: false });
 
+    if (auctionId) query = query.eq('auction_id', auctionId);
+
+    const { data: bids, error } = await query;
     if (error) throw error;
 
-    // Fetch team names manually
     const teamIds = [...new Set(bids.map(b => b.team_id))];
     const teamMap = {};
     if (teamIds.length > 0) {
@@ -157,14 +162,14 @@ router.get('/current-bids', async (req, res) => {
   }
 });
 
-// Get all teams (id, name, logo — used for logo lookups on host dashboard)
+// Get all teams
 router.get('/teams', async (req, res) => {
   try {
-    const { data: teams, error } = await supabase
-      .from('teams')
-      .select('id, name, logo')
-      .order('name');
+    const auctionId = getAuctionId(req);
+    let query = supabase.from('teams').select('id, name, logo').order('name');
+    if (auctionId) query = query.eq('auction_id', auctionId);
 
+    const { data: teams, error } = await query;
     if (error) throw error;
     res.json(teams || []);
   } catch (err) {
@@ -173,30 +178,34 @@ router.get('/teams', async (req, res) => {
   }
 });
 
-// Get team budgets (for host view)
+// Get team budgets
 router.get('/team-budgets', async (req, res) => {
   try {
-    const { data: teams, error } = await supabase
-      .from('teams')
-      .select('id, name, budget, logo')
-      .order('name');
+    const auctionId = getAuctionId(req);
+    let query = supabase.from('teams').select('id, name, budget, logo').order('name');
+    if (auctionId) query = query.eq('auction_id', auctionId);
 
+    const { data: teams, error } = await query;
     if (error) throw error;
-    res.json(teams);
+    res.json(teams || []);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Get all unsold/available players for caching images
+// Get all unsold/available players
 router.get('/unsold-players', async (req, res) => {
   try {
-    const { data: players, error } = await supabase
+    const auctionId = getAuctionId(req);
+    let query = supabase
       .from('players')
       .select('id, name, image')
       .in('status', ['AVAILABLE', 'UNSOLD'])
-      .order('id', { ascending: true }); // Simple stable order
+      .order('id', { ascending: true });
 
+    if (auctionId) query = query.eq('auction_id', auctionId);
+
+    const { data: players, error } = await query;
     if (error) throw error;
     res.json(players || []);
   } catch (err) {
@@ -205,26 +214,27 @@ router.get('/unsold-players', async (req, res) => {
   }
 });
 
-// Get team purses with players bought count (for host purse view)
+// Get team purses with players bought count
 router.get('/team-purses', async (req, res) => {
   try {
-    // Fetch teams
-    const { data: teams, error: teamsError } = await supabase
-      .from('teams')
-      .select('id, name, budget, logo')
-      .order('name');
+    const auctionId = getAuctionId(req);
+
+    let tQuery = supabase.from('teams').select('id, name, budget, logo').order('name');
+    let pQuery = supabase.from('players').select('sold_to_team, sold_price').eq('status', 'SOLD');
+
+    if (auctionId) {
+      tQuery = tQuery.eq('auction_id', auctionId);
+      pQuery = pQuery.eq('auction_id', auctionId);
+    }
+
+    const [{ data: teams, error: teamsError }, { data: soldPlayers, error: playersError }] = await Promise.all([
+      tQuery,
+      pQuery
+    ]);
 
     if (teamsError) throw teamsError;
-
-    // Fetch sold players grouped by team
-    const { data: soldPlayers, error: playersError } = await supabase
-      .from('players')
-      .select('sold_to_team, sold_price')
-      .eq('status', 'SOLD');
-
     if (playersError) throw playersError;
 
-    // Build team data with player counts and spend
     const teamData = (teams || []).map(team => {
       const teamPlayers = (soldPlayers || []).filter(p => p.sold_to_team === team.id);
       const totalSpent = teamPlayers.reduce((sum, p) => sum + (parseFloat(p.sold_price) || 0), 0);

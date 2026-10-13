@@ -80,6 +80,7 @@ function AdminDashboard({ user }) {
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
   const [showAdminBidding, setShowAdminBidding] = useState(false);
   const [customBidIncrement, setCustomBidIncrement] = useState(1000);
+  const [customBidIncrement2, setCustomBidIncrement2] = useState(2000);
   const [newBaseBidAmount, setNewBaseBidAmount] = useState(1000);
   const [adminBidTeamId, setAdminBidTeamId] = useState('');
 
@@ -924,25 +925,18 @@ function AdminDashboard({ user }) {
     }
   };
 
-  const handleAdminPlaceBid = async (teamId, type) => {
+  const handleAdminPlaceBid = async (teamId, type, incrementValue) => {
     if (!currentPlayer) return;
 
-    let useBasePrice = false;
     let bidAmount = 0;
-
-    const currentHighestAmount = highestBid ? highestBid.amount : 0;
 
     // Calculate new bid amount
     if (type === 'BASE') {
-      useBasePrice = true;
       bidAmount = currentPlayer.base_price;
     } else {
-      // Custom increment bid
-      // If no current bid, start from base_price + increment? Or just base_price?
-      // Usually "BID" means raising.
-      // If no bid exists yet, raising by increment means base_price + increment
+      // Use the explicitly passed increment value
       const startAmount = highestBid ? highestBid.amount : currentPlayer.base_price;
-      bidAmount = startAmount + parseInt(customBidIncrement);
+      bidAmount = startAmount + parseInt(incrementValue ?? customBidIncrement);
     }
 
     try {
@@ -2589,21 +2583,37 @@ function AdminDashboard({ user }) {
                 <span>⚡</span> Admin Bidding Console
               </h2>
               <div className="h-8 w-px bg-gray-600 mx-2"></div>
-              <div className="flex items-center gap-2">
-                <span className="text-gray-300 text-sm font-semibold">BID Increment:</span>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">₹</span>
-                  <input
-                    type="number"
-                    value={customBidIncrement}
-                    onChange={(e) => setCustomBidIncrement(e.target.value)}
-                    className="w-32 py-1.5 pl-7 pr-3 bg-gray-700 border border-gray-600 rounded text-white font-bold focus:ring-2 focus:ring-orange-500 outline-none"
-                  />
+              <div className="flex items-center gap-3">
+                <span className="text-gray-300 text-sm font-semibold shrink-0">BID Increments:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-emerald-400 text-xs font-bold">B1</span>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span>
+                    <input
+                      type="number"
+                      value={customBidIncrement}
+                      onChange={(e) => setCustomBidIncrement(e.target.value)}
+                      className="w-28 py-1.5 pl-6 pr-2 bg-gray-700 border border-emerald-600 rounded text-white font-bold focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="h-6 w-px bg-gray-600"></div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-blue-400 text-xs font-bold">B2</span>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span>
+                    <input
+                      type="number"
+                      value={customBidIncrement2}
+                      onChange={(e) => setCustomBidIncrement2(e.target.value)}
+                      className="w-28 py-1.5 pl-6 pr-2 bg-gray-700 border border-blue-600 rounded text-white font-bold focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {auctionState.status === 'LIVE' ? (
                 <div className="px-3 py-1 bg-green-600 text-white rounded font-bold animate-pulse">
                   LIVE
@@ -2615,10 +2625,20 @@ function AdminDashboard({ user }) {
               )}
 
               <button
-                onClick={handleUndoBid}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded border border-gray-500 font-semibold"
+                onClick={handleResetBidding}
+                disabled={!currentPlayer || auctionState.status !== 'LIVE'}
+                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded border border-yellow-500 disabled:border-gray-600 font-semibold transition-colors"
+                title="Reset all bids for the current player"
               >
-                Undo Last Bid
+                🔄 Reset Bids
+              </button>
+
+              <button
+                onClick={handleUndoBid}
+                disabled={!currentPlayer || !highestBid}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded border border-gray-500 disabled:border-gray-700 font-semibold transition-colors"
+              >
+                ↩ Undo Last Bid
               </button>
 
               <button
@@ -2672,12 +2692,23 @@ function AdminDashboard({ user }) {
                     </div>
                   </div>
 
-                  <div className="mt-auto w-full space-y-3">
+                  <div className="mt-auto w-full space-y-2">
+                    {/* SOLD — warns if no bid placed yet */}
                     <button
-                      onClick={() => handleMarkPlayer('SOLD')}
-                      className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-transform"
+                      onClick={() => {
+                        if (!highestBid) {
+                          if (!confirm('No bid has been placed yet. Are you sure you want to mark as SOLD?')) return;
+                        }
+                        handleMarkPlayer('SOLD');
+                      }}
+                      className={`w-full py-3 rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-all ${
+                        highestBid
+                          ? 'bg-green-600 hover:bg-green-700 text-white'
+                          : 'bg-orange-600 hover:bg-orange-700 text-white'
+                      }`}
+                      title={highestBid ? `Sell to ${highestBid.team_name}` : 'No bid placed yet — click to force SOLD'}
                     >
-                      SOLD
+                      {highestBid ? `SOLD → ${highestBid.team_name}` : '⚠ SOLD (no bid)'}
                     </button>
                     <button
                       onClick={() => handleMarkPlayer('UNSOLD')}
@@ -2707,7 +2738,8 @@ function AdminDashboard({ user }) {
               {teams.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
                   {teams.map(team => {
-                    const canAfford = team.budget >= (currentBid + parseInt(customBidIncrement));
+                    const canAfford1 = team.budget >= (currentBid + parseInt(customBidIncrement));
+                    const canAfford2 = team.budget >= (currentBid + parseInt(customBidIncrement2));
                     // Determine if team is full (only if logic is enabled)
                     // We need team squad counts for this which might not be updated here exactly unless we listen to everything.
                     // For now we check basic budget relative to next bid.
@@ -2730,23 +2762,37 @@ function AdminDashboard({ user }) {
                           </div>
                         </div>
 
-                        <div className="mt-auto grid grid-cols-2 gap-2">
+                        <div className="mt-auto grid grid-cols-3 gap-1.5">
                           <button
                             onClick={() => handleAdminPlaceBid(team.id, 'BASE')}
                             disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.amount >= (currentPlayer?.base_price || 0)}
                             className="px-2 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded text-sm font-semibold transition-colors"
                           >
-                            Base Price
+                            Base
                           </button>
                           <button
-                            onClick={() => handleAdminPlaceBid(team.id, 'INCREMENT')}
-                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.team_id === team.id}
-                            className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${highestBid?.team_id === team.id
-                              ? 'bg-green-600 text-white cursor-default'
-                              : 'bg-orange-600 hover:bg-orange-500 text-white hover:shadow-orange-500/20 disabled:bg-gray-700 disabled:text-gray-500 disabled:shadow-none'
-                              }`}
+                            onClick={() => handleAdminPlaceBid(team.id, 'INCREMENT', customBidIncrement)}
+                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.team_id === team.id || !canAfford1}
+                            className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${
+                              highestBid?.team_id === team.id
+                                ? 'bg-green-600 text-white cursor-default'
+                                : canAfford1
+                                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                            }`}
                           >
-                            {highestBid?.team_id === team.id ? 'Leading' : `BID +${parseInt(customBidIncrement) / 1000}k`}
+                            {highestBid?.team_id === team.id ? '✓ B1' : `+${(parseInt(customBidIncrement)/1000).toFixed(parseInt(customBidIncrement) % 1000 === 0 ? 0 : 1)}k`}
+                          </button>
+                          <button
+                            onClick={() => handleAdminPlaceBid(team.id, 'INCREMENT', customBidIncrement2)}
+                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || !canAfford2}
+                            className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${
+                              canAfford2
+                                ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                            }`}
+                          >
+                            +{(parseInt(customBidIncrement2)/1000).toFixed(parseInt(customBidIncrement2) % 1000 === 0 ? 0 : 1)}k
                           </button>
                         </div>
                       </div>

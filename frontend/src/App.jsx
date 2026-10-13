@@ -1,13 +1,41 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
 import HostDashboard from './pages/HostDashboard';
 import AppOwnerDashboard from './pages/AppOwnerDashboard';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import Overlay from './pages/Overlay';
 import PublicLive from './pages/PublicLive';
 import { getCurrentUser } from './services/auth';
+
+function AuctionAdminWrapper({ user }) {
+  const { auctionId } = useParams();
+  if (user?.role === 'admin' && (user.auctionId === auctionId || !user.auctionId || user.role === 'super_admin')) {
+    return <AdminDashboard user={user} />;
+  }
+  return <Navigate to={`/auction/${auctionId}/login`} replace />;
+}
+
+function AuctionOwnerWrapper({ user }) {
+  const { auctionId } = useParams();
+  if (user?.role === 'owner' && (user.auctionId === auctionId || !user.auctionId)) {
+    return <OwnerDashboard user={user} />;
+  }
+  return <Navigate to={`/auction/${auctionId}/owner-login`} replace />;
+}
+
+function AuctionLoginWrapper({ user, onLogin }) {
+  const { auctionId } = useParams();
+  if (user) {
+    if (user.role === 'admin') return <Navigate to={`/auction/${auctionId}/admin`} replace />;
+    if (user.role === 'owner') return <Navigate to={`/auction/${auctionId}/owner`} replace />;
+    if (user.role === 'host') return <Navigate to={`/auction/${auctionId}/host`} replace />;
+    if (user.role === 'super_admin') return <Navigate to="/super-admin" replace />;
+  }
+  return <Login onLogin={onLogin} />;
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -39,6 +67,20 @@ function App() {
   return (
     <Router>
       <Routes>
+        {/* Super Admin Control Panel */}
+        <Route path="/super-admin" element={<SuperAdminDashboard initialUser={user} />} />
+        <Route path="/super-admin/dashboard" element={<SuperAdminDashboard initialUser={user} />} />
+
+        {/* Multi-Auction Scoped Routes */}
+        <Route path="/auction/:auctionId/overlay" element={<Overlay />} />
+        <Route path="/auction/:auctionId/live" element={<PublicLive />} />
+        <Route path="/auction/:auctionId/host" element={<HostDashboard />} />
+        <Route path="/auction/:auctionId/login" element={<AuctionLoginWrapper user={user} onLogin={setUser} />} />
+        <Route path="/auction/:auctionId/owner-login" element={<AuctionLoginWrapper user={user} onLogin={setUser} />} />
+        <Route path="/auction/:auctionId/admin" element={<AuctionAdminWrapper user={user} />} />
+        <Route path="/auction/:auctionId/owner" element={<AuctionOwnerWrapper user={user} />} />
+
+        {/* Legacy Root Routes (backward compatibility) */}
         <Route path="/overlay" element={<Overlay />} />
         <Route path="/live" element={<PublicLive />} />
         <Route path="/host" element={<HostDashboard />} />
@@ -48,7 +90,7 @@ function App() {
             user.role === 'admin' ? '/admin' :
               user.role === 'owner' ? '/owner' :
                 user.role === 'host' ? '/host' :
-                  user.role === 'app_owner' ? '/app-owner' : '/login'
+                  user.role === 'super_admin' ? '/super-admin' : '/login'
           } /> : <Login onLogin={setUser} />}
         />
         <Route
@@ -57,7 +99,7 @@ function App() {
         />
         <Route
           path="/app-owner"
-          element={user?.role === 'app_owner' ? <AppOwnerDashboard user={user} /> : <Navigate to="/login" />}
+          element={user?.role === 'super_admin' ? <AppOwnerDashboard user={user} /> : <Navigate to="/login" />}
         />
         <Route
           path="/owner"
@@ -70,4 +112,3 @@ function App() {
 }
 
 export default App;
-

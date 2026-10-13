@@ -6,7 +6,7 @@ export function requireAuth(req, res, next) {
   next();
 }
 
-// Middleware to check if user is admin
+// Middleware to check if user is admin (scoped to an auction)
 export function requireAdmin(req, res, next) {
   if (!req.session.userId || req.session.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
@@ -30,10 +30,36 @@ export function requireHost(req, res, next) {
   next();
 }
 
-// Middleware to check if user is app owner
+// Middleware to check if user is app owner (legacy)
 export function requireAppOwner(req, res, next) {
   if (!req.session.userId || req.session.role !== 'app_owner') {
     return res.status(403).json({ error: 'App Owner access required' });
+  }
+  next();
+}
+
+// Middleware to check if user is super admin
+export function requireSuperAdmin(req, res, next) {
+  if (!req.session.userId || req.session.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Super Admin access required' });
+  }
+  next();
+}
+
+/**
+ * Middleware to enforce auction-level session isolation.
+ * Checks that the session's auctionId matches the route's :auctionId param.
+ * Super admins bypass this check.
+ */
+export function requireAuctionScope(req, res, next) {
+  // Super admins can access any auction
+  if (req.session.role === 'super_admin') return next();
+
+  const routeAuctionId = req.params.auctionId;
+  const sessionAuctionId = req.session.auctionId;
+
+  if (!routeAuctionId || !sessionAuctionId || routeAuctionId !== sessionAuctionId) {
+    return res.status(403).json({ error: 'Access denied: auction scope mismatch' });
   }
   next();
 }

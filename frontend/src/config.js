@@ -5,11 +5,15 @@ export const getApiUrl = () => {
     return '/api';
 };
 
-export const getSocketUrl = () => {
-    if (import.meta.env.MODE === 'production') {
-        return 'https://ezauction.onrender.com';
+export const getSocketUrl = (auctionId = null) => {
+    const aid = auctionId || window.location.pathname.match(/\/auction\/([^/]+)/)?.[1] || null;
+    const base = import.meta.env.MODE === 'production'
+        ? 'https://ezauction.onrender.com'
+        : '';
+    if (aid) {
+        return `${base}/auction/${aid}`;
     }
-    return '/';
+    return base || '/';
 };
 
 export const API_URL = getApiUrl();

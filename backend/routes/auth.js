@@ -3,22 +3,26 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import { supabase } from '../supabaseClient.js';
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
 
 // Login endpoint
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
+  const targetAuctionId = req.params.auctionId || req.body.auctionId || null;
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
 
   try {
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .maybeSingle();
+    let query = supabase.from('users').select('*').eq('username', username);
+
+    // If an auctionId is specified in URL or body, restrict to that auction unless super_admin
+    if (targetAuctionId) {
+      query = query.or(`auction_id.eq.${targetAuctionId},role.eq.super_admin`);
+    }
+
+    const { data: user, error } = await query.maybeSingle();
 
     if (error) {
       console.error('Database error during login:', error);
@@ -38,7 +42,7 @@ router.post('/login', async (req, res) => {
 
     // Map team data manually
     let teamName = null;
-    const teamId = user.team_id; // Using foreign key directly
+    const teamId = user.team_id;
 
     if (teamId) {
       const { data: team } = await supabase
@@ -50,13 +54,16 @@ router.post('/login', async (req, res) => {
       if (team) teamName = team.name;
     }
 
+    const userAuctionId = user.auction_id || targetAuctionId || null;
+
     // Set session
     req.session.userId = user.id;
     req.session.username = user.username;
     req.session.role = user.role;
     req.session.teamId = teamId;
+    req.session.auctionId = userAuctionId;
 
-    console.log('Login successful:', user.username, 'Role:', user.role);
+    console.log('Login successful:', user.username, 'Role:', user.role, 'AuctionId:', userAuctionId);
 
     res.json({
       success: true,
@@ -65,7 +72,8 @@ router.post('/login', async (req, res) => {
         username: user.username,
         role: user.role,
         teamId: teamId,
-        teamName: teamName
+        teamName: teamName,
+        auctionId: userAuctionId
       }
     });
   } catch (err) {
@@ -123,13 +131,16 @@ router.get('/me', async (req, res) => {
       if (team) teamName = team.name;
     }
 
+    const userAuctionId = user.auction_id || req.session.auctionId || null;
+
     res.json({
       user: {
         id: user.id,
         username: user.username,
         role: user.role,
         teamId: teamId,
-        teamName: teamName
+        teamName: teamName,
+        auctionId: userAuctionId
       }
     });
   } catch (err) {

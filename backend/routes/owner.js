@@ -3,31 +3,40 @@ import { requireAuth, requireOwner } from '../middleware/auth.js';
 import { supabase } from '../supabaseClient.js';
 import { getAuctionState } from '../auctionState.js';
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
+
+function getAuctionId(req) {
+    return req.params.auctionId || req.session.auctionId || req.headers['x-auction-id'] || null;
+}
 
 // All owner routes require authentication and owner role
 router.use(requireAuth);
 router.use(requireOwner);
 
 // Get current player and bid info
-// Get current player and bid info
 router.get('/current-info', async (req, res) => {
     try {
         const teamId = req.session.teamId;
+        const auctionId = getAuctionId(req);
 
         // 1. Initial independent fetches: Auction State & Current Team
-        const state = getAuctionState();
+        const state = getAuctionState(auctionId);
         const { data: team, error: teamError } = await supabase.from('teams').select('budget, bidding_locked').eq('id', teamId).single();
 
         if (teamError || !team) return res.status(404).json({ error: 'Team not found' });
 
         // 2. Prepare second batch of promises
-        const promises = [
-            // Stats (Sold/Unsold/Available)
-            supabase.from('players').select('id', { count: 'exact', head: true }).eq('sold_to_team', teamId).eq('status', 'SOLD'),
-            supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'UNSOLD'),
-            supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'AVAILABLE')
-        ];
+        let qSold = supabase.from('players').select('id', { count: 'exact', head: true }).eq('sold_to_team', teamId).eq('status', 'SOLD');
+        let qUnsold = supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'UNSOLD');
+        let qAvail = supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'AVAILABLE');
+
+        if (auctionId) {
+            qSold = qSold.eq('auction_id', auctionId);
+            qUnsold = qUnsold.eq('auction_id', auctionId);
+            qAvail = qAvail.eq('auction_id', auctionId);
+        }
+
+        const promises = [qSold, qUnsold, qAvail];
 
         // If a player is current, fetch player and highest bid
         if (state && state.current_player_id) {
@@ -137,6 +146,7 @@ router.post('/bid', async (req, res) => {
     let { amount, expectedHighestBidAmount } = req.body;
     amount = parseInt(amount, 10);
     const teamId = req.session.teamId;
+    const auctionId = getAuctionId(req);
     const io = req.app.locals.io;
 
     if (!amount || amount <= 0) {
@@ -154,7 +164,7 @@ router.post('/bid', async (req, res) => {
         await previousLock;
 
         // 1. Get Auction State (Using In-Memory Cache)
-        const state = getAuctionState();
+        const state = getAuctionState(auctionId);
         if (!state) return res.status(500).json({ error: 'Auction state error' });
 
         if (state.status !== 'LIVE') return res.status(400).json({ error: 'Auction is not live' });
@@ -162,7 +172,13 @@ router.post('/bid', async (req, res) => {
         if (!state.current_player_id) return res.status(400).json({ error: 'No player is currently being auctioned' });
 
         // 2. Parallel Fetching: Team, Player, Current Bid, Sold Count
-        // We need these to validate. Fetching them in parallel saves round trips.
+        let qBid = supabase.from('bids').select('*').eq('player_id', state.current_player_id).order('amount', { ascending: false }).limit(1).maybeSingle();
+        let qSold = supabase.from('players').select('id', { count: 'exact', head: true }).eq('sold_to_team', teamId).eq('status', 'SOLD');
+        if (auctionId) {
+            qBid = qBid.eq('auction_id', auctionId);
+            qSold = qSold.eq('auction_id', auctionId);
+        }
+
         const [
             teamResult,
             playerResult,
@@ -174,9 +190,9 @@ router.post('/bid', async (req, res) => {
             // Player
             supabase.from('players').select('*').eq('id', state.current_player_id).single(),
             // Highest Bid
-            supabase.from('bids').select('*').eq('player_id', state.current_player_id).order('amount', { ascending: false }).limit(1).maybeSingle(),
+            qBid,
             // Sold Count
-            supabase.from('players').select('id', { count: 'exact', head: true }).eq('sold_to_team', teamId).eq('status', 'SOLD')
+            qSold
         ]);
 
         const { data: team, error: teamError } = teamResult;
@@ -257,6 +273,7 @@ router.post('/bid', async (req, res) => {
                 player_id: state.current_player_id,
                 team_id: teamId,
                 amount: amount,
+                auction_id: auctionId,
                 timestamp: new Date()
             }])
             .select('*')
@@ -278,13 +295,21 @@ router.post('/bid', async (req, res) => {
         // Emit
         const increment = amount - previousBidAmount;
 
+        if (auctionId) {
+            io.of(`/auction/${auctionId}`).emit('bid-placed', {
+                bid: bidToSend,
+                playerId: state.current_player_id,
+                previousBid: previousBidAmount,
+                increment: increment
+            });
+            io.of(`/auction/${auctionId}`).emit('bid-updated', { highestBid: bidToSend, playerId: state.current_player_id });
+        }
         io.emit('bid-placed', {
             bid: bidToSend,
             playerId: state.current_player_id,
             previousBid: previousBidAmount,
             increment: increment
         });
-
         io.emit('bid-updated', { highestBid: bidToSend, playerId: state.current_player_id });
 
         res.json({
@@ -308,6 +333,7 @@ router.post('/bid', async (req, res) => {
 router.get('/players-by-status/:status', async (req, res) => {
     const { status } = req.params;
     const teamId = req.session.teamId;
+    const auctionId = getAuctionId(req);
 
     if (!['SOLD', 'AVAILABLE', 'UNSOLD'].includes(status)) {
         return res.status(400).json({ error: 'Invalid status' });
@@ -318,6 +344,8 @@ router.get('/players-by-status/:status', async (req, res) => {
             .from('players')
             .select('*')
             .eq('status', status);
+
+        if (auctionId) query = query.eq('auction_id', auctionId);
 
         if (status === 'SOLD') {
             query = query.eq('sold_to_team', teamId);
@@ -331,7 +359,9 @@ router.get('/players-by-status/:status', async (req, res) => {
         const teamIds = [...new Set(players.map(p => p.sold_to_team).filter(id => id))];
         const teamMap = {};
         if (teamIds.length > 0) {
-            const { data: teams } = await supabase.from('teams').select('id, name').in('id', teamIds);
+            let tQuery = supabase.from('teams').select('id, name').in('id', teamIds);
+            if (auctionId) tQuery = tQuery.eq('auction_id', auctionId);
+            const { data: teams } = await tQuery;
             if (teams) teams.forEach(t => teamMap[t.id] = t.name);
         }
 
@@ -351,11 +381,15 @@ router.get('/players-by-status/:status', async (req, res) => {
 // Get all teams
 router.get('/teams', async (req, res) => {
     try {
-        const { data: teams, error } = await supabase
+        const auctionId = getAuctionId(req);
+        let query = supabase
             .from('teams')
             .select('id, name')
             .order('name');
 
+        if (auctionId) query = query.eq('auction_id', auctionId);
+
+        const { data: teams, error } = await query;
         if (error) throw error;
         res.json(teams);
     } catch (err) {
@@ -366,8 +400,9 @@ router.get('/teams', async (req, res) => {
 // Get players purchased by a specific team
 router.get('/teams/:teamId/players', async (req, res) => {
     const { teamId } = req.params;
+    const auctionId = getAuctionId(req);
     try {
-        const { data: players, error } = await supabase
+        let query = supabase
             .from('players')
             .select('name, sold_price, serial_number')
             .eq('sold_to_team', teamId)
@@ -375,6 +410,9 @@ router.get('/teams/:teamId/players', async (req, res) => {
             .order('serial_number')
             .order('name');
 
+        if (auctionId) query = query.eq('auction_id', auctionId);
+
+        const { data: players, error } = await query;
         if (error) throw error;
         res.json(players);
     } catch (err) {

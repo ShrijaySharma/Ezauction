@@ -15,7 +15,23 @@ import SQLite3 from 'sqlite3';
 import * as XLSX from 'xlsx';
 import { refreshAuctionState, getAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState, getAdminAnonymousBid, setAdminAnonymousBid, clearAdminAnonymousBid } from '../auctionState.js';
 
-const router = express.Router();
+const router = express.Router({ mergeParams: true });
+
+function getAuctionId(req) {
+  return req.params.auctionId || req.session.auctionId || req.headers['x-auction-id'] || null;
+}
+
+function getAuctionIo(req) {
+  const auctionId = getAuctionId(req);
+  const baseIo = req.app.locals.io;
+  if (!auctionId) return baseIo;
+  return {
+    emit: (event, ...args) => {
+      baseIo.of(`/auction/${auctionId}`).emit(event, ...args);
+      baseIo.emit(event, ...args);
+    }
+  };
+}
 
 // All admin routes require authentication and admin role
 router.use(requireAuth);
@@ -54,7 +70,7 @@ function pickNextPlayer(pendingPlayers, state) {
 // Get auction state
 router.get('/auction-state', async (req, res) => {
   try {
-    const state = getAuctionState();
+    const state = getAuctionState(getAuctionId(req));
 
     if (!state) {
       // Initialize if not exists
@@ -100,7 +116,7 @@ router.get('/auction-state', async (req, res) => {
 // When disabled, resets the last-serial tracker so next enable starts fresh.
 router.post('/sequential-mode', async (req, res) => {
   const { enabled } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     const updateData = {
@@ -111,13 +127,11 @@ router.post('/sequential-mode', async (req, res) => {
     if (!enabled) updateData.sequential_last_serial = null;
 
     const { error } = await supabase
-      .from('auction_state')
-      .update(updateData)
-      .eq('id', 1);
+      .from('auction_state').update(updateData).match(getAuctionId(req) ? { auction_id: getAuctionId(req) } : { id: 1 });
 
     if (error) throw error;
 
-    await refreshAuctionState();
+    await refreshAuctionState(getAuctionId(req));
     io.emit('sequential-mode-changed', { enabled: !!enabled });
     res.json({ success: true, enabled: !!enabled });
   } catch (err) {
@@ -129,7 +143,7 @@ router.post('/sequential-mode', async (req, res) => {
 // Update enforce max bid setting
 router.post('/enforce-max-bid', async (req, res) => {
   const { enforceMaxBid, baseBidAmount } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     const { error } = await supabase
@@ -146,7 +160,7 @@ router.post('/enforce-max-bid', async (req, res) => {
       return res.status(500).json({ error: 'Database error' });
     }
 
-    await refreshAuctionState(); // Sync Cache
+    await refreshAuctionState(getAuctionId(req)); // Sync Cache
     io.emit('enforce-max-bid-changed', { enforceMaxBid, baseBidAmount });
     res.json({ success: true, enforceMaxBid, baseBidAmount });
   } catch (err) {
@@ -157,7 +171,7 @@ router.post('/enforce-max-bid', async (req, res) => {
 
 // Delete all players, teams, bids, and assets permanently
 router.delete('/players-all', async (req, res) => {
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     const pathsToDelete = [];
@@ -228,13 +242,11 @@ router.delete('/players-all', async (req, res) => {
     if (deleteTeamsError) throw deleteTeamsError;
 
     const { error: updateStateError } = await supabase
-      .from('auction_state')
-      .update({ current_player_id: null, status: 'STOPPED' })
-      .eq('id', 1);
+      .from('auction_state').update({ current_player_id: null, status: 'STOPPED' }).match(getAuctionId(req) ? { auction_id: getAuctionId(req) } : { id: 1 });
 
     if (updateStateError) throw updateStateError;
 
-    await refreshAuctionState(); // Sync Cache
+    await refreshAuctionState(getAuctionId(req)); // Sync Cache
     io.emit('all-players-deleted');
     io.emit('team-deleted');
     res.json({ success: true, message: 'All data deleted permanently' });
@@ -247,7 +259,7 @@ router.delete('/players-all', async (req, res) => {
 // Update auction status
 router.post('/auction-status', async (req, res) => {
   const { status } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   if (!['STOPPED', 'LIVE', 'PAUSED'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
@@ -261,7 +273,7 @@ router.post('/auction-status', async (req, res) => {
 
     if (error) throw error;
 
-    await refreshAuctionState(); // Sync Cache
+    await refreshAuctionState(getAuctionId(req)); // Sync Cache
     io.emit('auction-status-changed', { status });
     res.json({ success: true, status });
   } catch (err) {
@@ -273,7 +285,7 @@ router.post('/auction-status', async (req, res) => {
 // Load next player
 router.post('/load-player', async (req, res) => {
   const { playerId } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     // 1. Get player
@@ -289,7 +301,7 @@ router.post('/load-player', async (req, res) => {
     // 2. Update auction state
     // If sequential mode is active and the player has a serial number,
     // track it so the next auto-pick knows where to resume from.
-    const stateForLoad = getAuctionState();
+    const stateForLoad = getAuctionState(getAuctionId(req));
     const loadPayload = {
       current_player_id: playerId,
       status: 'LIVE',
@@ -300,13 +312,11 @@ router.post('/load-player', async (req, res) => {
     }
 
     const { error: updateError } = await supabase
-      .from('auction_state')
-      .update(loadPayload)
-      .eq('id', 1);
+      .from('auction_state').update(loadPayload).match(getAuctionId(req) ? { auction_id: getAuctionId(req) } : { id: 1 });
 
     if (updateError) throw updateError;
 
-    await refreshAuctionState(); // Sync Cache
+    await refreshAuctionState(getAuctionId(req)); // Sync Cache
 
     // 3. Clear bids for this player (if any exist from simpler times? usually empty if new)
     // Actually, if we reload a player, we might want to keep bids? 
@@ -319,7 +329,7 @@ router.post('/load-player', async (req, res) => {
     if (deleteBidsError) throw deleteBidsError;
 
     // Admin Bidding 2.0: always clear anonymous bid when a new player is loaded
-    clearAdminAnonymousBid();
+    clearAdminAnonymousBid(getAuctionId(req));
 
     io.emit('player-loaded', { player });
     res.json({ success: true, player });
@@ -333,7 +343,7 @@ router.post('/load-player', async (req, res) => {
 // Get current highest bid
 router.get('/current-bid', async (req, res) => {
   try {
-    const state = getAuctionState();
+    const state = getAuctionState(getAuctionId(req));
 
     if (!state || !state.current_player_id) {
       return res.json({ highestBid: null, player: null });
@@ -382,7 +392,7 @@ router.get('/current-bid', async (req, res) => {
     // If an anonymous bid is active for the current player and it's higher
     // than the DB bid (or there is no DB bid), return it as the highest bid.
     // This ensures a page refresh still shows the running anonymous bid amount.
-    const anonBid = getAdminAnonymousBid();
+    const anonBid = getAdminAnonymousBid(getAuctionId(req));
     if (anonBid.amount > 0 && anonBid.playerId === state.current_player_id) {
       const dbAmount = processedBid ? processedBid.amount : 0;
       if (anonBid.amount > dbAmount) {
@@ -413,7 +423,7 @@ router.get('/current-bid', async (req, res) => {
 // Get all bids for current player
 router.get('/bids', async (req, res) => {
   try {
-    const state = getAuctionState();
+    const state = getAuctionState(getAuctionId(req));
 
     if (!state || !state.current_player_id) {
       return res.json({ bids: [] });
@@ -452,10 +462,10 @@ router.get('/bids', async (req, res) => {
 
 // Undo last bid
 router.post('/undo-bid', async (req, res) => {
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
-    const state = getAuctionState();
+    const state = getAuctionState(getAuctionId(req));
 
     if (!state || !state.current_player_id) {
       return res.status(400).json({ error: 'No active player' });
@@ -463,9 +473,9 @@ router.post('/undo-bid', async (req, res) => {
 
     // ─── Admin Bidding 2.0: check if an anonymous in-memory bid is active ───
     // If so, undo it first (before touching DB bids).
-    const anonBid = getAdminAnonymousBid();
+    const anonBid = getAdminAnonymousBid(getAuctionId(req));
     if (anonBid.amount > 0 && anonBid.playerId === state.current_player_id) {
-      clearAdminAnonymousBid();
+      clearAdminAnonymousBid(getAuctionId(req));
 
       // Find the real DB highest bid after clearing anon (to restore display)
       const { data: remainingBids } = await supabase
@@ -556,7 +566,7 @@ router.post('/undo-bid', async (req, res) => {
 // Lock/unlock bidding
 router.post('/lock-bidding', async (req, res) => {
   const { locked } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     const { error } = await supabase
@@ -569,7 +579,7 @@ router.post('/lock-bidding', async (req, res) => {
 
     if (error) throw error;
 
-    await refreshAuctionState(); // Sync Cache
+    await refreshAuctionState(getAuctionId(req)); // Sync Cache
     io.emit('bidding-locked', { locked });
     res.json({ success: true, locked });
   } catch (err) {
@@ -581,7 +591,7 @@ router.post('/lock-bidding', async (req, res) => {
 // Get max players per team
 router.get('/max-players', async (req, res) => {
   try {
-    const state = getAuctionState();
+    const state = getAuctionState(getAuctionId(req));
     res.json({ maxPlayersPerTeam: state?.max_players_per_team || 10 });
   } catch (err) {
     console.error('Error getting max players:', err);
@@ -592,7 +602,7 @@ router.get('/max-players', async (req, res) => {
 // Update max players per team
 router.post('/max-players', async (req, res) => {
   const { maxPlayersPerTeam } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   if (!maxPlayersPerTeam || maxPlayersPerTeam < 1 || maxPlayersPerTeam > 50) {
     return res.status(400).json({ error: 'Invalid max players per team (must be between 1 and 50)' });
@@ -609,7 +619,7 @@ router.post('/max-players', async (req, res) => {
 
     if (error) throw error;
 
-    await refreshAuctionState(); // Sync Cache
+    await refreshAuctionState(getAuctionId(req)); // Sync Cache
     io.emit('max-players-changed', { maxPlayersPerTeam });
     res.json({ success: true, maxPlayersPerTeam });
   } catch (err) {
@@ -621,7 +631,7 @@ router.post('/max-players', async (req, res) => {
 // Update bid increments
 router.post('/bid-increments', async (req, res) => {
   const { increment1, increment2 } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     const { error } = await supabase
@@ -635,7 +645,7 @@ router.post('/bid-increments', async (req, res) => {
 
     if (error) throw error;
 
-    await refreshAuctionState(); // Sync Cache
+    await refreshAuctionState(getAuctionId(req)); // Sync Cache
     io.emit('bid-increments-changed', { increment1, increment2 });
     res.json({ success: true, increments: { increment1, increment2 } });
   } catch (err) {
@@ -647,7 +657,7 @@ router.post('/bid-increments', async (req, res) => {
 // Mark player as sold/unsold
 router.post('/mark-player', async (req, res) => {
   const { playerId, status, soldPrice, soldToTeam } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   if (!['SOLD', 'UNSOLD'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
@@ -770,7 +780,7 @@ router.post('/mark-player', async (req, res) => {
     if (pendingPlayers && pendingPlayers.length > 0) {
       // Use shared helper — respects sequential_mode; falls back to original
       // random logic (priority0/priority1) when sequential_mode = 0.
-      const currentState = getAuctionState();
+      const currentState = getAuctionState(getAuctionId(req));
 
       // For sequential mode: use the CURRENT player's serial_number as the authoritative
       // baseline (not sequential_last_serial from DB which may be stale or missing).
@@ -794,17 +804,15 @@ router.post('/mark-player', async (req, res) => {
         }
 
         await supabase
-          .from('auction_state')
-          .update(nextStateUpdate)
-          .eq('id', 1);
+          .from('auction_state').update(nextStateUpdate).match(getAuctionId(req) ? { auction_id: getAuctionId(req) } : { id: 1 });
 
-        await refreshAuctionState(); // Sync Cache
+        await refreshAuctionState(getAuctionId(req)); // Sync Cache
 
         // Clear bids
         await supabase.from('bids').delete().eq('player_id', nextPlayer.id);
 
         // Admin Bidding 2.0: clear anonymous bid so next player starts clean
-        clearAdminAnonymousBid();
+        clearAdminAnonymousBid(getAuctionId(req));
 
         console.log('Auto-loaded next player:', nextPlayer.name);
         io.emit('player-loaded', { player: nextPlayer });
@@ -824,7 +832,7 @@ router.post('/mark-player', async (req, res) => {
         })
         .eq('id', 1);
 
-      await refreshAuctionState(); // Sync Cache
+      await refreshAuctionState(getAuctionId(req)); // Sync Cache
       io.emit('player-loaded', { player: null });
       res.json({ success: true, nextPlayerLoaded: false, message: 'No more available players' });
     }
@@ -837,10 +845,10 @@ router.post('/mark-player', async (req, res) => {
 
 // Reset bidding for next player
 router.post('/reset-bidding', async (req, res) => {
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
-    const state = getAuctionState();
+    const state = getAuctionState(getAuctionId(req));
 
     if (!state || !state.current_player_id) {
       return res.status(400).json({ error: 'No active player' });
@@ -854,7 +862,7 @@ router.post('/reset-bidding', async (req, res) => {
     if (deleteError) throw deleteError;
 
     // ─── Admin Bidding 2.0: clear in-memory anonymous bid so next bid starts from base price ───
-    clearAdminAnonymousBid();
+    clearAdminAnonymousBid(getAuctionId(req));
 
     // Fetch player base price so frontend can reset bid display without API call
     const { data: resetPlayer } = await supabase
@@ -874,7 +882,7 @@ router.post('/reset-bidding', async (req, res) => {
 // Reset unsold tag for a player
 router.post('/reset-unsold-tag/:playerId', async (req, res) => {
   const { playerId } = req.params;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     // Check current status first to know if we need to change it
@@ -1081,7 +1089,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
 // Add new player
 router.post('/players', async (req, res) => {
   const { name, image, role, country, age, base_price, serial_number } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   if (!name || !role || !base_price) {
     return res.status(400).json({ error: 'Name, role, and base_price are required' });
@@ -1161,7 +1169,7 @@ router.post('/players', async (req, res) => {
 // Bulk add players
 router.post('/players-bulk', async (req, res) => {
   const { players } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   if (!players || !Array.isArray(players) || players.length === 0) {
     return res.status(400).json({ error: 'Invalid players data' });
@@ -1233,7 +1241,7 @@ router.post('/players-bulk-with-photos',
     { name: 'photoZip', maxCount: 1 }
   ]),
   async (req, res) => {
-    const io = req.app.locals.io;
+    const io = getAuctionIo(req);
 
     try {
       // 1. Parse the player file (xlsx or csv)
@@ -1465,7 +1473,7 @@ router.post('/players-bulk-with-photos',
 router.put('/players/:id', async (req, res) => {
   const { id } = req.params;
   const { name, image, thumb_url, role, country, age, base_price, status, sold_price, sold_to_team, serial_number } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     // Handle serial number logic if needed
@@ -1564,7 +1572,7 @@ router.put('/players/:id', async (req, res) => {
 // Delete player
 router.delete('/players/:id', async (req, res) => {
   const { id } = req.params;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     // Check if current player
@@ -1631,7 +1639,7 @@ router.get('/teams', async (req, res) => {
 // Add new team
 router.post('/teams', upload.single('logo'), async (req, res) => {
   const { name, owner_name, budget } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Team name is required' });
@@ -1739,7 +1747,7 @@ router.post('/teams', upload.single('logo'), async (req, res) => {
 router.put('/teams/:id', upload.single('logo'), async (req, res) => {
   const { id } = req.params;
   const { name, owner_name, budget } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     const updates = {};
@@ -1786,7 +1794,7 @@ router.put('/teams/:id', upload.single('logo'), async (req, res) => {
 // Delete team
 router.delete('/teams/:id', async (req, res) => {
   const { id } = req.params;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     // Check constraints - check for bids and sold players
@@ -1824,7 +1832,7 @@ router.delete('/teams/:id', async (req, res) => {
 router.put('/teams/:id/budget', async (req, res) => {
   const { id } = req.params;
   const { budget } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     const { error } = await supabase.from('teams').update({ budget }).eq('id', id);
@@ -1841,7 +1849,7 @@ router.put('/teams/:id/budget', async (req, res) => {
 router.put('/teams/:id/lock-bidding', async (req, res) => {
   const { id } = req.params;
   const { locked } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     const { error } = await supabase.from('teams').update({ bidding_locked: locked ? 1 : 0 }).eq('id', id);
@@ -1858,7 +1866,7 @@ router.put('/teams/:id/lock-bidding', async (req, res) => {
 router.put('/teams/:id/credentials', async (req, res) => {
   const { id } = req.params;
   const { username, password } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
@@ -2017,7 +2025,7 @@ router.get('/team-squads', async (req, res) => {
 // Remove player from team and return to auction
 router.post('/remove-player-from-team/:playerId', async (req, res) => {
   const { playerId } = req.params;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     // Get player details
@@ -2084,7 +2092,7 @@ router.post('/remove-player-from-team/:playerId', async (req, res) => {
 // Admin place bid on behalf of team
 router.post('/admin-bid', async (req, res) => {
   const { teamId, amount } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   if (!teamId || !amount || amount <= 0) {
     return res.status(400).json({ error: 'Invalid team ID or bid amount' });
@@ -2310,7 +2318,7 @@ router.get('/export-teams', async (req, res) => {
 // Get trading window status
 router.get('/trading-window/status', async (req, res) => {
   try {
-    const state = getTradingWindowState();
+    const state = getTradingWindowState(getAuctionId(req));
     res.json(state);
   } catch (err) {
     console.error('Error getting trading window status:', err);
@@ -2320,10 +2328,10 @@ router.get('/trading-window/status', async (req, res) => {
 
 // Open trading window
 router.post('/trading-window/open', async (req, res) => {
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
   try {
-    setTradingWindowState({ isOpen: true, trades: [] });
-    const state = getTradingWindowState();
+    setTradingWindowState(getAuctionId(req), { isOpen: true, trades: [] });
+    const state = getTradingWindowState(getAuctionId(req));
     io.emit('trading-window-update', state);
     res.json({ success: true, ...state });
   } catch (err) {
@@ -2334,10 +2342,10 @@ router.post('/trading-window/open', async (req, res) => {
 
 // Close trading window
 router.post('/trading-window/close', async (req, res) => {
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
   try {
-    resetTradingWindowState();
-    const state = getTradingWindowState();
+    resetTradingWindowState(getAuctionId(req), );
+    const state = getTradingWindowState(getAuctionId(req));
     io.emit('trading-window-update', state);
     res.json({ success: true, ...state });
   } catch (err) {
@@ -2349,11 +2357,11 @@ router.post('/trading-window/close', async (req, res) => {
 // Execute a trade
 router.post('/trading-window/execute', async (req, res) => {
   const { playerId, fromTeamId, toTeamId, amount } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   try {
     // 1. Validate trading window is open
-    const windowState = getTradingWindowState();
+    const windowState = getTradingWindowState(getAuctionId(req));
     if (!windowState.isOpen) {
       return res.status(400).json({ error: 'Trading window is not open' });
     }
@@ -2439,10 +2447,10 @@ router.post('/trading-window/execute', async (req, res) => {
       ...tradeRecord,
       traded_at: new Date().toISOString()
     };
-    addTradeToWindow(tradeForBanner);
+    addTradeToWindow(getAuctionId(req), tradeForBanner);
 
     // 9. Emit events
-    io.emit('trading-window-update', getTradingWindowState());
+    io.emit('trading-window-update', getTradingWindowState(getAuctionId(req)));
     io.emit('team-budget-updated', { teamId: fromTeamId, newBudget: newFromBudget });
     io.emit('team-budget-updated', { teamId: toTeamId, newBudget: newToBudget });
     io.emit('player-removed-from-team'); // Triggers squad refresh on listening clients
@@ -2466,7 +2474,7 @@ router.post('/trading-window/execute', async (req, res) => {
 // Admin anonymous bid increment (no team associated)
 router.post('/admin-bid-v2', async (req, res) => {
   const { amount } = req.body; // amount = the INCREMENT (1000, 2000, 5000)
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   if (!amount && amount !== 'BASE') {
     return res.status(400).json({ error: 'Invalid increment amount' });
@@ -2474,7 +2482,7 @@ router.post('/admin-bid-v2', async (req, res) => {
 
   try {
     // 1. Check auction state
-    const state = getAuctionState();
+    const state = getAuctionState(getAuctionId(req));
     if (!state) return res.status(500).json({ error: 'Auction state error' });
     if (state.status !== 'LIVE') return res.status(400).json({ error: 'Auction is not live' });
     if (!state.current_player_id) return res.status(400).json({ error: 'No player is currently being auctioned' });
@@ -2494,7 +2502,7 @@ router.post('/admin-bid-v2', async (req, res) => {
 
     // 4. Calculate new bid amount
     // Use highest of: DB bid, in-memory anonymous bid, or base_price
-    const anonBid = getAdminAnonymousBid();
+    const anonBid = getAdminAnonymousBid(getAuctionId(req));
     const dbAmount = currentHighest ? currentHighest.amount : 0;
     const anonAmount = (anonBid.playerId === state.current_player_id) ? anonBid.amount : 0;
     const startAmount = Math.max(dbAmount, anonAmount, player.base_price);
@@ -2545,7 +2553,7 @@ router.post('/admin-bid-v2', async (req, res) => {
 // Assign team to the current anonymous bid — inserts real bid into DB
 router.post('/admin-assign-team', async (req, res) => {
   const { teamId } = req.body;
-  const io = req.app.locals.io;
+  const io = getAuctionIo(req);
 
   if (!teamId) {
     return res.status(400).json({ error: 'Team ID is required' });
@@ -2553,12 +2561,12 @@ router.post('/admin-assign-team', async (req, res) => {
 
   try {
     // 1. Check auction state
-    const state = getAuctionState();
+    const state = getAuctionState(getAuctionId(req));
     if (!state) return res.status(500).json({ error: 'Auction state error' });
     if (!state.current_player_id) return res.status(400).json({ error: 'No player is currently being auctioned' });
 
     // 2. Get the anonymous bid amount from memory
-    const anonBid = getAdminAnonymousBid();
+    const anonBid = getAdminAnonymousBid(getAuctionId(req));
     if (!anonBid.amount || anonBid.playerId !== state.current_player_id) {
       return res.status(400).json({ error: 'No anonymous admin bid active for the current player' });
     }
@@ -2586,7 +2594,7 @@ router.post('/admin-assign-team', async (req, res) => {
     if (bidError) throw bidError;
 
     // 5. Clear the in-memory anonymous bid
-    clearAdminAnonymousBid();
+    clearAdminAnonymousBid(getAuctionId(req));
 
     // 6. Emit bid-updated with real team name
     const updatedBid = {

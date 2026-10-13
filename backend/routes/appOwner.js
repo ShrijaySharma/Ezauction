@@ -1,71 +1,117 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import { requireAuth, requireAppOwner } from '../middleware/auth.js';
+import { requireAuth, requireSuperAdmin } from '../middleware/auth.js';
 import { supabase } from '../supabaseClient.js';
 
 const router = express.Router();
 
 router.use(requireAuth);
-router.use(requireAppOwner);
+router.use(requireSuperAdmin);
 
-router.post('/update-credentials', async (req, res) => {
-    const { targetRole, newUsername, newPassword } = req.body;
+// Super Admin: Change their own password
+router.post('/change-password', async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.session.userId;
 
-    if (!['admin', 'host'].includes(targetRole)) {
-        return res.status(400).json({ error: 'Invalid target role. Must be admin or host.' });
+    if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Current and new password are required' });
     }
 
-    if (!newUsername || !newPassword) {
-        return res.status(400).json({ error: 'Username and password are required' });
+    if (newPassword.length < 6) {
+        return res.status(400).json({ error: 'New password must be at least 6 characters' });
     }
 
     try {
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-        // 1. Check if new username is taken by someone else
-        const { data: existingUser, error: checkError } = await supabase
+        // Fetch the super admin record
+        const { data: user, error: fetchError } = await supabase
             .from('users')
-            .select('id, role')
-            .eq('username', newUsername)
+            .select('id, username, password, role')
+            .eq('id', userId)
+            .eq('role', 'super_admin')
             .maybeSingle();
 
-        if (checkError) throw checkError;
+        if (fetchError) throw fetchError;
+        if (!user) return res.status(404).json({ error: 'Super admin account not found' });
 
-        if (existingUser && existingUser.role !== targetRole) {
-            return res.status(400).json({ error: 'Username already taken by another user' });
+        // Verify current password
+        const validPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!validPassword) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
         }
 
-        // 2. Find existing user with target role
-        const { data: targetUser, error: targetError } = await supabase
+        // Hash and update the new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({ password: hashedPassword })
+            .eq('id', userId);
+
+        if (updateError) throw updateError;
+
+        res.json({ success: true, message: 'Super Admin password updated successfully' });
+    } catch (error) {
+        console.error('Error changing super admin password:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Super Admin: Change username
+router.post('/change-username', async (req, res) => {
+    const { newUsername, currentPassword } = req.body;
+    const userId = req.session.userId;
+
+    if (!newUsername || !currentPassword) {
+        return res.status(400).json({ error: 'New username and current password are required' });
+    }
+
+    if (newUsername.length < 3) {
+        return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    }
+
+    try {
+        // Fetch current user
+        const { data: user, error: fetchError } = await supabase
+            .from('users')
+            .select('id, username, password, role')
+            .eq('id', userId)
+            .eq('role', 'super_admin')
+            .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (!user) return res.status(404).json({ error: 'Super admin account not found' });
+
+        // Verify current password
+        const validPassword = await bcrypt.compare(currentPassword, user.password);
+        if (!validPassword) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+
+        // Check if username is taken
+        const { data: existing } = await supabase
             .from('users')
             .select('id')
-            .eq('role', targetRole)
-            .limit(1) // Assuming single admin/host for now
+            .eq('username', newUsername)
+            .neq('id', userId)
             .maybeSingle();
 
-        if (targetError) throw targetError;
-
-        if (targetUser) {
-            // Update existing
-            const { error: updateError } = await supabase
-                .from('users')
-                .update({ username: newUsername, password: hashedPassword })
-                .eq('id', targetUser.id);
-
-            if (updateError) throw updateError;
-            res.json({ success: true, message: `${targetRole} credentials updated successfully` });
-        } else {
-            // Create new
-            const { error: insertError } = await supabase
-                .from('users')
-                .insert([{ username: newUsername, password: hashedPassword, role: targetRole }]);
-
-            if (insertError) throw insertError;
-            res.json({ success: true, message: `${targetRole} created with credentials successfully` });
+        if (existing) {
+            return res.status(409).json({ error: 'Username already taken. Choose a different one.' });
         }
 
+        // Update username
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({ username: newUsername })
+            .eq('id', userId);
+
+        if (updateError) throw updateError;
+
+        // Update session
+        req.session.username = newUsername;
+
+        res.json({ success: true, message: 'Username updated successfully', newUsername });
     } catch (error) {
-        console.error('Error updating credentials:', error);
+        console.error('Error changing super admin username:', error);
         res.status(500).json({ error: 'Server error' });
     }
 });

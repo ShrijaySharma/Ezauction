@@ -12,9 +12,10 @@ import ownerRoutes from './routes/owner.js';
 import hostRoutes from './routes/host.js';
 import appOwnerRoutes from './routes/appOwner.js';
 import publicRoutes from './routes/public.js';
+import superAdminRoutes from './routes/superAdmin.js';
+import bcrypt from 'bcrypt';
 import { supabase } from './supabaseClient.js';
-import { refreshAuctionState, getAuctionState } from './auctionState.js';
-import { getAdminAnonymousBid } from './auctionState.js';
+import { refreshAuctionState, refreshAllAuctionStates, getAuctionState, getAdminAnonymousBid } from './auctionState.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -59,16 +60,16 @@ app.get('/', (req, res) => {
 app.set('trust proxy', 1);
 
 // Session configuration
-// Determine if running in production/hosted environment
-const isProduction = process.env.NODE_ENV !== 'development';
+// Secure cookie ONLY in actual production (Render HTTPS). Localhost uses standard Lax/insecure cookie so it persists across refreshes.
+const isProduction = process.env.NODE_ENV === 'production' || !!process.env.RENDER;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'cricket-auction-secret-key-2024',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: isProduction, // True for cross-site since Render provides HTTPS
-    sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-site
+    secure: isProduction, // True only for cross-site HTTPS
+    sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-site HTTPS; 'lax' for local dev
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
@@ -77,7 +78,17 @@ app.use(session({
 // Make io available to routes
 app.locals.io = io;
 
-// Routes
+// Super Admin Routes
+app.use('/api/super-admin', superAdminRoutes);
+
+// Auction-Scoped Routes
+app.use('/api/auction/:auctionId/auth', authRoutes);
+app.use('/api/auction/:auctionId/admin', adminRoutes);
+app.use('/api/auction/:auctionId/owner', ownerRoutes);
+app.use('/api/auction/:auctionId/host', hostRoutes);
+app.use('/api/auction/:auctionId/public', publicRoutes);
+
+// Legacy Root Routes (backward compatibility)
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/owner', ownerRoutes);
@@ -113,31 +124,150 @@ app.get('/api/proxy-image', async (req, res) => {
   }
 });
 
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+// ── Helper: Seed Super Admin if not exists ──────────────────────────────────
+async function seedSuperAdmin() {
+  try {
+    const { data: existing, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('role', 'super_admin')
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[Seed] Could not check super_admin:', error.message);
+      return;
+    }
+
+    if (!existing) {
+      const username = process.env.SUPER_ADMIN_USERNAME || 'superadmin';
+      const password = process.env.SUPER_ADMIN_PASSWORD || 'SuperAdmin@123';
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const { error: insertError } = await supabase.from('users').insert([{
+        username,
+        password: hashedPassword,
+        role: 'super_admin'
+      }]);
+
+      if (insertError) {
+        console.error('[Seed] Error creating super_admin:', insertError.message);
+      } else {
+        console.log(`✅ [Seed] Initial super_admin created: "${username}" (Password: ${password})`);
+      }
+    }
+  } catch (err) {
+    console.error('[Seed] Unexpected error seeding super_admin:', err);
+  }
+}
+
+// ── Socket.IO Dynamic Auction Namespace Handling ────────────────────────────
+// Handles connections to /auction/:auctionId
+const auctionNamespace = io.of(/^\/auction\/[a-zA-Z0-9_-]+$/);
+
+auctionNamespace.on('connection', (socket) => {
+  const auctionId = socket.nsp.name.replace('/auction/', '');
+  console.log(`[Socket] Client connected to auction namespace [${auctionId}]:`, socket.id);
 
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    console.log(`[Socket] Client disconnected from [${auctionId}]:`, socket.id);
   });
 
-  // Handle request for initial state (e.g. from Overlay)
+  // Handle request for initial state (e.g. from Overlay / Host)
   socket.on('request-info', async () => {
     try {
-      const state = getAuctionState();
+      const state = getAuctionState(auctionId);
 
       if (state && state.current_player_id) {
-        // Fetch player
         const { data: player } = await supabase
           .from('players')
           .select('*')
           .eq('id', state.current_player_id)
-          .single();
+          .eq('auction_id', auctionId)
+          .maybeSingle();
 
         if (player) {
           socket.emit('player-loaded', { player });
 
-          // Fetch highest bid for this player
+          const { data: bid } = await supabase
+            .from('bids')
+            .select('*')
+            .eq('player_id', state.current_player_id)
+            .eq('auction_id', auctionId)
+            .order('amount', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          let processedBid = null;
+          if (bid) {
+            let teamName = '';
+            if (bid.team_id) {
+              const { data: team } = await supabase
+                .from('teams')
+                .select('name')
+                .eq('id', bid.team_id)
+                .maybeSingle();
+              if (team) teamName = team.name;
+            }
+
+            processedBid = { ...bid, team_name: teamName };
+
+            // Check if there's a higher in-memory anonymous bid
+            const anonBid = getAdminAnonymousBid(auctionId);
+            if (anonBid.playerId === state.current_player_id && anonBid.amount > processedBid.amount) {
+              processedBid = {
+                ...processedBid,
+                amount: anonBid.amount,
+                team_id: null,
+                team_name: ''
+              };
+            }
+
+            socket.emit('bid-updated', { highestBid: processedBid });
+          } else {
+            const anonBid = getAdminAnonymousBid(auctionId);
+            if (anonBid.playerId === state.current_player_id && anonBid.amount > 0) {
+              socket.emit('bid-updated', {
+                highestBid: {
+                  id: Date.now(),
+                  player_id: state.current_player_id,
+                  team_id: null,
+                  amount: anonBid.amount,
+                  team_name: '',
+                  timestamp: new Date()
+                }
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[Socket:${auctionId}] Error in request-info:`, err);
+    }
+  });
+});
+
+// Legacy root namespace handling (fallback / backward compatibility)
+io.on('connection', (socket) => {
+  console.log('Client connected to root namespace:', socket.id);
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected from root namespace:', socket.id);
+  });
+
+  socket.on('request-info', async () => {
+    try {
+      const state = getAuctionState();
+      if (state && state.current_player_id) {
+        const { data: player } = await supabase
+          .from('players')
+          .select('*')
+          .eq('id', state.current_player_id)
+          .maybeSingle();
+
+        if (player) {
+          socket.emit('player-loaded', { player });
+
           const { data: bid } = await supabase
             .from('bids')
             .select('*')
@@ -149,26 +279,17 @@ io.on('connection', (socket) => {
           if (bid) {
             let processedBid;
             if (bid.team_id) {
-              // Normal bid — fetch team name
               const { data: team } = await supabase
                 .from('teams')
                 .select('name')
                 .eq('id', bid.team_id)
                 .maybeSingle();
 
-              processedBid = {
-                ...bid,
-                team_name: team ? team.name : ''
-              };
+              processedBid = { ...bid, team_name: team ? team.name : '' };
             } else {
-              // Anonymous admin bid — no team to look up
-              processedBid = {
-                ...bid,
-                team_name: ''
-              };
+              processedBid = { ...bid, team_name: '' };
             }
 
-            // Check if there's a higher in-memory anonymous bid
             const anonBid = getAdminAnonymousBid();
             if (anonBid.playerId === state.current_player_id && anonBid.amount > processedBid.amount) {
               processedBid = {
@@ -181,7 +302,6 @@ io.on('connection', (socket) => {
 
             socket.emit('bid-updated', { highestBid: processedBid });
           } else {
-            // No DB bid — check if there's an in-memory anonymous bid
             const anonBid = getAdminAnonymousBid();
             if (anonBid.playerId === state.current_player_id && anonBid.amount > 0) {
               socket.emit('bid-updated', {
@@ -199,7 +319,7 @@ io.on('connection', (socket) => {
         }
       }
     } catch (err) {
-      console.error('Error sending initial info:', err);
+      console.error('Error sending root initial info:', err);
     }
   });
 });
@@ -207,7 +327,8 @@ io.on('connection', (socket) => {
 // Start server
 httpServer.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-  await refreshAuctionState();
+  await refreshAllAuctionStates();
+  await seedSuperAdmin();
 });
 
 export { io };

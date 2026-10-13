@@ -20,12 +20,23 @@ function Login({ onLogin }) {
         // Update global auth state first
         onLogin(response.user);
 
-        // Then navigate based on role
-        const redirectPath =
-          response.user.role === 'admin' ? '/admin' :
-            response.user.role === 'owner' ? '/owner' :
-              response.user.role === 'host' ? '/host' :
-                response.user.role === 'app_owner' ? '/app-owner' : '/login';
+        // Then navigate based on role and auction scope
+        const auctionId = response.user.auctionId || (window.location.pathname.match(/\/auction\/([^/]+)/)?.[1]);
+        let redirectPath;
+        if (auctionId) {
+          redirectPath =
+            response.user.role === 'admin' ? `/auction/${auctionId}/admin` :
+              response.user.role === 'owner' ? `/auction/${auctionId}/owner` :
+                response.user.role === 'host' ? `/auction/${auctionId}/host` :
+                  response.user.role === 'super_admin' ? '/super-admin' : `/auction/${auctionId}/login`;
+        } else {
+          redirectPath =
+            response.user.role === 'admin' ? '/admin' :
+              response.user.role === 'owner' ? '/owner' :
+                response.user.role === 'host' ? '/host' :
+                  response.user.role === 'super_admin' ? '/super-admin' :
+                    response.user.role === 'app_owner' ? '/app-owner' : '/login';
+        }
         navigate(redirectPath);
       } else {
         setError('Invalid response from server');
