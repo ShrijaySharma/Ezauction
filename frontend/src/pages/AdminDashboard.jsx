@@ -569,12 +569,22 @@ function AdminDashboard({ user }) {
     try {
       // For SOLD, backend will automatically use the highest bidder
       // For UNSOLD, proceed directly
-      await adminService.markPlayer(currentPlayer.id, status, null, null);
+      const markRes = await adminService.markPlayer(currentPlayer.id, status, null, null);
+
+      if (markRes && markRes.nextPlayer) {
+        setCurrentPlayer(markRes.nextPlayer);
+        setHighestBid(null);
+        setAllBids([]);
+      } else if (markRes && markRes.nextPlayerLoaded === false) {
+        setCurrentPlayer(null);
+        setHighestBid(null);
+        setAllBids([]);
+      }
 
       if (status === 'SOLD') {
         const teamName = highestBid ? highestBid.team_name : 'leading team';
         alert(`Player marked as SOLD to ${teamName}`);
-        loadTeams(); // Refresh teams to update budgets
+        loadTeams();
       } else {
         alert(`Player marked as ${status}`);
       }

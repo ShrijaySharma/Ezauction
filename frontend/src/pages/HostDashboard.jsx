@@ -264,6 +264,15 @@ function HostDashboard() {
     try {
       const data = await hostService.getUnsoldPlayers();
       setUnsoldPlayers(data || []);
+      // Active background image preloading into browser cache
+      if (Array.isArray(data)) {
+        data.forEach(p => {
+          if (p.image) {
+            const img = new Image();
+            img.src = getImageUrl(p.image);
+          }
+        });
+      }
       console.log(`Preloading ${data?.length || 0} unsold player images for instant rendering`);
     } catch (error) {
       console.error('Error loading unsold players for preloading:', error);

@@ -766,14 +766,16 @@ router.post('/mark-player', async (req, res) => {
     }
 
     // 6. Auto-load next player (Shared logic)
-    // Find next available or unsold player — EXCLUDE the just-marked player so an
-    // UNSOLD player is never immediately re-served as the next pick.
-    const { data: pendingPlayers, error: pendingError } = await supabase
+    const auctionId = getAuctionId(req);
+    let pendingQ = supabase
       .from('players')
       .select('*')
       .in('status', ['AVAILABLE', 'UNSOLD'])
-      .neq('id', playerId)                     // <-- never re-serve the just-marked player immediately
-      .order('was_unsold', { ascending: true }); // Prioritize fresh players
+      .neq('id', playerId)
+      .order('was_unsold', { ascending: true });
+    if (auctionId) pendingQ = pendingQ.eq('auction_id', auctionId);
+
+    const { data: pendingPlayers, error: pendingError } = await pendingQ;
 
     if (pendingError) {
       console.error('Error finding next player:', pendingError);
@@ -781,22 +783,18 @@ router.post('/mark-player', async (req, res) => {
     }
 
     if (pendingPlayers && pendingPlayers.length > 0) {
-      // Use shared helper — respects sequential_mode; falls back to original
-      // random logic (priority0/priority1) when sequential_mode = 0.
-      const currentState = getAuctionState(getAuctionId(req));
-
-      // For sequential mode: use the CURRENT player's serial_number as the authoritative
-      // baseline (not sequential_last_serial from DB which may be stale or missing).
-      // This means "next player after the one we just sold/unsold" is always correct
-      // even if the DB column doesn't exist yet or had a stale value.
+      const currentState = getAuctionState(auctionId);
       const sequentialBaseline = (currentState && currentState.sequential_mode === 1)
         ? { ...currentState, sequential_last_serial: currentPlayer.serial_number ?? currentState.sequential_last_serial }
         : currentState;
 
-      const nextPlayer = pickNextPlayer(pendingPlayers, sequentialBaseline);
+      let nextPlayer = pickNextPlayer(pendingPlayers, sequentialBaseline);
+      // Guarantee next player fallback so screen never gets stuck
+      if (!nextPlayer && pendingPlayers.length > 0) {
+        nextPlayer = pendingPlayers[0];
+      }
 
       if (nextPlayer) {
-        // Build state update — track last served serial when in sequential mode
         const nextStateUpdate = {
           current_player_id: nextPlayer.id,
           status: 'LIVE',
@@ -806,39 +804,38 @@ router.post('/mark-player', async (req, res) => {
           nextStateUpdate.sequential_last_serial = nextPlayer.serial_number;
         }
 
+        const matchObj = auctionId ? { auction_id: auctionId } : { id: 1 };
         await supabase
-          .from('auction_state').update(nextStateUpdate).match(getAuctionId(req) ? { auction_id: getAuctionId(req) } : { id: 1 });
+          .from('auction_state').update(nextStateUpdate).match(matchObj);
 
-        await refreshAuctionState(getAuctionId(req)); // Sync Cache
+        await refreshAuctionState(auctionId);
 
-        // Clear bids
-        await supabase.from('bids').delete().eq('player_id', nextPlayer.id);
+        let delBidsQ = supabase.from('bids').delete().eq('player_id', nextPlayer.id);
+        if (auctionId) delBidsQ = delBidsQ.eq('auction_id', auctionId);
+        await delBidsQ;
 
-        // Admin Bidding 2.0: clear anonymous bid so next player starts clean
-        clearAdminAnonymousBid(getAuctionId(req));
+        clearAdminAnonymousBid(auctionId);
 
         console.log('Auto-loaded next player:', nextPlayer.name);
         io.emit('player-loaded', { player: nextPlayer });
-        res.json({ success: true, nextPlayerLoaded: true, nextPlayer });
-      } else {
-        // Should not happen if length > 0
-        res.json({ success: true });
+        return res.json({ success: true, nextPlayerLoaded: true, nextPlayer });
       }
-    } else {
-      // No more players
-      await supabase
-        .from('auction_state')
-        .update({
-          current_player_id: null,
-          status: 'STOPPED',
-          updated_at: new Date()
-        })
-        .eq('id', 1);
-
-      await refreshAuctionState(getAuctionId(req)); // Sync Cache
-      io.emit('player-loaded', { player: null });
-      res.json({ success: true, nextPlayerLoaded: false, message: 'No more available players' });
     }
+
+    // No more players in this auction
+    const matchObj = auctionId ? { auction_id: auctionId } : { id: 1 };
+    await supabase
+      .from('auction_state')
+      .update({
+        current_player_id: null,
+        status: 'STOPPED',
+        updated_at: new Date()
+      })
+      .match(matchObj);
+
+    await refreshAuctionState(auctionId);
+    io.emit('player-loaded', { player: null });
+    res.json({ success: true, nextPlayerLoaded: false, message: 'No more available players' });
 
   } catch (err) {
     console.error('Error in mark-player:', err);
@@ -1657,18 +1654,20 @@ router.post('/teams', upload.single('logo'), async (req, res) => {
   }
 
   try {
-    // Upload logo if exists
+    // Upload logo if exists - smartly compress to WebP
     let logoPath = null;
     if (req.file) {
-      const fileContent = req.file.buffer;
-      const base64Str = fileContent.toString('base64');
-      const arrayBuffer = decode(base64Str);
+      const logoBuffer = await sharp(req.file.buffer)
+        .resize(500, 500, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
 
-      const ext = req.file.originalname.split('.').pop();
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const filename = `team-${uniqueSuffix}.${ext}`;
+      const logoBase64 = logoBuffer.toString('base64');
+      const arrayBuffer = decode(logoBase64);
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E6);
+      const filename = `teams/team-${uniqueSuffix}.webp`;
 
-      const { error: uploadError } = await supabase.storage.from('auction-images').upload(filename, arrayBuffer, { upsert: true, contentType: req.file.mimetype });
+      const { error: uploadError } = await supabase.storage.from('auction-images').upload(filename, arrayBuffer, { upsert: true, contentType: 'image/webp' });
       if (uploadError) console.error('Logo upload error:', uploadError);
       else {
         const { data: publicUrlData } = supabase.storage.from('auction-images').getPublicUrl(filename);
@@ -1772,16 +1771,19 @@ router.put('/teams/:id', upload.single('logo'), async (req, res) => {
     if (budget !== undefined) updates.budget = parseFloat(budget);
 
     if (req.file) {
-      const fileContent = req.file.buffer;
-      const base64Str = fileContent.toString('base64');
-      const arrayBuffer = decode(base64Str);
+      const logoBuffer = await sharp(req.file.buffer)
+        .resize(500, 500, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
 
-      const ext = req.file.originalname.split('.').pop();
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const filename = `team-${uniqueSuffix}.${ext}`;
+      const logoBase64 = logoBuffer.toString('base64');
+      const arrayBuffer = decode(logoBase64);
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E6);
+      const filename = `teams/team-${uniqueSuffix}.webp`;
 
-      const { error: uploadError } = await supabase.storage.from('auction-images').upload(filename, arrayBuffer, { upsert: true, contentType: req.file.mimetype });
-      if (!uploadError) {
+      const { error: uploadError } = await supabase.storage.from('auction-images').upload(filename, arrayBuffer, { upsert: true, contentType: 'image/webp' });
+      if (uploadError) console.error('Logo upload error:', uploadError);
+      else {
         const { data: publicUrlData } = supabase.storage.from('auction-images').getPublicUrl(filename);
         updates.logo = publicUrlData.publicUrl;
       }
