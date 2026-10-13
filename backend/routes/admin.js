@@ -28,7 +28,6 @@ function getAuctionIo(req) {
   return {
     emit: (event, ...args) => {
       baseIo.of(`/auction/${auctionId}`).emit(event, ...args);
-      baseIo.emit(event, ...args);
     }
   };
 }
@@ -70,19 +69,15 @@ function pickNextPlayer(pendingPlayers, state) {
 // Get auction state
 router.get('/auction-state', async (req, res) => {
   try {
-    const state = getAuctionState(getAuctionId(req));
+    const auctionId = getAuctionId(req);
+    let state = getAuctionState(auctionId);
 
     if (!state) {
-      // Initialize if not exists
-      const { error: insertError } = await supabase
-        .from('auction_state')
-        .insert([{ id: 1, status: 'STOPPED' }]);
+      await refreshAuctionState(auctionId);
+      state = getAuctionState(auctionId);
+    }
 
-      if (insertError) {
-        console.error('Error initializing auction state:', insertError);
-        return res.status(500).json({ error: 'Database error' });
-      }
-
+    if (!state) {
       res.json({
         status: 'STOPPED',
         currentPlayerId: null,
@@ -286,22 +281,27 @@ router.post('/auction-status', async (req, res) => {
 router.post('/load-player', async (req, res) => {
   const { playerId } = req.body;
   const io = getAuctionIo(req);
+  const auctionId = getAuctionId(req);
 
   try {
-    // 1. Get player
-    const { data: player, error: playerError } = await supabase
+    // 1. Get player scoped to auction
+    let playerQuery = supabase
       .from('players')
       .select('*')
-      .eq('id', playerId)
-      .single();
+      .eq('id', playerId);
+    if (auctionId) playerQuery = playerQuery.eq('auction_id', auctionId);
+
+    const { data: player, error: playerError } = await playerQuery.maybeSingle();
 
     if (playerError) throw playerError;
     if (!player) return res.status(404).json({ error: 'Player not found' });
 
-    // 2. Update auction state
-    // If sequential mode is active and the player has a serial number,
-    // track it so the next auto-pick knows where to resume from.
-    const stateForLoad = getAuctionState(getAuctionId(req));
+    // 2. Update auction state (ensure state exists for this auction)
+    let stateForLoad = getAuctionState(auctionId);
+    if (!stateForLoad) {
+      await refreshAuctionState(auctionId);
+      stateForLoad = getAuctionState(auctionId);
+    }
     const loadPayload = {
       current_player_id: playerId,
       status: 'LIVE',
@@ -311,25 +311,27 @@ router.post('/load-player', async (req, res) => {
       loadPayload.sequential_last_serial = player.serial_number;
     }
 
-    const { error: updateError } = await supabase
-      .from('auction_state').update(loadPayload).match(getAuctionId(req) ? { auction_id: getAuctionId(req) } : { id: 1 });
+    const matchCondition = auctionId ? { auction_id: auctionId } : { id: 1 };
+    let { error: updateError } = await supabase
+      .from('auction_state').update(loadPayload).match(matchCondition);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      await refreshAuctionState(auctionId);
+      await supabase.from('auction_state').update(loadPayload).match(matchCondition);
+    }
 
-    await refreshAuctionState(getAuctionId(req)); // Sync Cache
+    await refreshAuctionState(auctionId); // Sync Cache
 
-    // 3. Clear bids for this player (if any exist from simpler times? usually empty if new)
-    // Actually, if we reload a player, we might want to keep bids? 
-    // The original code DELETES bids. I will follow original logic.
-    const { error: deleteBidsError } = await supabase
+    // 3. Clear bids for this player
+    let deleteBidsQuery = supabase
       .from('bids')
       .delete()
       .eq('player_id', playerId);
+    if (auctionId) deleteBidsQuery = deleteBidsQuery.eq('auction_id', auctionId);
+    await deleteBidsQuery;
 
-    if (deleteBidsError) throw deleteBidsError;
-
-    // Admin Bidding 2.0: always clear anonymous bid when a new player is loaded
-    clearAdminAnonymousBid(getAuctionId(req));
+    // Admin Bidding: clear anonymous bid
+    clearAdminAnonymousBid(auctionId);
 
     io.emit('player-loaded', { player });
     res.json({ success: true, player });
@@ -919,18 +921,25 @@ router.post('/reset-unsold-tag/:playerId', async (req, res) => {
 // Get all players
 router.get('/players', async (req, res) => {
   try {
-    // Fetch players
-    const { data: players, error: playersError } = await supabase
+    const auctionId = getAuctionId(req);
+
+    // Fetch players scoped to auction
+    let playersQuery = supabase
       .from('players')
       .select('*')
       .order('id', { ascending: true });
+    if (auctionId) playersQuery = playersQuery.eq('auction_id', auctionId);
 
+    const { data: players, error: playersError } = await playersQuery;
     if (playersError) throw playersError;
 
-    // Fetch teams to map names (since FK might be missing for join)
-    const { data: teams, error: teamsError } = await supabase
+    // Fetch teams to map names scoped to auction
+    let teamsQuery = supabase
       .from('teams')
       .select('id, name');
+    if (auctionId) teamsQuery = teamsQuery.eq('auction_id', auctionId);
+
+    const { data: teams, error: teamsError } = await teamsQuery;
 
     if (teamsError) throw teamsError;
 
@@ -1090,6 +1099,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
 router.post('/players', async (req, res) => {
   const { name, image, role, country, age, base_price, serial_number } = req.body;
   const io = getAuctionIo(req);
+  const auctionId = getAuctionId(req);
 
   if (!name || !role || !base_price) {
     return res.status(400).json({ error: 'Name, role, and base_price are required' });
@@ -1103,22 +1113,18 @@ router.post('/players', async (req, res) => {
       finalSerialNum = serialNum;
 
       // Check if serial number already exists
-      const { data: existing, error: checkError } = await supabase
-        .from('players')
-        .select('id')
-        .eq('serial_number', serialNum)
-        .maybeSingle();
+      let checkQuery = supabase.from('players').select('id').eq('serial_number', serialNum);
+      if (auctionId) checkQuery = checkQuery.eq('auction_id', auctionId);
+      const { data: existing, error: checkError } = await checkQuery.maybeSingle();
 
       if (checkError) throw checkError;
 
       if (existing) {
         // Shift all players with serial_number >= serialNum up by 1
         // Fetch all affected rows
-        const { data: playersToShift, error: fetchError } = await supabase
-          .from('players')
-          .select('id, serial_number')
-          .gte('serial_number', serialNum)
-          .order('serial_number', { ascending: false }); // Start from end to avoid constraint issues if unique? serial_number is not unique constraint in schema but implies order
+        let shiftQuery = supabase.from('players').select('id, serial_number').gte('serial_number', serialNum).order('serial_number', { ascending: false });
+        if (auctionId) shiftQuery = shiftQuery.eq('auction_id', auctionId);
+        const { data: playersToShift, error: fetchError } = await shiftQuery; // Start from end to avoid constraint issues if unique? serial_number is not unique constraint in schema but implies order
 
         if (fetchError) throw fetchError;
 
@@ -1149,7 +1155,8 @@ router.post('/players', async (req, res) => {
         base_price: base_price,
         age: age ? parseInt(age) : null,
         status: 'AVAILABLE',
-        serial_number: finalSerialNum
+        serial_number: finalSerialNum,
+        auction_id: auctionId
       }])
       .select()
       .single();
@@ -1170,6 +1177,7 @@ router.post('/players', async (req, res) => {
 router.post('/players-bulk', async (req, res) => {
   const { players } = req.body;
   const io = getAuctionIo(req);
+  const auctionId = getAuctionId(req);
 
   if (!players || !Array.isArray(players) || players.length === 0) {
     return res.status(400).json({ error: 'Invalid players data' });
@@ -1194,8 +1202,9 @@ router.post('/players-bulk', async (req, res) => {
         age: p.age ? parseInt(p.age) : null,
         serial_number: p.serial_number ? parseInt(p.serial_number) : null,
         status: 'AVAILABLE',
-        image: p.image || null, // Default image will be handled by frontend if null
-        thumb_url: p.thumb_url || null
+        image: p.image || null,
+        thumb_url: p.thumb_url || null,
+        auction_id: auctionId
       });
     }
 
@@ -1307,7 +1316,8 @@ router.post('/players-bulk-with-photos',
           serial_number: p.serial_number ? parseInt(p.serial_number) : null,
           status: 'AVAILABLE',
           image: null,
-          thumb_url: null
+          thumb_url: null,
+          auction_id: getAuctionId(req)
         });
       }
 
@@ -1576,7 +1586,7 @@ router.delete('/players/:id', async (req, res) => {
 
   try {
     // Check if current player
-    const { data: state } = await supabase.from('auction_state').select('current_player_id').eq('id', 1).single();
+    const state = getAuctionState(getAuctionId(req));
     if (state && state.current_player_id === parseInt(id)) {
       return res.status(400).json({ error: 'Cannot delete player that is currently being auctioned' });
     }
@@ -1608,10 +1618,10 @@ router.delete('/players/:id', async (req, res) => {
 // Get all teams
 router.get('/teams', async (req, res) => {
   try {
-    const { data: teams, error } = await supabase
-      .from('teams')
-      .select('*')
-      .order('id', { ascending: true });
+    const auctionId = getAuctionId(req);
+    let teamsQuery = supabase.from('teams').select('*').order('id', { ascending: true });
+    if (auctionId) teamsQuery = teamsQuery.eq('auction_id', auctionId);
+    const { data: teams, error } = await teamsQuery;
 
     if (error) throw error;
 
@@ -1667,8 +1677,11 @@ router.post('/teams', upload.single('logo'), async (req, res) => {
 
     const teamBudget = budget ? parseFloat(budget) : 1000000;
 
-    // Check name uniqueness
-    const { data: existing } = await supabase.from('teams').select('id').eq('name', name.trim()).maybeSingle();
+    const auctionId = getAuctionId(req);
+    // Check name uniqueness scoped to auction
+    let checkTeamQuery = supabase.from('teams').select('id').eq('name', name.trim());
+    if (auctionId) checkTeamQuery = checkTeamQuery.eq('auction_id', auctionId);
+    const { data: existing } = await checkTeamQuery.maybeSingle();
     if (existing) return res.status(400).json({ error: 'Team name already exists' });
 
     // Insert team first to get ID
@@ -1679,7 +1692,8 @@ router.post('/teams', upload.single('logo'), async (req, res) => {
         owner_name: owner_name || null,
         logo: logoPath,
         budget: teamBudget,
-        bidding_locked: 0
+        bidding_locked: 0,
+        auction_id: auctionId
       }])
       .select()
       .single();
@@ -1709,7 +1723,8 @@ router.post('/teams', upload.single('logo'), async (req, res) => {
         username,
         password: hashedPassword,
         role: 'owner',
-        team_id: team.id
+        team_id: team.id,
+        auction_id: auctionId
       }])
       .select()
       .single();
@@ -1954,17 +1969,21 @@ router.put('/teams/:id/credentials', async (req, res) => {
 // Get players by status (for owner dashboard)
 router.get('/players-by-status/:status', async (req, res) => {
   const { status } = req.params;
+  const auctionId = getAuctionId(req);
 
   if (!['SOLD', 'AVAILABLE', 'UNSOLD'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
   }
 
   try {
-    const { data: players, error } = await supabase
+    let playersQuery = supabase
       .from('players')
       .select('*')
       .eq('status', status)
       .order('name');
+    if (auctionId) playersQuery = playersQuery.eq('auction_id', auctionId);
+
+    const { data: players, error } = await playersQuery;
 
     if (error) throw error;
 
@@ -1992,20 +2011,17 @@ router.get('/players-by-status/:status', async (req, res) => {
 // Get team squads (teams with their sold players)
 router.get('/team-squads', async (req, res) => {
   try {
-    // Fetch all teams
-    const { data: teams, error: teamsError } = await supabase
-      .from('teams')
-      .select('*')
-      .order('name');
-
+    const auctionId = getAuctionId(req);
+    // Fetch teams scoped to auction
+    let teamsQuery = supabase.from('teams').select('*').order('name');
+    if (auctionId) teamsQuery = teamsQuery.eq('auction_id', auctionId);
+    const { data: teams, error: teamsError } = await teamsQuery;
     if (teamsError) throw teamsError;
 
-    // Fetch all sold players
-    const { data: players, error: playersError } = await supabase
-      .from('players')
-      .select('*')
-      .eq('status', 'SOLD')
-      .order('name');
+    // Fetch sold players scoped to auction
+    let playersQuery = supabase.from('players').select('*').eq('status', 'SOLD').order('name');
+    if (auctionId) playersQuery = playersQuery.eq('auction_id', auctionId);
+    const { data: players, error: playersError } = await playersQuery;
 
     if (playersError) throw playersError;
 
@@ -2100,8 +2116,9 @@ router.post('/admin-bid', async (req, res) => {
 
   try {
     // 1. Check auction state
-    const { data: state, error: stateError } = await supabase.from('auction_state').select('*').eq('id', 1).single();
-    if (stateError || !state) throw new Error('Auction state error');
+    const auctionId = getAuctionId(req);
+    const state = getAuctionState(auctionId);
+    if (!state) throw new Error('Auction state error');
 
     if (state.status !== 'LIVE') return res.status(400).json({ error: 'Auction is not live' });
     if (!state.current_player_id) return res.status(400).json({ error: 'No player is currently being auctioned' });
@@ -2210,17 +2227,15 @@ router.post('/admin-bid', async (req, res) => {
 // Export Team Squads
 router.get('/export-teams', async (req, res) => {
   try {
-    const { data: teams, error: teamsError } = await supabase
-      .from('teams')
-      .select('id, name')
-      .order('name');
+    const auctionId = getAuctionId(req);
+    let teamsQuery = supabase.from('teams').select('id, name').order('name');
+    if (auctionId) teamsQuery = teamsQuery.eq('auction_id', auctionId);
+    const { data: teams, error: teamsError } = await teamsQuery;
     if (teamsError) throw teamsError;
 
-    const { data: players, error: playersError } = await supabase
-      .from('players')
-      .select('name, role, sold_price, serial_number, sold_to_team')
-      .eq('status', 'SOLD')
-      .order('serial_number');
+    let playersQuery = supabase.from('players').select('name, role, sold_price, serial_number, sold_to_team').eq('status', 'SOLD').order('serial_number');
+    if (auctionId) playersQuery = playersQuery.eq('auction_id', auctionId);
+    const { data: players, error: playersError } = await playersQuery;
     if (playersError) throw playersError;
 
     const workbook = new ExcelJS.Workbook();

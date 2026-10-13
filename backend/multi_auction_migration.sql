@@ -36,3 +36,9 @@ CREATE INDEX IF NOT EXISTS idx_astate_auction   ON public.auction_state(auction_
 
 -- 5. Unique constraint: one auction_state row per auction
 CREATE UNIQUE INDEX IF NOT EXISTS uq_astate_auction ON public.auction_state(auction_id);
+
+-- 6. Ensure auction_state has an auto-incrementing id sequence
+CREATE SEQUENCE IF NOT EXISTS public.auction_state_id_seq;
+SELECT setval('public.auction_state_id_seq', GREATEST(COALESCE((SELECT MAX(id) FROM public.auction_state), 0) + 1, 1), false);
+ALTER TABLE public.auction_state ALTER COLUMN id SET DEFAULT nextval('public.auction_state_id_seq');
+

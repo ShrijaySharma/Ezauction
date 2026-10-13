@@ -84,10 +84,24 @@ router.post('/auctions', async (req, res) => {
       role: 'admin',
       auction_id: id
     }]);
-    if (userError) throw userError;
+    if (userError) {
+      await supabase.from('auctions').delete().eq('id', id);
+      throw userError;
+    }
+
+    // Determine safe next ID for auction_state (handles schemas where id is not auto-increment)
+    const { data: maxStateRow } = await supabase
+      .from('auction_state')
+      .select('id')
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nextStateId = maxStateRow?.id ? Number(maxStateRow.id) + 1 : Date.now();
 
     // Initialize auction_state row for this auction
     const { error: stateError } = await supabase.from('auction_state').insert([{
+      id: nextStateId,
       auction_id: id,
       status: 'STOPPED',
       current_player_id: null,
@@ -100,7 +114,12 @@ router.post('/auctions', async (req, res) => {
       sequential_mode: 0,
       sequential_last_serial: null
     }]);
-    if (stateError) throw stateError;
+    if (stateError) {
+      // Clean up orphaned auction and user records if auction_state failed
+      await supabase.from('users').delete().eq('username', adminUsername);
+      await supabase.from('auctions').delete().eq('id', id);
+      throw stateError;
+    }
 
     res.json({
       success: true,
@@ -215,20 +234,30 @@ router.post('/auctions/:auctionId/regen-creds', async (req, res) => {
   }
 });
 
-// ── Delete Archived Auction ────────────────────────────────────────────────────
+// ── Delete Auction (Direct delete with complete cleanup) ───────────────────────
 router.delete('/auctions/:auctionId', async (req, res) => {
   const auctionId = req.params.auctionId;
   try {
-    const { data: auction } = await supabase.from('auctions').select('status').eq('id', auctionId).single();
+    const { data: auction } = await supabase.from('auctions').select('id, admin_username').eq('id', auctionId).maybeSingle();
     if (!auction) return res.status(404).json({ error: 'Auction not found' });
-    if (auction.status !== 'archived') return res.status(400).json({ error: 'Only archived auctions can be deleted' });
 
-    // CASCADE handles child rows due to ON DELETE CASCADE on all FK columns
+    // Clean up all related tables in foreign-key safe order
+    await supabase.from('bids').delete().eq('auction_id', auctionId);
+    await supabase.from('trades').delete().eq('auction_id', auctionId);
+    await supabase.from('players').delete().eq('auction_id', auctionId);
+    await supabase.from('users').delete().eq('auction_id', auctionId);
+    if (auction.admin_username) {
+      await supabase.from('users').delete().eq('username', auction.admin_username);
+    }
+    await supabase.from('teams').delete().eq('auction_id', auctionId);
+    await supabase.from('auction_state').delete().eq('auction_id', auctionId);
+
     const { error } = await supabase.from('auctions').delete().eq('id', auctionId);
     if (error) throw error;
-    res.json({ success: true });
+    res.json({ success: true, message: `Auction ${auctionId} deleted successfully.` });
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Delete auction error:', err);
+    res.status(500).json({ error: 'Server error: ' + err.message });
   }
 });
 

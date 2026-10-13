@@ -335,38 +335,36 @@ export default function SuperAdminDashboard({ initialUser }) {
                     <span>View Links &amp; URLs</span>
                   </button>
 
-                  <div className="grid grid-cols-3 gap-2 pt-1">
+                  <div className="grid grid-cols-4 gap-1.5 pt-1">
                     <button
                       onClick={() => handleRegenCreds(auction)}
                       title="Generate new admin password"
-                      className="py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition"
+                      className="py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition text-center"
                     >
-                      🔑 New Pass
+                      🔑 Pass
                     </button>
                     <button
                       onClick={() => handleResetData(auction)}
                       title="Wipe data (keep auction and login)"
-                      className="py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-lg text-[11px] font-medium transition"
+                      className="py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 rounded-lg text-[11px] font-medium transition text-center"
                     >
                       🔄 Reset
                     </button>
                     <button
                       onClick={() => handleToggleStatus(auction)}
                       title={auction.status === 'active' ? 'Archive auction' : 'Unarchive auction'}
-                      className="py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition"
+                      className="py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] font-medium transition text-center"
                     >
-                      {auction.status === 'active' ? '📦 Archive' : '⚡ Activate'}
+                      {auction.status === 'active' ? '📦 Archive' : '⚡ Active'}
                     </button>
-                  </div>
-
-                  {auction.status === 'archived' && (
                     <button
                       onClick={() => handleDeleteAuction(auction)}
-                      className="w-full py-1 text-red-400/80 hover:text-red-300 text-[11px] transition text-center"
+                      title="Permanently delete auction"
+                      className="py-1.5 bg-red-500/10 hover:bg-red-500/25 text-red-400 border border-red-500/20 rounded-lg text-[11px] font-medium transition text-center"
                     >
-                      🗑 Delete Permanently
+                      🗑 Delete
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             ))}
