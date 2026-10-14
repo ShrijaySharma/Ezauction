@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_URL } from '../config';
+import { API_URL, getAuctionApiPath, getCurrentAuctionId } from '../config';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -8,8 +8,13 @@ const api = axios.create({
 
 // Request interceptor to automatically attach x-auction-id from URL or storage
 api.interceptors.request.use((config) => {
-  const match = window.location.pathname.match(/\/auction\/([^/]+)/);
-  const auctionId = match ? match[1] : (window.__currentAuctionId || localStorage.getItem('currentAuctionId'));
+  const auctionId = getCurrentAuctionId();
+
+  // All tenant routes must use the server's scoped path.  The header remains
+  // useful for compatibility, but is no longer the only tenant signal.
+  if (auctionId && typeof config.url === 'string' && /^\/(admin|owner|host|public)(?:\/|$)/.test(config.url)) {
+    config.url = getAuctionApiPath(config.url);
+  }
 
   if (auctionId) {
     config.headers['x-auction-id'] = auctionId;
@@ -19,7 +24,7 @@ api.interceptors.request.use((config) => {
 
 export const login = async (username, password, auctionId = null) => {
   try {
-    const aid = auctionId || (window.location.pathname.match(/\/auction\/([^/]+)/)?.[1]);
+    const aid = auctionId || getCurrentAuctionId();
     const url = aid ? `/auction/${aid}/auth/login` : '/auth/login';
     const response = await api.post(url, { username, password, auctionId: aid });
     if (aid) {
@@ -55,14 +60,14 @@ export const superAdminLogin = async (username, password) => {
 };
 
 export const logout = async (auctionId = null) => {
-  const aid = auctionId || (window.location.pathname.match(/\/auction\/([^/]+)/)?.[1]) || localStorage.getItem('currentAuctionId');
+  const aid = auctionId || getCurrentAuctionId();
   const url = aid ? `/auction/${aid}/auth/logout` : '/auth/logout';
   await api.post(url);
   localStorage.removeItem('currentAuctionId');
 };
 
 export const getCurrentUser = async (auctionId = null) => {
-  const aid = auctionId || (window.location.pathname.match(/\/auction\/([^/]+)/)?.[1]) || localStorage.getItem('currentAuctionId');
+  const aid = auctionId || getCurrentAuctionId();
   const url = aid ? `/auction/${aid}/auth/me` : '/auth/me';
   const response = await api.get(url);
   return response.data.user;

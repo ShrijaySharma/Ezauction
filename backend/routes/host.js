@@ -8,6 +8,13 @@ function getAuctionId(req) {
   return req.params.auctionId || req.headers['x-auction-id'] || null;
 }
 
+router.use((req, res, next) => {
+  if (!getAuctionId(req)) {
+    return res.status(400).json({ error: 'Auction ID is required' });
+  }
+  next();
+});
+
 // Host routes are public — no auth required
 
 // Get current public state (player, bid, stats)
@@ -25,11 +32,9 @@ router.get('/current-info', async (req, res) => {
     let qUnsold = supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'UNSOLD');
     let qAvail = supabase.from('players').select('id', { count: 'exact', head: true }).eq('status', 'AVAILABLE');
 
-    if (auctionId) {
-      qSold = qSold.eq('auction_id', auctionId);
-      qUnsold = qUnsold.eq('auction_id', auctionId);
-      qAvail = qAvail.eq('auction_id', auctionId);
-    }
+    qSold = qSold.eq('auction_id', auctionId);
+    qUnsold = qUnsold.eq('auction_id', auctionId);
+    qAvail = qAvail.eq('auction_id', auctionId);
 
     const promises = [qSold, qUnsold, qAvail];
 
@@ -37,10 +42,8 @@ router.get('/current-info', async (req, res) => {
       let qPlayer = supabase.from('players').select('*').eq('id', currentPlayerId);
       let qBid = supabase.from('bids').select('*').eq('player_id', currentPlayerId).order('amount', { ascending: false }).limit(1).maybeSingle();
 
-      if (auctionId) {
-        qPlayer = qPlayer.eq('auction_id', auctionId);
-        qBid = qBid.eq('auction_id', auctionId);
-      }
+      qPlayer = qPlayer.eq('auction_id', auctionId);
+      qBid = qBid.eq('auction_id', auctionId);
 
       promises.push(qPlayer.single());
       promises.push(qBid);
@@ -75,7 +78,7 @@ router.get('/current-info', async (req, res) => {
 
       if (bidResult && bidResult.data) {
         const b = bidResult.data;
-        const { data: bidTeam } = await supabase.from('teams').select('name').eq('id', b.team_id).maybeSingle();
+        const { data: bidTeam } = await supabase.from('teams').select('name').eq('id', b.team_id).eq('auction_id', auctionId).maybeSingle();
 
         highestBid = {
           ...b,
@@ -137,7 +140,7 @@ router.get('/current-bids', async (req, res) => {
       .eq('player_id', state.current_player_id)
       .order('amount', { ascending: false });
 
-    if (auctionId) query = query.eq('auction_id', auctionId);
+    query = query.eq('auction_id', auctionId);
 
     const { data: bids, error } = await query;
     if (error) throw error;
@@ -145,7 +148,7 @@ router.get('/current-bids', async (req, res) => {
     const teamIds = [...new Set(bids.map(b => b.team_id))];
     const teamMap = {};
     if (teamIds.length > 0) {
-      const { data: teams } = await supabase.from('teams').select('id, name').in('id', teamIds);
+      const { data: teams } = await supabase.from('teams').select('id, name').in('id', teamIds).eq('auction_id', auctionId);
       if (teams) teams.forEach(t => teamMap[t.id] = t.name);
     }
 
@@ -167,7 +170,7 @@ router.get('/teams', async (req, res) => {
   try {
     const auctionId = getAuctionId(req);
     let query = supabase.from('teams').select('id, name, logo').order('name');
-    if (auctionId) query = query.eq('auction_id', auctionId);
+    query = query.eq('auction_id', auctionId);
 
     const { data: teams, error } = await query;
     if (error) throw error;
@@ -183,7 +186,7 @@ router.get('/team-budgets', async (req, res) => {
   try {
     const auctionId = getAuctionId(req);
     let query = supabase.from('teams').select('id, name, budget, logo').order('name');
-    if (auctionId) query = query.eq('auction_id', auctionId);
+    query = query.eq('auction_id', auctionId);
 
     const { data: teams, error } = await query;
     if (error) throw error;
@@ -203,7 +206,7 @@ router.get('/unsold-players', async (req, res) => {
       .in('status', ['AVAILABLE', 'UNSOLD'])
       .order('id', { ascending: true });
 
-    if (auctionId) query = query.eq('auction_id', auctionId);
+    query = query.eq('auction_id', auctionId);
 
     const { data: players, error } = await query;
     if (error) throw error;
@@ -222,10 +225,8 @@ router.get('/team-purses', async (req, res) => {
     let tQuery = supabase.from('teams').select('id, name, budget, logo').order('name');
     let pQuery = supabase.from('players').select('sold_to_team, sold_price').eq('status', 'SOLD');
 
-    if (auctionId) {
-      tQuery = tQuery.eq('auction_id', auctionId);
-      pQuery = pQuery.eq('auction_id', auctionId);
-    }
+    tQuery = tQuery.eq('auction_id', auctionId);
+    pQuery = pQuery.eq('auction_id', auctionId);
 
     const [{ data: teams, error: teamsError }, { data: soldPlayers, error: playersError }] = await Promise.all([
       tQuery,

@@ -1,7 +1,5 @@
 import api from './auth';
-import { getApiUrl } from '../config';
-
-const getApiBaseUrl = getApiUrl;
+import { getAuctionApiUrl } from '../config';
 
 export const clearAuctionData = async () => {
   const response = await api.delete('/admin/clear-data');
@@ -83,8 +81,7 @@ export const bulkImportWithPhotos = async (playerFile, photoZip) => {
       formData.append('photoZip', photoZip);
     }
 
-    const API_BASE_URL = getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/admin/players-bulk-with-photos`, {
+    const response = await fetch(getAuctionApiUrl('/admin/players-bulk-with-photos'), {
       method: 'POST',
       body: formData,
       credentials: 'include'
@@ -123,8 +120,7 @@ export const uploadImage = async (file) => {
     const formData = new FormData();
     formData.append('image', file);
 
-    const API_BASE_URL = getApiBaseUrl();
-    const response = await fetch(`${API_BASE_URL}/admin/upload-image`, {
+    const response = await fetch(getAuctionApiUrl('/admin/upload-image'), {
       method: 'POST',
       body: formData,
       credentials: 'include'
@@ -184,8 +180,7 @@ export const addTeam = async (teamData) => {
       formData.append('logo', teamData.logo);
     }
 
-    const API_BASE_URL = getApiBaseUrl();
-    const url = `${API_BASE_URL}/admin/teams`;
+    const url = getAuctionApiUrl('/admin/teams');
     console.log('Sending request to:', url);
     console.log('FormData entries:');
     for (let pair of formData.entries()) {
@@ -231,8 +226,7 @@ export const updateTeam = async (teamId, teamData) => {
   if (teamData.budget !== undefined) formData.append('budget', teamData.budget);
   if (teamData.logo) formData.append('logo', teamData.logo);
 
-  const API_BASE_URL = getApiBaseUrl();
-  const response = await fetch(`${API_BASE_URL}/admin/teams/${teamId}`, {
+  const response = await fetch(getAuctionApiUrl(`/admin/teams/${teamId}`), {
     method: 'PUT',
     body: formData,
     credentials: 'include'

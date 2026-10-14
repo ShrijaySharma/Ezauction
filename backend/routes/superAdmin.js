@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import { supabase } from '../supabaseClient.js';
 import { requireSuperAdmin } from '../middleware/auth.js';
+import { refreshAuctionState, clearAdminAnonymousBid, resetTradingWindowState } from '../auctionState.js';
 
 const router = express.Router();
 
@@ -89,19 +90,8 @@ router.post('/auctions', async (req, res) => {
       throw userError;
     }
 
-    // Determine safe next ID for auction_state (handles schemas where id is not auto-increment)
-    const { data: maxStateRow } = await supabase
-      .from('auction_state')
-      .select('id')
-      .order('id', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const nextStateId = maxStateRow?.id ? Number(maxStateRow.id) + 1 : Date.now();
-
     // Initialize auction_state row for this auction
     const { error: stateError } = await supabase.from('auction_state').insert([{
-      id: nextStateId,
       auction_id: id,
       status: 'STOPPED',
       current_player_id: null,
@@ -116,7 +106,7 @@ router.post('/auctions', async (req, res) => {
     }]);
     if (stateError) {
       // Clean up orphaned auction and user records if auction_state failed
-      await supabase.from('users').delete().eq('username', adminUsername);
+      await supabase.from('users').delete().eq('username', adminUsername).eq('auction_id', id);
       await supabase.from('auctions').delete().eq('id', id);
       throw stateError;
     }
@@ -189,21 +179,30 @@ router.patch('/auctions/:auctionId/status', async (req, res) => {
 router.post('/auctions/:auctionId/reset', async (req, res) => {
   const auctionId = req.params.auctionId;
   try {
-    // Delete in FK-safe order: bids → trades → players → teams (users too except admin)
-    await supabase.from('bids').delete().eq('auction_id', auctionId);
-    await supabase.from('trades').delete().eq('auction_id', auctionId);
-    await supabase.from('players').delete().eq('auction_id', auctionId);
-    // Delete non-admin users (owners) for this auction
-    await supabase.from('users').delete().eq('auction_id', auctionId).eq('role', 'owner');
-    await supabase.from('teams').delete().eq('auction_id', auctionId);
-
-    // Reset auction_state for this auction
+    // Clean up in FK-safe order:
+    // 1. Decouple current player from auction_state first to satisfy FK constraints
     await supabase.from('auction_state').update({
       status: 'STOPPED',
       current_player_id: null,
       bidding_locked: 0,
       sequential_last_serial: null
     }).eq('auction_id', auctionId);
+
+    // 2. Detach owners from teams to break circular dependency
+    await supabase.from('teams').update({ owner_id: null }).eq('auction_id', auctionId);
+
+    // 3. Delete dependent child records
+    await supabase.from('bids').delete().eq('auction_id', auctionId);
+    await supabase.from('trades').delete().eq('auction_id', auctionId);
+    await supabase.from('users').delete().eq('auction_id', auctionId).eq('role', 'owner');
+
+    // 4. Delete players and teams
+    await supabase.from('players').delete().eq('auction_id', auctionId);
+    await supabase.from('teams').delete().eq('auction_id', auctionId);
+
+    clearAdminAnonymousBid(auctionId);
+    resetTradingWindowState(auctionId);
+    await refreshAuctionState(auctionId);
 
     res.json({ success: true, message: 'Auction data reset. Credentials preserved.' });
   } catch (err) {
@@ -223,7 +222,11 @@ router.post('/auctions/:auctionId/regen-creds', async (req, res) => {
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
     await supabase.from('auctions').update({ admin_password: hashedPassword }).eq('id', auctionId);
-    await supabase.from('users').update({ password: hashedPassword }).eq('username', auction.admin_username);
+    await supabase
+      .from('users')
+      .update({ password: hashedPassword })
+      .eq('username', auction.admin_username)
+      .eq('auction_id', auctionId);
 
     res.json({
       success: true,
@@ -241,19 +244,23 @@ router.delete('/auctions/:auctionId', async (req, res) => {
     const { data: auction } = await supabase.from('auctions').select('id, admin_username').eq('id', auctionId).maybeSingle();
     if (!auction) return res.status(404).json({ error: 'Auction not found' });
 
-    // Clean up all related tables in foreign-key safe order
+    // Clean up all related tables in foreign-key safe order:
+    // 1. Delete auction_state (removes FK reference to players)
+    await supabase.from('auction_state').delete().eq('auction_id', auctionId);
+    // 2. Break circular FK between teams and users
+    await supabase.from('teams').update({ owner_id: null }).eq('auction_id', auctionId);
+    // 3. Delete dependent rows
     await supabase.from('bids').delete().eq('auction_id', auctionId);
     await supabase.from('trades').delete().eq('auction_id', auctionId);
-    await supabase.from('players').delete().eq('auction_id', auctionId);
     await supabase.from('users').delete().eq('auction_id', auctionId);
-    if (auction.admin_username) {
-      await supabase.from('users').delete().eq('username', auction.admin_username);
-    }
+    // 4. Delete players and teams
+    await supabase.from('players').delete().eq('auction_id', auctionId);
     await supabase.from('teams').delete().eq('auction_id', auctionId);
-    await supabase.from('auction_state').delete().eq('auction_id', auctionId);
 
     const { error } = await supabase.from('auctions').delete().eq('id', auctionId);
     if (error) throw error;
+    clearAdminAnonymousBid(auctionId);
+    resetTradingWindowState(auctionId);
     res.json({ success: true, message: `Auction ${auctionId} deleted successfully.` });
   } catch (err) {
     console.error('Delete auction error:', err);

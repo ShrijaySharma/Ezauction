@@ -8,6 +8,13 @@ function getAuctionId(req) {
   return req.params.auctionId || req.headers['x-auction-id'] || null;
 }
 
+router.use((req, res, next) => {
+  if (!getAuctionId(req)) {
+    return res.status(400).json({ error: 'Auction ID is required' });
+  }
+  next();
+});
+
 // Get all players (public)
 router.get('/players', async (req, res) => {
   try {
@@ -18,7 +25,7 @@ router.get('/players', async (req, res) => {
       .order('serial_number', { ascending: true })
       .order('id', { ascending: true });
 
-    if (auctionId) query = query.eq('auction_id', auctionId);
+    query = query.eq('auction_id', auctionId);
 
     const { data: players, error } = await query;
     if (error) throw error;
@@ -37,7 +44,7 @@ router.get('/teams', async (req, res) => {
       .from('teams')
       .select('id, name, logo, budget, owner_name');
 
-    if (auctionId) query = query.eq('auction_id', auctionId);
+    query = query.eq('auction_id', auctionId);
 
     const { data: teams, error } = await query;
     if (error) throw error;
@@ -77,7 +84,7 @@ router.get('/current-bid', async (req, res) => {
       .order('amount', { ascending: false })
       .limit(1);
 
-    if (auctionId) query = query.eq('auction_id', auctionId);
+    query = query.eq('auction_id', auctionId);
 
     const { data: bid, error: bidError } = await query.maybeSingle();
     if (bidError) throw bidError;
@@ -88,6 +95,7 @@ router.get('/current-bid', async (req, res) => {
         .from('teams')
         .select('name')
         .eq('id', bid.team_id)
+        .eq('auction_id', auctionId)
         .maybeSingle();
 
       processedBid = {

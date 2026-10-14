@@ -6,7 +6,7 @@ export const getCurrentInfo = async () => {
 };
 
 export const getAllBids = async () => {
-  const response = await api.get('/host/bids');
+  const response = await api.get('/host/current-bids');
   return response.data;
 };
 

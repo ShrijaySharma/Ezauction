@@ -13,8 +13,10 @@ import hostRoutes from './routes/host.js';
 import appOwnerRoutes from './routes/appOwner.js';
 import publicRoutes from './routes/public.js';
 import superAdminRoutes from './routes/superAdmin.js';
+import { requireAuctionScope } from './middleware/auth.js';
 import bcrypt from 'bcrypt';
 import { supabase } from './supabaseClient.js';
+import { SupabaseSessionStore } from './supabaseSessionStore.js';
 import { refreshAuctionState, refreshAllAuctionStates, getAuctionState, getAdminAnonymousBid } from './auctionState.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +41,13 @@ const io = new Server(httpServer, {
 });
 
 const PORT = process.env.PORT || 4000;
+// Render and production deployments must never fall back to a checked-in
+// session secret.
+const isProduction = process.env.NODE_ENV === 'production' || !!process.env.RENDER;
+const sessionSecret = process.env.SESSION_SECRET;
+if (isProduction && !sessionSecret) {
+  throw new Error('SESSION_SECRET must be configured in production');
+}
 
 // Middleware
 app.use(cors({
@@ -61,10 +70,10 @@ app.set('trust proxy', 1);
 
 // Session configuration
 // Secure cookie ONLY in actual production (Render HTTPS). Localhost uses standard Lax/insecure cookie so it persists across refreshes.
-const isProduction = process.env.NODE_ENV === 'production' || !!process.env.RENDER;
 
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'cricket-auction-secret-key-2024',
+  secret: sessionSecret || 'development-only-auction-session-secret',
+  store: new SupabaseSessionStore(),
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -83,8 +92,8 @@ app.use('/api/super-admin', superAdminRoutes);
 
 // Auction-Scoped Routes
 app.use('/api/auction/:auctionId/auth', authRoutes);
-app.use('/api/auction/:auctionId/admin', adminRoutes);
-app.use('/api/auction/:auctionId/owner', ownerRoutes);
+app.use('/api/auction/:auctionId/admin', requireAuctionScope, adminRoutes);
+app.use('/api/auction/:auctionId/owner', requireAuctionScope, ownerRoutes);
 app.use('/api/auction/:auctionId/host', hostRoutes);
 app.use('/api/auction/:auctionId/public', publicRoutes);
 
@@ -103,9 +112,22 @@ app.get('/api/proxy-image', async (req, res) => {
     return res.status(400).send('URL query parameter is required');
   }
 
+  // This endpoint is public, so never let it become a general-purpose server
+  // side request proxy. Player assets are stored only in this Supabase project.
+  let parsedImageUrl;
+  try {
+    parsedImageUrl = new URL(imageUrl);
+    const configuredHost = new URL(process.env.SUPABASE_URL).hostname;
+    if (parsedImageUrl.protocol !== 'https:' || parsedImageUrl.hostname !== configuredHost) {
+      return res.status(400).send('Only this project\'s Supabase image URLs are allowed');
+    }
+  } catch {
+    return res.status(400).send('Invalid image URL');
+  }
+
   try {
     // We fetch the image from Supabase via Render's backend (which isn't blocked by Jio)
-    const response = await fetch(imageUrl);
+    const response = await fetch(parsedImageUrl);
 
     if (!response.ok) {
       return res.status(response.status).send('Failed to fetch image from Supabase');
@@ -206,6 +228,7 @@ auctionNamespace.on('connection', (socket) => {
                 .from('teams')
                 .select('name')
                 .eq('id', bid.team_id)
+                .eq('auction_id', auctionId)
                 .maybeSingle();
               if (team) teamName = team.name;
             }
@@ -247,82 +270,9 @@ auctionNamespace.on('connection', (socket) => {
   });
 });
 
-// Legacy root namespace handling (fallback / backward compatibility)
-io.on('connection', (socket) => {
-  console.log('Client connected to root namespace:', socket.id);
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected from root namespace:', socket.id);
-  });
-
-  socket.on('request-info', async () => {
-    try {
-      const state = getAuctionState();
-      if (state && state.current_player_id) {
-        const { data: player } = await supabase
-          .from('players')
-          .select('*')
-          .eq('id', state.current_player_id)
-          .maybeSingle();
-
-        if (player) {
-          socket.emit('player-loaded', { player });
-
-          const { data: bid } = await supabase
-            .from('bids')
-            .select('*')
-            .eq('player_id', state.current_player_id)
-            .order('amount', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (bid) {
-            let processedBid;
-            if (bid.team_id) {
-              const { data: team } = await supabase
-                .from('teams')
-                .select('name')
-                .eq('id', bid.team_id)
-                .maybeSingle();
-
-              processedBid = { ...bid, team_name: team ? team.name : '' };
-            } else {
-              processedBid = { ...bid, team_name: '' };
-            }
-
-            const anonBid = getAdminAnonymousBid();
-            if (anonBid.playerId === state.current_player_id && anonBid.amount > processedBid.amount) {
-              processedBid = {
-                ...processedBid,
-                amount: anonBid.amount,
-                team_id: null,
-                team_name: ''
-              };
-            }
-
-            socket.emit('bid-updated', { highestBid: processedBid });
-          } else {
-            const anonBid = getAdminAnonymousBid();
-            if (anonBid.playerId === state.current_player_id && anonBid.amount > 0) {
-              socket.emit('bid-updated', {
-                highestBid: {
-                  id: Date.now(),
-                  player_id: state.current_player_id,
-                  team_id: null,
-                  amount: anonBid.amount,
-                  team_name: '',
-                  timestamp: new Date()
-                }
-              });
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error sending root initial info:', err);
-    }
-  });
-});
+// There is intentionally no root Socket.IO data channel. Auction clients must
+// join /auction/:auctionId, which prevents one auction's event stream from ever
+// being broadcast to viewers of another auction.
 
 // Start server
 httpServer.listen(PORT, '0.0.0.0', async () => {

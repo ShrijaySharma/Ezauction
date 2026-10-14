@@ -8,7 +8,7 @@ import BidNotification from '../components/BidNotification';
 import BulkUploadModal from '../components/BulkUploadModal';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
-import { getSocketUrl } from '../config';
+import { getSocketUrl, getAuctionApiUrl } from '../config';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -2178,7 +2178,7 @@ function AdminDashboard({ user }) {
                   <div className="flex items-center gap-4">
                     <h2 className="text-2xl font-bold text-white">Team Squads</h2>
                     <button
-                      onClick={() => window.open('/api/admin/export-teams', '_blank')}
+                      onClick={() => window.open(getAuctionApiUrl('/admin/export-teams'), '_blank')}
                       className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded flex items-center gap-2 transition-colors shadow-lg"
                       title="Export all data to an Excel file"
                     >

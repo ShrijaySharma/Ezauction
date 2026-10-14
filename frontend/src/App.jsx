@@ -12,7 +12,7 @@ import { getCurrentUser } from './services/auth';
 
 function AuctionAdminWrapper({ user }) {
   const { auctionId } = useParams();
-  if (user?.role === 'admin' && (user.auctionId === auctionId || !user.auctionId || user.role === 'super_admin')) {
+  if (user?.role === 'super_admin' || (user?.role === 'admin' && (user.auctionId === auctionId || !user.auctionId))) {
     return <AdminDashboard user={user} />;
   }
   return <Navigate to={`/auction/${auctionId}/login`} replace />;

@@ -44,22 +44,16 @@ export async function refreshAuctionState(auctionId) {
         } else {
             // Create it if missing
             console.warn(`[Cache:${auctionId}] Auction state not found. Initializing...`);
-            const { data: maxStateRow } = await supabase
+            const defaults = defaultAuctionState(auctionId);
+            const { data: insertedState, error: insertError } = await supabase
                 .from('auction_state')
-                .select('id')
-                .order('id', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-            const nextStateId = maxStateRow?.id ? Number(maxStateRow.id) + 1 : Date.now();
-            const defaults = { ...defaultAuctionState(auctionId), id: nextStateId };
-            const { error: insertError } = await supabase
-                .from('auction_state')
-                .insert([defaults]);
+                .insert([defaults])
+                .select()
+                .single();
             if (insertError) {
                 console.error(`[Cache:${auctionId}] Error creating initial state:`, insertError);
             } else {
-                auctionStateCaches.set(auctionId, defaults);
+                auctionStateCaches.set(auctionId, insertedState);
             }
         }
     } catch (err) {

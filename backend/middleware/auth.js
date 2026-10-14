@@ -6,9 +6,9 @@ export function requireAuth(req, res, next) {
   next();
 }
 
-// Middleware to check if user is admin (scoped to an auction)
+// Middleware to check if user is admin (scoped to an auction, or super_admin)
 export function requireAdmin(req, res, next) {
-  if (!req.session.userId || req.session.role !== 'admin') {
+  if (!req.session.userId || (req.session.role !== 'admin' && req.session.role !== 'super_admin')) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();

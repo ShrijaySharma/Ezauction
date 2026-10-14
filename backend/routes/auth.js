@@ -15,14 +15,29 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    let query = supabase.from('users').select('*').eq('username', username);
-
-    // If an auctionId is specified in URL or body, restrict to that auction unless super_admin
-    if (targetAuctionId) {
-      query = query.or(`auction_id.eq.${targetAuctionId},role.eq.super_admin`);
+    // Normal users must enter through a tenant link. Super-admin authentication
+    // is deliberately kept on its separate endpoint.
+    if (!targetAuctionId) {
+      return res.status(400).json({ error: 'Auction ID is required. Use the auction-specific login link.' });
     }
 
-    const { data: user, error } = await query.maybeSingle();
+    const { data: auction, error: auctionError } = await supabase
+      .from('auctions')
+      .select('id, status')
+      .eq('id', targetAuctionId)
+      .maybeSingle();
+
+    if (auctionError) throw auctionError;
+    if (!auction || auction.status !== 'active') {
+      return res.status(404).json({ error: 'This auction is unavailable' });
+    }
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .eq('auction_id', targetAuctionId)
+      .maybeSingle();
 
     if (error) {
       console.error('Database error during login:', error);
@@ -49,12 +64,13 @@ router.post('/login', async (req, res) => {
         .from('teams')
         .select('name')
         .eq('id', teamId)
+        .eq('auction_id', targetAuctionId)
         .maybeSingle();
 
       if (team) teamName = team.name;
     }
 
-    const userAuctionId = user.auction_id || targetAuctionId || null;
+    const userAuctionId = user.auction_id;
 
     // Set session
     req.session.userId = user.id;
@@ -117,6 +133,12 @@ router.get('/me', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
+    const userAuctionId = user.auction_id || req.session.auctionId || null;
+    const routeAuctionId = req.params.auctionId || req.session.auctionId || null;
+    if (routeAuctionId && user.role !== 'super_admin' && userAuctionId !== routeAuctionId) {
+      return res.status(403).json({ error: 'Access denied: auction scope mismatch' });
+    }
+
     // Map team data manually
     let teamName = null;
     const teamId = user.team_id;
@@ -126,12 +148,11 @@ router.get('/me', async (req, res) => {
         .from('teams')
         .select('name')
         .eq('id', teamId)
+        .eq('auction_id', userAuctionId)
         .maybeSingle();
 
       if (team) teamName = team.name;
     }
-
-    const userAuctionId = user.auction_id || req.session.auctionId || null;
 
     res.json({
       user: {
