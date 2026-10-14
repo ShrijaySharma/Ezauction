@@ -18,21 +18,37 @@ router.post('/login', async (req, res) => {
     let user;
 
     if (!targetAuctionId) {
-      // If no auction ID is provided, allow super_admin to log in.
-      // Tenant users (admin/owner) must use their auction-specific link.
-      const { data: superAdminUser, error: saError } = await supabase
+      // Look up user by username across all accounts
+      const { data: matchedUsers, error: userError } = await supabase
         .from('users')
         .select('*')
-        .eq('username', username)
-        .eq('role', 'super_admin')
-        .maybeSingle();
+        .eq('username', username);
 
-      if (saError) throw saError;
+      if (userError) throw userError;
 
-      if (!superAdminUser) {
-        return res.status(400).json({ error: 'Auction ID is required. Use the auction-specific login link.' });
+      if (!matchedUsers || matchedUsers.length === 0) {
+        console.log('Login attempt failed: User not found -', username);
+        return res.status(401).json({ error: 'Invalid credentials' });
       }
-      user = superAdminUser;
+
+      if (matchedUsers.length > 1) {
+        return res.status(400).json({ error: 'Multiple accounts match this username. Please use your auction-specific login link.' });
+      }
+
+      user = matchedUsers[0];
+
+      // If user belongs to an auction, check that the auction exists and is active
+      if (user.auction_id) {
+        const { data: auction } = await supabase
+          .from('auctions')
+          .select('id, status')
+          .eq('id', user.auction_id)
+          .maybeSingle();
+
+        if (!auction || auction.status !== 'active') {
+          return res.status(404).json({ error: 'This auction is currently unavailable or archived' });
+        }
+      }
     } else {
       // Validate auction exists and is active
       const { data: auction, error: auctionError } = await supabase
