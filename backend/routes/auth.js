@@ -15,33 +15,50 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    // Normal users must enter through a tenant link. Super-admin authentication
-    // is deliberately kept on its separate endpoint.
+    let user;
+
     if (!targetAuctionId) {
-      return res.status(400).json({ error: 'Auction ID is required. Use the auction-specific login link.' });
-    }
+      // If no auction ID is provided, allow super_admin to log in.
+      // Tenant users (admin/owner) must use their auction-specific link.
+      const { data: superAdminUser, error: saError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .eq('role', 'super_admin')
+        .maybeSingle();
 
-    const { data: auction, error: auctionError } = await supabase
-      .from('auctions')
-      .select('id, status')
-      .eq('id', targetAuctionId)
-      .maybeSingle();
+      if (saError) throw saError;
 
-    if (auctionError) throw auctionError;
-    if (!auction || auction.status !== 'active') {
-      return res.status(404).json({ error: 'This auction is unavailable' });
-    }
+      if (!superAdminUser) {
+        return res.status(400).json({ error: 'Auction ID is required. Use the auction-specific login link.' });
+      }
+      user = superAdminUser;
+    } else {
+      // Validate auction exists and is active
+      const { data: auction, error: auctionError } = await supabase
+        .from('auctions')
+        .select('id, status')
+        .eq('id', targetAuctionId)
+        .maybeSingle();
 
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .eq('auction_id', targetAuctionId)
-      .maybeSingle();
+      if (auctionError) throw auctionError;
+      if (!auction || auction.status !== 'active') {
+        return res.status(404).json({ error: 'This auction is unavailable' });
+      }
 
-    if (error) {
-      console.error('Database error during login:', error);
-      return res.status(500).json({ error: 'Database error: ' + error.message });
+      // Check for user in this auction, or allow super_admin
+      const { data: matchedUser, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .or(`auction_id.eq.${targetAuctionId},role.eq.super_admin`)
+        .maybeSingle();
+
+      if (userError) {
+        console.error('Database error during login:', userError);
+        return res.status(500).json({ error: 'Database error: ' + userError.message });
+      }
+      user = matchedUser;
     }
 
     if (!user) {
@@ -59,18 +76,18 @@ router.post('/login', async (req, res) => {
     let teamName = null;
     const teamId = user.team_id;
 
-    if (teamId) {
+    if (teamId && user.auction_id) {
       const { data: team } = await supabase
         .from('teams')
         .select('name')
         .eq('id', teamId)
-        .eq('auction_id', targetAuctionId)
+        .eq('auction_id', user.auction_id)
         .maybeSingle();
 
       if (team) teamName = team.name;
     }
 
-    const userAuctionId = user.auction_id;
+    const userAuctionId = user.auction_id || null;
 
     // Set session
     req.session.userId = user.id;
