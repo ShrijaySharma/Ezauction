@@ -298,7 +298,11 @@ router.post('/auction-status', async (req, res) => {
 
 // Load next player
 router.post('/load-player', async (req, res) => {
-  const { playerId } = req.body;
+  const numericPlayerId = parseInt(req.body.playerId);
+  if (!numericPlayerId || isNaN(numericPlayerId)) {
+    return res.status(400).json({ error: 'Valid player ID is required' });
+  }
+
   const io = getAuctionIo(req);
   const auctionId = getAuctionId(req);
 
@@ -307,7 +311,7 @@ router.post('/load-player', async (req, res) => {
     let playerQuery = supabase
       .from('players')
       .select('*')
-      .eq('id', playerId);
+      .eq('id', numericPlayerId);
     playerQuery = playerQuery.eq('auction_id', auctionId);
 
     const { data: player, error: playerError } = await playerQuery.maybeSingle();
@@ -322,7 +326,7 @@ router.post('/load-player', async (req, res) => {
       stateForLoad = getAuctionState(auctionId);
     }
     const loadPayload = {
-      current_player_id: playerId,
+      current_player_id: numericPlayerId,
       status: 'LIVE',
       updated_at: new Date()
     };
@@ -350,7 +354,7 @@ router.post('/load-player', async (req, res) => {
     let deleteBidsQuery = supabase
       .from('bids')
       .delete()
-      .eq('player_id', playerId);
+      .eq('player_id', numericPlayerId);
     deleteBidsQuery = deleteBidsQuery.eq('auction_id', auctionId);
     await deleteBidsQuery;
 
@@ -362,7 +366,7 @@ router.post('/load-player', async (req, res) => {
 
   } catch (err) {
     console.error('Error loading player:', err);
-    res.status(500).json({ error: 'Database error' });
+    res.status(500).json({ error: 'Database error: ' + (err.message || 'Unknown database error') });
   }
 });
 

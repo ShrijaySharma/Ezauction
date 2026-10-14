@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { logout } from '../services/auth';
@@ -85,6 +85,8 @@ function AdminDashboard({ user }) {
   const [adminBidTeamId, setAdminBidTeamId] = useState('');
   const [isMarkingPlayer, setIsMarkingPlayer] = useState(false);
   const [saleToast, setSaleToast] = useState(null);
+  const [loadPlayerSearch, setLoadPlayerSearch] = useState('');
+  const [consolePlayerSearch, setConsolePlayerSearch] = useState('');
 
   // Trading Window State
   const [showTradingModal, setShowTradingModal] = useState(false);
@@ -472,18 +474,31 @@ function AdminDashboard({ user }) {
   };
 
   const handleLoadPlayer = async (targetPlayerId = null) => {
-    const idToLoad = targetPlayerId || selectedPlayerId;
-    if (!idToLoad) {
-      alert('Please select a player');
+    // If targetPlayerId is an event object (e.g. from onClick={handleLoadPlayer}) or non-primitive, ignore it
+    const idToUse = (typeof targetPlayerId === 'number' || typeof targetPlayerId === 'string')
+      ? targetPlayerId
+      : selectedPlayerId;
+
+    if (!idToUse) {
+      alert('Please select a player to load');
       return;
     }
+
+    const parsedId = parseInt(idToUse);
+    if (isNaN(parsedId) || parsedId <= 0) {
+      alert('Please select a valid player');
+      return;
+    }
+
     try {
-      const res = await adminService.loadPlayer(parseInt(idToLoad));
+      const res = await adminService.loadPlayer(parsedId);
       if (res && res.player) {
         setCurrentPlayer(res.player);
         setHighestBid(null);
         setAllBids([]);
         setSelectedPlayerId(res.player.id.toString());
+        setLoadPlayerSearch('');
+        setConsolePlayerSearch('');
         loadCurrentBid();
         loadPlayers();
         if (showTeamSquads) loadTeamSquads();
@@ -492,6 +507,25 @@ function AdminDashboard({ user }) {
       alert('Error loading player: ' + (error.response?.data?.error || error.message));
     }
   };
+
+  const availablePlayersToLoad = useMemo(() => {
+    return players.filter(p => p.status === 'AVAILABLE' || p.status === 'UNSOLD' || !p.status);
+  }, [players]);
+
+  const getFilteredPlayersForLoad = useCallback((searchTerm) => {
+    if (!searchTerm || !searchTerm.trim()) return availablePlayersToLoad;
+    const term = searchTerm.toLowerCase().trim();
+    const cleanNum = term.replace(/^#/, '');
+    return availablePlayersToLoad.filter(p => {
+      const name = (p.name || '').toLowerCase();
+      const role = (p.role || '').toLowerCase();
+      const serial = p.serial_number != null ? String(p.serial_number) : '';
+      return name.includes(term) ||
+             role.includes(term) ||
+             (cleanNum && serial === cleanNum) ||
+             (serial && serial.includes(term));
+    });
+  }, [availablePlayersToLoad]);
 
   const handleUndoBid = async () => {
     if (!confirm('Undo last bid?')) return;
@@ -1511,32 +1545,125 @@ function AdminDashboard({ user }) {
               </div>
             )}
 
-            {/* Load Player */}
+            {/* Load Player with Search */}
             <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-4 border border-gray-700 shadow-lg">
-              <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-                <span className="text-xl">🎯</span>
-                Load Player
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-white font-semibold flex items-center gap-2">
+                  <span className="text-xl">🎯</span>
+                  Load Player
+                </h3>
+                <span className="text-xs text-gray-400 bg-gray-700/60 px-2 py-0.5 rounded-full border border-gray-600">
+                  {availablePlayersToLoad.length} available
+                </span>
+              </div>
+
+              {/* Real-time Search Input */}
+              <div className="relative mb-2.5">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-sm">
+                  🔍
+                </span>
+                <input
+                  type="text"
+                  value={loadPlayerSearch}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setLoadPlayerSearch(val);
+                    const matches = getFilteredPlayersForLoad(val);
+                    if (matches.length === 1) {
+                      setSelectedPlayerId(matches[0].id.toString());
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const matches = getFilteredPlayersForLoad(loadPlayerSearch);
+                      if (matches.length === 1) {
+                        handleLoadPlayer(matches[0].id);
+                      } else if (selectedPlayerId) {
+                        handleLoadPlayer(selectedPlayerId);
+                      }
+                    }
+                  }}
+                  placeholder="Search player by name, #serial no, or role..."
+                  className="w-full pl-9 pr-8 py-2 bg-gray-700/80 border border-gray-600 rounded-lg text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+                {loadPlayerSearch && (
+                  <button
+                    onClick={() => setLoadPlayerSearch('')}
+                    className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-white text-xs"
+                    title="Clear search"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Dropdown + Load Button */}
               <div className="flex gap-2">
                 <select
                   value={selectedPlayerId}
                   onChange={(e) => setSelectedPlayerId(e.target.value)}
-                  className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 >
-                  <option value="">Select a player</option>
-                  {players.filter(p => p.status === 'AVAILABLE' || p.status === 'UNSOLD').map(player => (
+                  <option value="">
+                    {loadPlayerSearch
+                      ? `Select from ${getFilteredPlayersForLoad(loadPlayerSearch).length} matches...`
+                      : 'Select a player from list...'}
+                  </option>
+                  {getFilteredPlayersForLoad(loadPlayerSearch).map(player => (
                     <option key={player.id} value={player.id}>
                       {player.status === 'UNSOLD' ? '🔄 ' : ''}{player.was_unsold ? '⚠️ ' : ''}{player.serial_number ? `#${player.serial_number} ` : ''}{player.name} - {player.role} (₹{player.base_price?.toLocaleString('en-IN')})
                     </option>
                   ))}
                 </select>
                 <button
-                  onClick={handleLoadPlayer}
-                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-105"
+                  onClick={() => handleLoadPlayer(selectedPlayerId)}
+                  disabled={!selectedPlayerId}
+                  className="px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95 text-sm flex items-center gap-1.5 flex-shrink-0"
                 >
-                  ▶ Load
+                  <span>▶</span> Load
                 </button>
               </div>
+
+              {/* Instant Match Quick Chips when searching */}
+              {loadPlayerSearch.trim() && (
+                <div className="mt-2.5 pt-2 border-t border-gray-700/60">
+                  <div className="text-[11px] text-gray-400 mb-1.5 flex justify-between items-center">
+                    <span>
+                      {getFilteredPlayersForLoad(loadPlayerSearch).length === 0
+                        ? 'No matching players found'
+                        : `Matching Players (${getFilteredPlayersForLoad(loadPlayerSearch).length}):`}
+                    </span>
+                    <span className="text-[10px] text-gray-500">Click any player to load instantly</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar">
+                    {getFilteredPlayersForLoad(loadPlayerSearch).slice(0, 8).map(player => (
+                      <button
+                        key={player.id}
+                        onClick={() => {
+                          setSelectedPlayerId(player.id.toString());
+                          handleLoadPlayer(player.id);
+                        }}
+                        className={`text-xs px-2.5 py-1 rounded-md border flex items-center gap-1.5 transition-all text-left ${
+                          String(selectedPlayerId) === String(player.id)
+                            ? 'bg-blue-600 border-blue-400 text-white font-semibold'
+                            : 'bg-gray-700/70 border-gray-600 text-gray-200 hover:bg-gray-600 hover:text-white'
+                        }`}
+                      >
+                        {player.status === 'UNSOLD' && <span className="text-orange-400">🔄</span>}
+                        {player.serial_number && <span className="text-blue-400 font-mono text-[11px]">#{player.serial_number}</span>}
+                        <span className="font-medium truncate max-w-[120px]">{player.name}</span>
+                        <span className="text-[10px] text-gray-400">({player.role?.slice(0, 3)})</span>
+                        <span className="text-[11px] text-green-400 font-bold ml-0.5">▶</span>
+                      </button>
+                    ))}
+                    {getFilteredPlayersForLoad(loadPlayerSearch).length > 8 && (
+                      <span className="text-[11px] text-gray-400 self-center px-1">
+                        +{getFilteredPlayersForLoad(loadPlayerSearch).length - 8} more in dropdown
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1752,6 +1879,18 @@ function AdminDashboard({ user }) {
                       <div className="text-gray-400 text-xs mt-0.5">{player.role} • {player.age ? `${player.age} yrs • ` : ''}₹{player.base_price?.toLocaleString('en-IN')}</div>
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
+                      {player.status !== 'SOLD' && (
+                        <button
+                          onClick={() => {
+                            setSelectedPlayerId(player.id.toString());
+                            handleLoadPlayer(player.id);
+                          }}
+                          className="px-2 py-1.5 bg-blue-600/90 hover:bg-blue-600 text-white rounded text-xs whitespace-nowrap transition-colors font-semibold flex items-center gap-1 shadow-sm"
+                          title="Load this player for live bidding"
+                        >
+                          ▶ Load
+                        </button>
+                      )}
                       {!!player.was_unsold && (
                         <button
                           onClick={() => handleResetUnsoldTag(player.id)}
@@ -2704,15 +2843,54 @@ function AdminDashboard({ user }) {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Quick load next player dropdown inside console top bar */}
+              {/* Quick search and load next player inside console top bar */}
               <div className="flex items-center gap-1.5 bg-gray-700/60 p-1 rounded-lg border border-gray-600">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={consolePlayerSearch}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setConsolePlayerSearch(val);
+                      const matches = getFilteredPlayersForLoad(val);
+                      if (matches.length === 1) {
+                        setSelectedPlayerId(matches[0].id.toString());
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const matches = getFilteredPlayersForLoad(consolePlayerSearch);
+                        if (matches.length === 1) {
+                          handleLoadPlayer(matches[0].id);
+                        } else if (selectedPlayerId) {
+                          handleLoadPlayer(selectedPlayerId);
+                        }
+                      }
+                    }}
+                    placeholder="🔍 Search name / #..."
+                    className="w-32 sm:w-36 py-1 pl-2 pr-5 bg-gray-800 border border-gray-600 rounded text-white text-xs outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-400"
+                  />
+                  {consolePlayerSearch && (
+                    <button
+                      onClick={() => setConsolePlayerSearch('')}
+                      className="absolute inset-y-0 right-0 pr-1.5 flex items-center text-gray-400 hover:text-white text-[10px]"
+                      title="Clear search"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
                 <select
                   value={selectedPlayerId}
                   onChange={(e) => setSelectedPlayerId(e.target.value)}
-                  className="w-44 py-1 px-2 bg-gray-800 border border-gray-600 rounded text-white text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-36 sm:w-44 py-1 px-2 bg-gray-800 border border-gray-600 rounded text-white text-xs outline-none focus:ring-1 focus:ring-blue-500"
                 >
-                  <option value="">Switch / Load Player...</option>
-                  {players.filter(p => p.status === 'AVAILABLE' || p.status === 'UNSOLD').map(p => (
+                  <option value="">
+                    {consolePlayerSearch
+                      ? `(${getFilteredPlayersForLoad(consolePlayerSearch).length}) Matches...`
+                      : 'Switch / Load Player...'}
+                  </option>
+                  {getFilteredPlayersForLoad(consolePlayerSearch).map(p => (
                     <option key={p.id} value={p.id}>
                       {p.status === 'UNSOLD' ? '🔄 ' : ''}{p.serial_number ? `#${p.serial_number} ` : ''}{p.name}
                     </option>
@@ -2721,9 +2899,10 @@ function AdminDashboard({ user }) {
                 <button
                   onClick={() => handleLoadPlayer(selectedPlayerId)}
                   disabled={!selectedPlayerId}
-                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded text-xs font-bold transition-colors"
+                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded text-xs font-bold transition-colors flex items-center gap-1"
+                  title="Load selected player"
                 >
-                  ▶ Load
+                  <span>▶</span> Load
                 </button>
               </div>
 
@@ -2834,34 +3013,141 @@ function AdminDashboard({ user }) {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center">
-                  <span className="text-6xl mb-4">🏏</span>
-                  <p className="text-xl font-bold text-white mb-2">No player loaded</p>
-                  <p className="text-sm text-gray-400 mb-6 max-w-xs">Select a player from the list below to load and begin bidding directly inside this console.</p>
+                <div className="flex flex-col items-center justify-start h-full text-gray-400 p-4 text-center overflow-y-auto custom-scrollbar">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-4xl">🏏</span>
+                    <div className="text-left">
+                      <p className="text-lg font-bold text-white">No Player Loaded</p>
+                      <p className="text-xs text-gray-400">Search or select a player below to start live bidding</p>
+                    </div>
+                  </div>
 
-                  <div className="w-full max-w-sm flex flex-col gap-3">
-                    <select
-                      value={selectedPlayerId}
-                      onChange={(e) => setSelectedPlayerId(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
-                    >
-                      <option value="">Select a player to load</option>
-                      {players.filter(p => p.status === 'AVAILABLE' || p.status === 'UNSOLD').map(player => (
-                        <option key={player.id} value={player.id}>
-                          {player.status === 'UNSOLD' ? '🔄 ' : ''}{player.was_unsold ? '⚠️ ' : ''}{player.serial_number ? `#${player.serial_number} ` : ''}{player.name} - {player.role} (₹{player.base_price?.toLocaleString('en-IN')})
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => handleLoadPlayer(selectedPlayerId)}
-                      disabled={!selectedPlayerId}
-                      className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg font-bold shadow-lg transition-all"
-                    >
-                      ▶ Load Selected Player
-                    </button>
+                  <div className="w-full max-w-md flex flex-col gap-2.5">
+                    {/* Search Input */}
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 text-sm">
+                        🔍
+                      </span>
+                      <input
+                        type="text"
+                        value={consolePlayerSearch}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setConsolePlayerSearch(val);
+                          const matches = getFilteredPlayersForLoad(val);
+                          if (matches.length === 1) {
+                            setSelectedPlayerId(matches[0].id.toString());
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const matches = getFilteredPlayersForLoad(consolePlayerSearch);
+                            if (matches.length === 1) {
+                              handleLoadPlayer(matches[0].id);
+                            } else if (selectedPlayerId) {
+                              handleLoadPlayer(selectedPlayerId);
+                            }
+                          }
+                        }}
+                        placeholder="Search player by name, #serial, or role..."
+                        className="w-full pl-9 pr-8 py-2 bg-gray-700/90 border border-gray-600 rounded-lg text-white placeholder-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                      />
+                      {consolePlayerSearch && (
+                        <button
+                          onClick={() => setConsolePlayerSearch('')}
+                          className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-gray-400 hover:text-white text-xs"
+                          title="Clear search"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filtered Players Scrollable List */}
+                    <div className="bg-gray-800/80 rounded-lg border border-gray-700 p-2 max-h-64 overflow-y-auto custom-scrollbar text-left space-y-1.5">
+                      <div className="text-[11px] text-gray-400 px-1 pb-1 border-b border-gray-700/60 flex justify-between items-center">
+                        <span>
+                          {getFilteredPlayersForLoad(consolePlayerSearch).length === 0
+                            ? 'No matching players'
+                            : `Available Players (${getFilteredPlayersForLoad(consolePlayerSearch).length} of ${availablePlayersToLoad.length})`}
+                        </span>
+                        <span className="text-[10px] text-gray-500">1-click to load</span>
+                      </div>
+
+                      {getFilteredPlayersForLoad(consolePlayerSearch).length > 0 ? (
+                        getFilteredPlayersForLoad(consolePlayerSearch).map((player) => (
+                          <div
+                            key={player.id}
+                            className={`p-2 rounded-lg border flex items-center justify-between gap-2 transition-all ${
+                              String(selectedPlayerId) === String(player.id)
+                                ? 'bg-blue-900/40 border-blue-500'
+                                : 'bg-gray-700/40 border-gray-700 hover:bg-gray-700/80'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              {player.serial_number ? (
+                                <span className="px-1.5 py-0.5 bg-blue-600/30 text-blue-300 font-mono text-xs rounded border border-blue-500/30 flex-shrink-0">
+                                  #{player.serial_number}
+                                </span>
+                              ) : (
+                                <span className="text-gray-500 text-xs">#—</span>
+                              )}
+                              <div className="min-w-0">
+                                <div className="text-white text-xs font-semibold truncate flex items-center gap-1">
+                                  {player.status === 'UNSOLD' && <span title="Unsold">🔄</span>}
+                                  {player.was_unsold && <span title="Previously Unsold">⚠️</span>}
+                                  <span className="truncate">{player.name}</span>
+                                </div>
+                                <div className="text-[11px] text-gray-400">
+                                  {player.role} • ₹{player.base_price?.toLocaleString('en-IN')}
+                                </div>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                setSelectedPlayerId(player.id.toString());
+                                handleLoadPlayer(player.id);
+                              }}
+                              className="px-3 py-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded text-xs font-bold shadow transition-all flex items-center gap-1 flex-shrink-0"
+                            >
+                              <span>▶</span> Load
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="py-6 text-center text-xs text-gray-500">
+                          No players match "{consolePlayerSearch}"
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Dropdown Fallback */}
+                    <div className="flex gap-2">
+                      <select
+                        value={selectedPlayerId}
+                        onChange={(e) => setSelectedPlayerId(e.target.value)}
+                        className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-xs focus:ring-2 focus:ring-blue-500 outline-none"
+                      >
+                        <option value="">Or pick from dropdown...</option>
+                        {getFilteredPlayersForLoad(consolePlayerSearch).map(player => (
+                          <option key={player.id} value={player.id}>
+                            {player.status === 'UNSOLD' ? '🔄 ' : ''}{player.was_unsold ? '⚠️ ' : ''}{player.serial_number ? `#${player.serial_number} ` : ''}{player.name} - {player.role}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => handleLoadPlayer(selectedPlayerId)}
+                        disabled={!selectedPlayerId}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all"
+                      >
+                        Load
+                      </button>
+                    </div>
+
                     <button
                       onClick={() => setShowAdminBidding(false)}
-                      className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm font-semibold transition-colors mt-2"
+                      className="w-full py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-xs font-semibold transition-colors mt-1"
                     >
                       Back to Dashboard
                     </button>
