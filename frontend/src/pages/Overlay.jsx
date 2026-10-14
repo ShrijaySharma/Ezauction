@@ -17,16 +17,16 @@ function Overlay() {
         document.body.style.setProperty('background', 'transparent', 'important');
         document.body.classList.add('bg-transparent');
 
-        // Connect to the server with WebSocket-only transport
+        // Connect to the server with dual transport
         const newSocket = io(getSocketUrl(), {
-            transports: ['websocket'],        // Force WebSocket only
-            upgrade: false,
+            transports: ['websocket', 'polling'],
+            upgrade: true,
             withCredentials: true,
             reconnection: true,
-            reconnectionAttempts: 20,
+            reconnectionAttempts: Infinity,
             reconnectionDelay: 1000,
-            reconnectionDelayMax: 10000,
-            timeout: 15000,
+            reconnectionDelayMax: 5000,
+            timeout: 20000,
         });
         setSocket(newSocket);
 

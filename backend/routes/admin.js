@@ -693,6 +693,9 @@ router.post('/bid-increments', async (req, res) => {
   }
 });
 
+// In-memory mutex to prevent double-marking / rapid click race conditions
+const markPlayerLocks = new Set();
+
 // Mark player as sold/unsold
 router.post('/mark-player', async (req, res) => {
   const { playerId, status, soldPrice, soldToTeam } = req.body;
@@ -702,6 +705,11 @@ router.post('/mark-player', async (req, res) => {
   if (!['SOLD', 'UNSOLD'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
   }
+
+  if (markPlayerLocks.has(auctionId)) {
+    return res.status(429).json({ error: 'Player mark operation already in progress' });
+  }
+  markPlayerLocks.add(auctionId);
 
   try {
     const state = getAuctionState(auctionId);
@@ -889,6 +897,8 @@ router.post('/mark-player', async (req, res) => {
   } catch (err) {
     console.error('Error in mark-player:', err);
     res.status(500).json({ error: 'Database error' });
+  } finally {
+    markPlayerLocks.delete(auctionId);
   }
 });
 

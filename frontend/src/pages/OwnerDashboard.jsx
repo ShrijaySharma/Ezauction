@@ -4,7 +4,7 @@ import { io } from 'socket.io-client';
 import { logout } from '../services/auth';
 import * as ownerService from '../services/owner';
 import { getImageUrl } from '../utils/imageUtils';
-import { getSocketUrl } from '../config';
+import { getSocketUrl, setCurrentAuctionId } from '../config';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
 
@@ -73,16 +73,20 @@ function OwnerDashboard({ user }) {
   const [bidLockout, setBidLockout] = useState(false);
 
   useEffect(() => {
-    // Initialize socket with WebSocket-only transport
-    const newSocket = io(getSocketUrl(), {
-      transports: ['websocket'],        // Force WebSocket only — no polling fallback
-      upgrade: false,                    // Don't attempt transport upgrade
+    if (user?.auctionId) {
+      setCurrentAuctionId(user.auctionId);
+    }
+
+    // Initialize socket with dual transport for bulletproof connectivity
+    const newSocket = io(getSocketUrl(user?.auctionId), {
+      transports: ['websocket', 'polling'],
+      upgrade: true,
       withCredentials: true,
       reconnection: true,
-      reconnectionAttempts: 20,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      timeout: 15000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
     setSocket(newSocket);
 
@@ -95,6 +99,13 @@ function OwnerDashboard({ user }) {
     newSocket.on('connect', () => {
       console.log('[Socket:Owner] Connected');
       setConnectionError(false);
+      loadCurrentInfo();
+    });
+
+    newSocket.on('reconnect', () => {
+      console.log('[Socket:Owner] Reconnected — re-syncing state');
+      setConnectionError(false);
+      loadCurrentInfo();
     });
 
     newSocket.on('disconnect', () => {

@@ -87,15 +87,15 @@ function App() {
         <Route
           path="/login"
           element={user ? <Navigate to={
-            user.role === 'admin' ? '/admin' :
-              user.role === 'owner' ? '/owner' :
-                user.role === 'host' ? '/host' :
+            user.role === 'admin' ? (user.auctionId ? `/auction/${user.auctionId}/admin` : '/admin') :
+              user.role === 'owner' ? (user.auctionId ? `/auction/${user.auctionId}/owner` : '/owner') :
+                user.role === 'host' ? (user.auctionId ? `/auction/${user.auctionId}/host` : '/host') :
                   user.role === 'super_admin' ? '/super-admin' : '/login'
           } /> : <Login onLogin={setUser} />}
         />
         <Route
           path="/admin"
-          element={user?.role === 'admin' ? <AdminDashboard user={user} /> : <Navigate to="/login" />}
+          element={user?.role === 'admin' ? (user.auctionId ? <Navigate to={`/auction/${user.auctionId}/admin`} replace /> : <AdminDashboard user={user} />) : <Navigate to="/login" />}
         />
         <Route
           path="/app-owner"
@@ -103,7 +103,11 @@ function App() {
         />
         <Route
           path="/owner"
-          element={user?.role === 'owner' ? <OwnerDashboard user={user} /> : <Navigate to="/login" />}
+          element={user?.role === 'owner' ? (user.auctionId ? <Navigate to={`/auction/${user.auctionId}/owner`} replace /> : <OwnerDashboard user={user} />) : <Navigate to="/login" />}
+        />
+        <Route
+          path="/host"
+          element={user?.role === 'host' ? (user.auctionId ? <Navigate to={`/auction/${user.auctionId}/host`} replace /> : <HostDashboard user={user} />) : <Navigate to="/login" />}
         />
         <Route path="/" element={<Navigate to="/login" />} />
       </Routes>

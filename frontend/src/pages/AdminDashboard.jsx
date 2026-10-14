@@ -8,7 +8,7 @@ import BidNotification from '../components/BidNotification';
 import BulkUploadModal from '../components/BulkUploadModal';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
-import { getSocketUrl, getAuctionApiUrl } from '../config';
+import { getSocketUrl, getAuctionApiUrl, setCurrentAuctionId } from '../config';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -83,6 +83,8 @@ function AdminDashboard({ user }) {
   const [customBidIncrement2, setCustomBidIncrement2] = useState(2000);
   const [newBaseBidAmount, setNewBaseBidAmount] = useState(1000);
   const [adminBidTeamId, setAdminBidTeamId] = useState('');
+  const [isMarkingPlayer, setIsMarkingPlayer] = useState(false);
+  const [saleToast, setSaleToast] = useState(null);
 
   // Trading Window State
   const [showTradingModal, setShowTradingModal] = useState(false);
@@ -130,16 +132,20 @@ function AdminDashboard({ user }) {
     audio.preload = 'auto';
     audioElementRef.current = audio;
 
+    if (user?.auctionId) {
+      setCurrentAuctionId(user.auctionId);
+    }
+
     console.log('AdminDashboard mounted');
-    const newSocket = io(getSocketUrl(), {
-      transports: ['websocket'],        // Force WebSocket only — no polling fallback
-      upgrade: false,                    // Don't attempt transport upgrade
+    const newSocket = io(getSocketUrl(user?.auctionId), {
+      transports: ['websocket', 'polling'], // Allow polling fallback so UI never freezes on network hiccups
+      upgrade: true,
       withCredentials: true,
       reconnection: true,
-      reconnectionAttempts: 20,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      timeout: 15000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
     setSocket(newSocket);
 
@@ -152,6 +158,19 @@ function AdminDashboard({ user }) {
     newSocket.on('connect', () => {
       console.log('[Socket:Admin] Connected');
       setConnectionError(false);
+      loadData();
+      loadCurrentBid();
+      loadPlayers();
+      loadTeams();
+    });
+
+    newSocket.on('reconnect', () => {
+      console.log('[Socket:Admin] Reconnected — re-syncing latest state');
+      setConnectionError(false);
+      loadData();
+      loadCurrentBid();
+      loadPlayers();
+      loadTeams();
     });
 
     newSocket.on('disconnect', () => {
@@ -446,20 +465,31 @@ function AdminDashboard({ user }) {
   const handleStatusChange = async (status) => {
     try {
       await adminService.updateAuctionStatus(status);
+      setAuctionState(prev => ({ ...prev, status }));
     } catch (error) {
-      alert('Error updating status: ' + error.response?.data?.error);
+      alert('Error updating status: ' + (error.response?.data?.error || error.message));
     }
   };
 
-  const handleLoadPlayer = async () => {
-    if (!selectedPlayerId) {
+  const handleLoadPlayer = async (targetPlayerId = null) => {
+    const idToLoad = targetPlayerId || selectedPlayerId;
+    if (!idToLoad) {
       alert('Please select a player');
       return;
     }
     try {
-      await adminService.loadPlayer(parseInt(selectedPlayerId));
+      const res = await adminService.loadPlayer(parseInt(idToLoad));
+      if (res && res.player) {
+        setCurrentPlayer(res.player);
+        setHighestBid(null);
+        setAllBids([]);
+        setSelectedPlayerId(res.player.id.toString());
+        loadCurrentBid();
+        loadPlayers();
+        if (showTeamSquads) loadTeamSquads();
+      }
     } catch (error) {
-      alert('Error loading player: ' + error.response?.data?.error);
+      alert('Error loading player: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -467,16 +497,19 @@ function AdminDashboard({ user }) {
     if (!confirm('Undo last bid?')) return;
     try {
       await adminService.undoBid();
+      loadCurrentBid();
+      loadAllBids();
     } catch (error) {
-      alert('Error undoing bid: ' + error.response?.data?.error);
+      alert('Error undoing bid: ' + (error.response?.data?.error || error.message));
     }
   };
 
   const handleLockBidding = async (locked) => {
     try {
       await adminService.lockBidding(locked);
+      setAuctionState(prev => prev ? ({ ...prev, biddingLocked: locked }) : prev);
     } catch (error) {
-      alert('Error locking bidding: ' + error.response?.data?.error);
+      alert('Error locking bidding: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -561,40 +594,51 @@ function AdminDashboard({ user }) {
   };
 
   const handleMarkPlayer = async (status) => {
-    if (!currentPlayer) {
-      alert('No player selected');
+    if (!currentPlayer || isMarkingPlayer) {
+      if (!currentPlayer) alert('No player selected');
       return;
     }
+
+    if (status === 'SOLD' && highestBid && !highestBid.team_id && !highestBid.team_name) {
+      alert('Please assign a team to the current bid before marking as SOLD');
+      return;
+    }
+
+    const playerToMark = currentPlayer;
+    setIsMarkingPlayer(true);
 
     try {
       // For SOLD, backend will automatically use the highest bidder
       // For UNSOLD, proceed directly
-      const markRes = await adminService.markPlayer(currentPlayer.id, status, null, null);
+      const markRes = await adminService.markPlayer(playerToMark.id, status, null, null);
 
       if (markRes && markRes.nextPlayer) {
         setCurrentPlayer(markRes.nextPlayer);
         setHighestBid(null);
         setAllBids([]);
-      } else if (markRes && markRes.nextPlayerLoaded === false) {
+        setSelectedPlayerId(markRes.nextPlayer.id.toString());
+      } else {
         setCurrentPlayer(null);
         setHighestBid(null);
         setAllBids([]);
+        setSelectedPlayerId('');
       }
 
       if (status === 'SOLD') {
-        const teamName = highestBid ? highestBid.team_name : 'leading team';
-        alert(`Player marked as SOLD to ${teamName}`);
+        const teamName = highestBid ? (highestBid.team_name || 'leading team') : 'team';
+        setSaleToast(`✓ ${playerToMark.name} SOLD to ${teamName}`);
         loadTeams();
       } else {
-        alert(`Player marked as ${status}`);
+        setSaleToast(`ℹ ${playerToMark.name} marked as ${status}`);
       }
+      setTimeout(() => setSaleToast(null), 3500);
 
       loadPlayers();
-
-      // The backend will automatically load the next player via Socket.IO
-      // The 'player-loaded' event listener will handle updating the UI
+      loadCurrentBid();
     } catch (error) {
       alert('Error marking player: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setIsMarkingPlayer(false);
     }
   };
 
@@ -752,8 +796,11 @@ function AdminDashboard({ user }) {
     if (!confirm('Reset bidding for current player?')) return;
     try {
       await adminService.resetBidding();
+      setHighestBid(null);
+      setAllBids([]);
+      loadCurrentBid();
     } catch (error) {
-      alert('Error resetting bidding: ' + error.response?.data?.error);
+      alert('Error resetting bidding: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -950,8 +997,12 @@ function AdminDashboard({ user }) {
     }
 
     try {
-      await adminService.adminPlaceBid(teamId, bidAmount);
-      // Socket will update UI
+      const res = await adminService.adminPlaceBid(teamId, bidAmount);
+      if (res && res.bid) {
+        setHighestBid(res.bid);
+        setAllBids(prev => [res.bid, ...prev]);
+        setPreviousBid(highestBid ? highestBid.amount : (currentPlayer ? currentPlayer.base_price : 0));
+      }
     } catch (error) {
       alert('Error placing bid: ' + (error.response?.data?.error || error.message));
     }
@@ -966,8 +1017,11 @@ function AdminDashboard({ user }) {
       return;
     }
     try {
-      await adminService.adminBidV2(increment);
-      // Socket will update UI
+      const res = await adminService.adminBidV2(increment);
+      if (res && res.bid) {
+        setHighestBid(res.bid);
+        setAllBids(prev => [res.bid, ...prev]);
+      }
     } catch (error) {
       alert('Error placing admin bid: ' + (error.response?.data?.error || error.message));
     }
@@ -980,6 +1034,10 @@ function AdminDashboard({ user }) {
     }
     try {
       const result = await adminService.adminAssignTeam(parseInt(adminBidTeamId));
+      if (result && result.bid) {
+        setHighestBid(result.bid);
+        setAllBids(prev => [result.bid, ...prev]);
+      }
       alert(`Team "${result.teamName}" assigned to current bid successfully!`);
     } catch (error) {
       alert('Error assigning team: ' + (error.response?.data?.error || error.message));
@@ -1354,15 +1412,17 @@ function AdminDashboard({ user }) {
                       }
                       handleMarkPlayer('SOLD');
                     }}
-                    className="px-5 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-105"
+                    disabled={isMarkingPlayer}
+                    className="px-5 py-3 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-105"
                   >
-                    ✓ Mark as SOLD
+                    {isMarkingPlayer ? '⏳ Processing...' : '✓ Mark as SOLD'}
                   </button>
                   <button
                     onClick={() => handleMarkPlayer('UNSOLD')}
-                    className="px-5 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-105"
+                    disabled={isMarkingPlayer}
+                    className="px-5 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-105"
                   >
-                    ✗ Mark as UNSOLD
+                    {isMarkingPlayer ? '⏳ Processing...' : '✗ Mark as UNSOLD'}
                   </button>
                   {!!currentPlayer.was_unsold && (
                     <button
@@ -2286,35 +2346,55 @@ function AdminDashboard({ user }) {
                 </div>
                 <div className="p-6 overflow-y-auto custom-scrollbar">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {teams.map((team) => (
-                      <div key={team.id} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
-                        <div className="flex items-center gap-3 mb-3">
-                          {team.logo ? (
-                            <img
-                              src={getImageUrl(team.logo)}
-                              alt={team.name}
-                              className="w-12 h-12 object-cover rounded-full"
-                              onError={(e) => {
-                                e.target.src = 'https://via.placeholder.com/48?text=Team';
-                              }}
-                            />
-                          ) : (
-                            <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center text-white font-bold">
-                              {team.name.charAt(0)}
+                    {teams.map((team) => {
+                      const playersBought = players.filter(p => p.sold_to_team === team.id && p.status === 'SOLD').length;
+                      const maxAllowed = auctionState?.maxPlayersPerTeam || 10;
+                      const remainingPlayers = maxAllowed - playersBought;
+                      const isLogicOn = auctionState?.enforceMaxBid === 1 || auctionState?.enforceMaxBid === true || enforceMaxBid;
+                      const baseAmount = auctionState?.baseBidAmount !== undefined ? auctionState.baseBidAmount : (newBaseBidAmount || 1000);
+                      const reservedPlayersCount = Math.max(0, remainingPlayers - 1);
+                      const minimumAmountToKeep = isLogicOn ? (reservedPlayersCount * baseAmount) : 0;
+                      const maxBidAllowed = isLogicOn
+                        ? (remainingPlayers <= 0 ? 0 : Math.max(0, (team.budget || 0) - minimumAmountToKeep))
+                        : (team.budget || 0);
+
+                      return (
+                        <div key={team.id} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                          <div className="flex items-center gap-3 mb-3">
+                            {team.logo ? (
+                              <img
+                                src={getImageUrl(team.logo)}
+                                alt={team.name}
+                                className="w-12 h-12 object-cover rounded-full"
+                                onError={(e) => {
+                                  e.target.src = 'https://via.placeholder.com/48?text=Team';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-12 h-12 bg-gray-600 rounded-full flex items-center justify-center text-white font-bold">
+                                {team.name.charAt(0)}
+                              </div>
+                            )}
+                            <div className="flex-1">
+                              <div className="text-white font-bold truncate">{team.name}</div>
+                              <div className="text-gray-400 text-sm">Owner: {team.owner_name || 'N/A'}</div>
+                              <div className="text-blue-400 text-xs font-bold mt-1">Players: {playersBought}/{maxAllowed}</div>
+                              <div className="text-red-400 text-xs font-bold mt-0.5">
+                                {isLogicOn && remainingPlayers <= 0 ? (
+                                  <span className="text-red-500 font-extrabold">Squad Full (Max: ₹0)</span>
+                                ) : (
+                                  <span>Max Bid: ₹{maxBidAllowed.toLocaleString('en-IN')}</span>
+                                )}
+                              </div>
                             </div>
-                          )}
-                          <div className="flex-1">
-                            <div className="text-white font-bold truncate">{team.name}</div>
-                            <div className="text-gray-400 text-sm">Owner: {team.owner_name || 'N/A'}</div>
-                            <div className="text-blue-400 text-xs font-bold mt-1">Players: {players.filter(p => p.sold_to_team === team.id && p.status === 'SOLD').length}</div>
+                          </div>
+                          <div className="bg-gray-800 p-3 rounded-lg border border-gray-600">
+                            <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">REMAINING PURSE</div>
+                            <div className="text-2xl font-bold text-green-400">₹{team.budget?.toLocaleString('en-IN') || '0'}</div>
                           </div>
                         </div>
-                        <div className="bg-gray-800 p-3 rounded-lg border border-gray-600">
-                          <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">REMAINING PURSE</div>
-                          <div className="text-2xl font-bold text-green-400">₹{team.budget?.toLocaleString('en-IN') || '0'}</div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -2624,6 +2704,29 @@ function AdminDashboard({ user }) {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Quick load next player dropdown inside console top bar */}
+              <div className="flex items-center gap-1.5 bg-gray-700/60 p-1 rounded-lg border border-gray-600">
+                <select
+                  value={selectedPlayerId}
+                  onChange={(e) => setSelectedPlayerId(e.target.value)}
+                  className="w-44 py-1 px-2 bg-gray-800 border border-gray-600 rounded text-white text-xs outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Switch / Load Player...</option>
+                  {players.filter(p => p.status === 'AVAILABLE' || p.status === 'UNSOLD').map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.status === 'UNSOLD' ? '🔄 ' : ''}{p.serial_number ? `#${p.serial_number} ` : ''}{p.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => handleLoadPlayer(selectedPlayerId)}
+                  disabled={!selectedPlayerId}
+                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded text-xs font-bold transition-colors"
+                >
+                  ▶ Load
+                </button>
+              </div>
+
               {auctionState.status === 'LIVE' ? (
                 <div className="px-3 py-1 bg-green-600 text-white rounded font-bold animate-pulse">
                   LIVE
@@ -2711,34 +2814,58 @@ function AdminDashboard({ user }) {
                         }
                         handleMarkPlayer('SOLD');
                       }}
-                      className={`w-full py-3 rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-all ${
+                      disabled={isMarkingPlayer}
+                      className={`w-full py-3 rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                         highestBid
                           ? 'bg-green-600 hover:bg-green-700 text-white'
                           : 'bg-orange-600 hover:bg-orange-700 text-white'
                       }`}
                       title={highestBid ? `Sell to ${highestBid.team_name}` : 'No bid placed yet — click to force SOLD'}
                     >
-                      {highestBid ? `SOLD → ${highestBid.team_name}` : '⚠ SOLD (no bid)'}
+                      {isMarkingPlayer ? '⏳ Selling...' : (highestBid ? `SOLD → ${highestBid.team_name}` : '⚠ SOLD (no bid)')}
                     </button>
                     <button
                       onClick={() => handleMarkPlayer('UNSOLD')}
-                      className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-transform"
+                      disabled={isMarkingPlayer}
+                      className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-transform"
                     >
-                      UNSOLD
+                      {isMarkingPlayer ? '⏳ Processing...' : 'UNSOLD'}
                     </button>
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <div className="flex flex-col items-center justify-center h-full text-gray-400 p-6 text-center">
                   <span className="text-6xl mb-4">🏏</span>
-                  <p className="text-xl">No player loaded</p>
-                  <p className="text-sm mt-2">Load a player from the dashboard to start bidding</p>
-                  <button
-                    onClick={() => setShowAdminBidding(false)}
-                    className="mt-6 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                  >
-                    Back to Dashboard
-                  </button>
+                  <p className="text-xl font-bold text-white mb-2">No player loaded</p>
+                  <p className="text-sm text-gray-400 mb-6 max-w-xs">Select a player from the list below to load and begin bidding directly inside this console.</p>
+
+                  <div className="w-full max-w-sm flex flex-col gap-3">
+                    <select
+                      value={selectedPlayerId}
+                      onChange={(e) => setSelectedPlayerId(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                    >
+                      <option value="">Select a player to load</option>
+                      {players.filter(p => p.status === 'AVAILABLE' || p.status === 'UNSOLD').map(player => (
+                        <option key={player.id} value={player.id}>
+                          {player.status === 'UNSOLD' ? '🔄 ' : ''}{player.was_unsold ? '⚠️ ' : ''}{player.serial_number ? `#${player.serial_number} ` : ''}{player.name} - {player.role} (₹{player.base_price?.toLocaleString('en-IN')})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => handleLoadPlayer(selectedPlayerId)}
+                      disabled={!selectedPlayerId}
+                      className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg font-bold shadow-lg transition-all"
+                    >
+                      ▶ Load Selected Player
+                    </button>
+                    <button
+                      onClick={() => setShowAdminBidding(false)}
+                      className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm font-semibold transition-colors mt-2"
+                    >
+                      Back to Dashboard
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -2748,11 +2875,25 @@ function AdminDashboard({ user }) {
               {teams.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
                   {teams.map(team => {
-                    const canAfford1 = team.budget >= (currentBid + parseInt(customBidIncrement));
-                    const canAfford2 = team.budget >= (currentBid + parseInt(customBidIncrement2));
-                    // Determine if team is full (only if logic is enabled)
-                    // We need team squad counts for this which might not be updated here exactly unless we listen to everything.
-                    // For now we check basic budget relative to next bid.
+                    const playersBought = players.filter(p => p.sold_to_team === team.id && p.status === 'SOLD').length;
+                    const maxAllowed = auctionState?.maxPlayersPerTeam || 10;
+                    const remainingPlayers = maxAllowed - playersBought;
+                    const isLogicOn = auctionState?.enforceMaxBid === 1 || auctionState?.enforceMaxBid === true || enforceMaxBid;
+                    const baseAmount = auctionState?.baseBidAmount !== undefined ? auctionState.baseBidAmount : (newBaseBidAmount || 1000);
+                    const reservedPlayersCount = Math.max(0, remainingPlayers - 1);
+                    const minimumAmountToKeep = isLogicOn ? (reservedPlayersCount * baseAmount) : 0;
+                    const maxBidAllowed = isLogicOn
+                      ? (remainingPlayers <= 0 ? 0 : Math.max(0, (team.budget || 0) - minimumAmountToKeep))
+                      : (team.budget || 0);
+
+                    const baseBidPrice = currentPlayer?.base_price || 0;
+                    const nextBid1 = currentBid + parseInt(customBidIncrement);
+                    const nextBid2 = currentBid + parseInt(customBidIncrement2);
+
+                    const isSquadFull = isLogicOn && remainingPlayers <= 0;
+                    const canAffordBase = !isSquadFull && maxBidAllowed >= baseBidPrice;
+                    const canAfford1 = !isSquadFull && maxBidAllowed >= nextBid1;
+                    const canAfford2 = !isSquadFull && maxBidAllowed >= nextBid2;
 
                     return (
                       <div key={team.id} className={`bg-gray-800 rounded-xl border-2 p-4 flex flex-col shadow-lg transition-all ${highestBid?.team_id === team.id ? 'border-green-500 shadow-green-500/20 ring-1 ring-green-500' : 'border-gray-700 hover:border-gray-500'
@@ -2768,15 +2909,23 @@ function AdminDashboard({ user }) {
                           <div className="min-w-0">
                             <div className="font-bold text-white text-lg truncate leading-tight" title={team.name}>{team.name}</div>
                             <div className="text-green-400 font-mono font-semibold">₹{team.budget?.toLocaleString('en-IN')}</div>
-                            <div className="text-blue-400 text-xs font-bold mt-0.5">Players: {players.filter(p => p.sold_to_team === team.id && p.status === 'SOLD').length}</div>
+                            <div className="text-blue-400 text-xs font-bold mt-0.5">Players: {playersBought}/{maxAllowed}</div>
+                            <div className="text-red-400 text-xs font-bold mt-0.5">
+                              {isSquadFull ? (
+                                <span className="text-red-500 font-extrabold">Squad Full (Max: ₹0)</span>
+                              ) : (
+                                <span>Max Bid: ₹{maxBidAllowed.toLocaleString('en-IN')}</span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
                         <div className="mt-auto grid grid-cols-3 gap-1.5">
                           <button
                             onClick={() => handleAdminPlaceBid(team.id, 'BASE')}
-                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.amount >= (currentPlayer?.base_price || 0)}
+                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.amount >= baseBidPrice || !canAffordBase}
                             className="px-2 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded text-sm font-semibold transition-colors"
+                            title={isSquadFull ? 'Squad is full' : !canAffordBase ? 'Exceeds max allowed bid' : 'Place base bid'}
                           >
                             Base
                           </button>
@@ -2790,17 +2939,19 @@ function AdminDashboard({ user }) {
                                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                                   : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                             }`}
+                            title={highestBid?.team_id === team.id ? 'Leading bidder' : isSquadFull ? 'Squad full' : !canAfford1 ? 'Exceeds max allowed bid' : `+₹${parseInt(customBidIncrement).toLocaleString('en-IN')}`}
                           >
                             {highestBid?.team_id === team.id ? '✓ B1' : `+${(parseInt(customBidIncrement)/1000).toFixed(parseInt(customBidIncrement) % 1000 === 0 ? 0 : 1)}k`}
                           </button>
                           <button
                             onClick={() => handleAdminPlaceBid(team.id, 'INCREMENT', customBidIncrement2)}
-                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || !canAfford2}
+                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.team_id === team.id || !canAfford2}
                             className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${
-                              canAfford2
+                              canAfford2 && highestBid?.team_id !== team.id
                                 ? 'bg-blue-600 hover:bg-blue-500 text-white'
                                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                             }`}
+                            title={isSquadFull ? 'Squad full' : !canAfford2 ? 'Exceeds max allowed bid' : `+₹${parseInt(customBidIncrement2).toLocaleString('en-IN')}`}
                           >
                             +{(parseInt(customBidIncrement2)/1000).toFixed(parseInt(customBidIncrement2) % 1000 === 0 ? 0 : 1)}k
                           </button>
@@ -2973,6 +3124,14 @@ function AdminDashboard({ user }) {
           <img key={`preload-${player.id}`} src={getImageUrl(player.thumb_url || player.image)} alt="" />
         ))}
       </div>
+
+      {/* Non-blocking Sale Toast Notification */}
+      {saleToast && (
+        <div className="fixed top-6 right-6 z-50 bg-gradient-to-r from-emerald-600 to-green-700 text-white px-6 py-3.5 rounded-xl shadow-2xl font-bold border-2 border-emerald-400 flex items-center gap-2 transform transition-all animate-bounce">
+          <span>🏏</span>
+          <span>{saleToast}</span>
+        </div>
+      )}
 
       {/* Image Preview Modal */}
       {previewImage && (

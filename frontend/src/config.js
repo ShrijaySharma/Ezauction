@@ -8,9 +8,24 @@ export const getApiUrl = () => {
 // The auction slug is the tenant boundary for every non-super-admin API call.
 // Keeping this in one place prevents pages from accidentally falling back to
 // legacy /api/* endpoints, which return unscoped data.
+export const setCurrentAuctionId = (id) => {
+    if (id) {
+        window.__currentAuctionId = id;
+        try {
+            localStorage.setItem('currentAuctionId', id);
+        } catch (e) {
+            console.error('Failed to save currentAuctionId:', e);
+        }
+    }
+};
+
 export const getCurrentAuctionId = () => {
     const match = window.location.pathname.match(/\/auction\/([^/]+)/);
-    return match?.[1] || window.__currentAuctionId || localStorage.getItem('currentAuctionId') || null;
+    if (match?.[1]) {
+        setCurrentAuctionId(match[1]);
+        return match[1];
+    }
+    return window.__currentAuctionId || localStorage.getItem('currentAuctionId') || null;
 };
 
 export const getAuctionApiPath = (path) => {

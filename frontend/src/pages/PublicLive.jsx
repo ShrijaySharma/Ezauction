@@ -30,11 +30,14 @@ function PublicLive() {
     useEffect(() => {
         // --- WEBSOCKET CONNECTION ---
         const newSocket = io(getSocketUrl(), {
-            transports: ['websocket'],
-            upgrade: false,
+            transports: ['websocket', 'polling'],
+            upgrade: true,
             withCredentials: true,
             reconnection: true,
-            reconnectionAttempts: 20,
+            reconnectionAttempts: Infinity,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            timeout: 20000,
         });
         setSocket(newSocket);
 

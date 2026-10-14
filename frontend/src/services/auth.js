@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_URL, getAuctionApiPath, getCurrentAuctionId } from '../config';
+import { API_URL, getAuctionApiPath, getCurrentAuctionId, setCurrentAuctionId } from '../config';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -27,8 +27,9 @@ export const login = async (username, password, auctionId = null) => {
     const aid = auctionId || getCurrentAuctionId();
     const url = aid ? `/auction/${aid}/auth/login` : '/auth/login';
     const response = await api.post(url, { username, password, auctionId: aid });
-    if (aid) {
-      localStorage.setItem('currentAuctionId', aid);
+    const userAuctionId = response.data?.user?.auctionId || aid;
+    if (userAuctionId) {
+      setCurrentAuctionId(userAuctionId);
     }
     return response.data;
   } catch (error) {
@@ -70,7 +71,11 @@ export const getCurrentUser = async (auctionId = null) => {
   const aid = auctionId || getCurrentAuctionId();
   const url = aid ? `/auction/${aid}/auth/me` : '/auth/me';
   const response = await api.get(url);
-  return response.data.user;
+  const user = response.data.user;
+  if (user?.auctionId) {
+    setCurrentAuctionId(user.auctionId);
+  }
+  return user;
 };
 
 export default api;

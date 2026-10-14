@@ -5,7 +5,7 @@ import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
-import { getSocketUrl } from '../config';
+import { getSocketUrl, setCurrentAuctionId } from '../config';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -17,7 +17,7 @@ const getApiUrl = () => {
 
 const API_URL = getApiUrl();
 
-function HostDashboard() {
+function HostDashboard({ user }) {
   const [socket, setSocket] = useState(null);
   const [status, setStatus] = useState('STOPPED');
   const [currentPlayer, setCurrentPlayer] = useState(null);
@@ -75,15 +75,19 @@ function HostDashboard() {
     audio.preload = 'auto';
     audioElementRef.current = audio;
 
-    const newSocket = io(getSocketUrl(), {
-      transports: ['websocket'],        // Force WebSocket only — no polling fallback
-      upgrade: false,                    // Don't attempt transport upgrade
+    if (user?.auctionId) {
+      setCurrentAuctionId(user.auctionId);
+    }
+
+    const newSocket = io(getSocketUrl(user?.auctionId), {
+      transports: ['websocket', 'polling'],
+      upgrade: true,
       withCredentials: true,
       reconnection: true,
-      reconnectionAttempts: 20,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 10000,
-      timeout: 15000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
     });
     setSocket(newSocket);
 
@@ -96,6 +100,19 @@ function HostDashboard() {
     newSocket.on('connect', () => {
       console.log('[Socket:Host] Connected');
       setConnectionError(false);
+      loadCurrentInfo();
+      loadTeams();
+      loadUnsoldPlayers();
+      loadTeamPurses();
+    });
+
+    newSocket.on('reconnect', () => {
+      console.log('[Socket:Host] Reconnected — re-syncing');
+      setConnectionError(false);
+      loadCurrentInfo();
+      loadTeams();
+      loadUnsoldPlayers();
+      loadTeamPurses();
     });
 
     newSocket.on('reconnect_failed', () => {
