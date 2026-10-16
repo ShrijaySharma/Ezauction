@@ -63,16 +63,31 @@ router.post('/login', async (req, res) => {
       }
 
       // Check for user in this auction, or allow super_admin
-      const { data: matchedUser, error: userError } = await supabase
+      let { data: matchedUser, error: userError } = await supabase
         .from('users')
         .select('*')
         .eq('username', username)
-        .or(`auction_id.eq.${targetAuctionId},role.eq.super_admin`)
+        .eq('auction_id', targetAuctionId)
         .maybeSingle();
 
       if (userError) {
         console.error('Database error during login:', userError);
         return res.status(500).json({ error: 'Database error: ' + userError.message });
+      }
+
+      if (!matchedUser) {
+        const { data: saUser, error: saError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('username', username)
+          .eq('role', 'super_admin')
+          .maybeSingle();
+
+        if (saError) {
+          console.error('Database error checking super_admin during login:', saError);
+          return res.status(500).json({ error: 'Database error: ' + saError.message });
+        }
+        matchedUser = saUser;
       }
       user = matchedUser;
     }

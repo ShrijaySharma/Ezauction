@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { getImageUrl } from '../utils/imageUtils';
-import { getSocketUrl } from '../config';
+import { getSocketUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
+import { getPublicPlayers } from '../services/public';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 
 function Overlay() {
+    const { auctionId: routeAuctionId } = useParams();
+    const auctionId = routeAuctionId || getCurrentAuctionId();
+
     const [socket, setSocket] = useState(null);
     const [currentPlayer, setCurrentPlayer] = useState(null);
     const [highestBid, setHighestBid] = useState(null);
@@ -12,13 +17,42 @@ function Overlay() {
     const [bidFlash, setBidFlash] = useState(false);
     const [leadingTeam, setLeadingTeam] = useState(null);
 
+    const currentPlayerRef = useRef(null);
+
     useEffect(() => {
+        const preloadAssets = async () => {
+            try {
+                const players = await getPublicPlayers();
+                if (Array.isArray(players)) {
+                    players.forEach(p => {
+                        if (p.thumb_url) {
+                            const img = new Image();
+                            img.src = getImageUrl(p.thumb_url);
+                        }
+                        if (p.image) {
+                            const img = new Image();
+                            img.src = getImageUrl(p.image);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to preload overlay assets', e);
+            }
+        };
+        preloadAssets();
+    }, [auctionId]);
+
+    useEffect(() => {
+        if (auctionId) {
+            setCurrentAuctionId(auctionId);
+        }
+
         // Force the body background to be transparent by overriding inline style
         document.body.style.setProperty('background', 'transparent', 'important');
         document.body.classList.add('bg-transparent');
 
         // Connect to the server with dual transport
-        const newSocket = io(getSocketUrl(), {
+        const newSocket = io(getSocketUrl(auctionId), {
             transports: ['websocket', 'polling'],
             upgrade: true,
             withCredentials: true,
@@ -46,13 +80,8 @@ function Overlay() {
             newSocket.emit('request-info'); // Re-request state via socket, no API call
         });
 
-        // Since we don't have a service imported that fetches data (to avoid auth deps if possible),
-        // we might need to rely on the socket pushing an initial state or just wait.
-        // Actually, let's try to fetch current info using fetch directly to avoid service dependency requiring auth logic
-        // But since authentication is cookie-based, axios/fetch with credentials should work if user is logged in context of browser
-        // For now, let's listen to events aggressively.
-
         newSocket.on('player-loaded', (data) => {
+            currentPlayerRef.current = data.player;
             setCurrentPlayer(data.player);
             setHighestBid(null);
             setCurrentBid(data.player ? data.player.base_price : 0);
@@ -78,11 +107,12 @@ function Overlay() {
                 setHighestBid(null);
                 setLeadingTeam(null);
                 // revert to base price if possible, or 0
-                if (currentPlayer) setCurrentBid(currentPlayer.base_price);
+                if (currentPlayerRef.current) setCurrentBid(currentPlayerRef.current.base_price);
             }
         });
 
         newSocket.on('all-players-deleted', () => {
+            currentPlayerRef.current = null;
             setCurrentPlayer(null);
             setHighestBid(null);
             setCurrentBid(0);
@@ -94,7 +124,7 @@ function Overlay() {
             document.body.style.removeProperty('background');
             document.body.classList.remove('bg-transparent');
         };
-    }, []); // Removed currentPlayer dependency to prevent socket reconnection cycles
+    }, []); // Socket connection on mount
 
     const flashBid = () => {
         setBidFlash(true);

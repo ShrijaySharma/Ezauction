@@ -68,24 +68,6 @@ export default function SuperAdminDashboard({ initialUser }) {
     }
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoginError('');
-    setLoginLoading(true);
-    try {
-      const res = await superAdminLogin(loginUsername, loginPassword);
-      if (res.user && res.user.role === 'super_admin') {
-        setCurrentUser(res.user);
-        await loadAuctions();
-      } else {
-        setLoginError('Access denied: You must be a Super Admin');
-      }
-    } catch (err) {
-      setLoginError(err.response?.data?.error || err.message || 'Login failed');
-    } finally {
-      setLoginLoading(false);
-    }
-  };
 
   const handleLogout = async () => {
     await logout();

@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { logout } from '../services/auth';
 import * as ownerService from '../services/owner';
 import { getImageUrl } from '../utils/imageUtils';
-import { getSocketUrl, setCurrentAuctionId } from '../config';
+import { getSocketUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
 
@@ -21,6 +21,8 @@ const getApiUrl = () => {
 const API_URL = getApiUrl();
 
 function OwnerDashboard({ user }) {
+  const { auctionId: routeAuctionId } = useParams();
+  const auctionId = routeAuctionId || user?.auctionId || getCurrentAuctionId();
   const navigate = useNavigate();
   const [socket, setSocket] = useState(null);
   const [currentPlayer, setCurrentPlayer] = useState(null);
@@ -73,12 +75,12 @@ function OwnerDashboard({ user }) {
   const [bidLockout, setBidLockout] = useState(false);
 
   useEffect(() => {
-    if (user?.auctionId) {
-      setCurrentAuctionId(user.auctionId);
+    if (auctionId) {
+      setCurrentAuctionId(auctionId);
     }
 
     // Initialize socket with dual transport for bulletproof connectivity
-    const newSocket = io(getSocketUrl(user?.auctionId), {
+    const newSocket = io(getSocketUrl(auctionId), {
       transports: ['websocket', 'polling'],
       upgrade: true,
       withCredentials: true,

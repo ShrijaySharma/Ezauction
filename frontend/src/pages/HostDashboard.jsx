@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import * as hostService from '../services/host';
 import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
-import { getSocketUrl, setCurrentAuctionId } from '../config';
+import { getSocketUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -18,6 +19,9 @@ const getApiUrl = () => {
 const API_URL = getApiUrl();
 
 function HostDashboard({ user }) {
+  const { auctionId: routeAuctionId } = useParams();
+  const auctionId = routeAuctionId || user?.auctionId || getCurrentAuctionId();
+
   const [socket, setSocket] = useState(null);
   const [status, setStatus] = useState('STOPPED');
   const [currentPlayer, setCurrentPlayer] = useState(null);
@@ -75,11 +79,11 @@ function HostDashboard({ user }) {
     audio.preload = 'auto';
     audioElementRef.current = audio;
 
-    if (user?.auctionId) {
-      setCurrentAuctionId(user.auctionId);
+    if (auctionId) {
+      setCurrentAuctionId(auctionId);
     }
 
-    const newSocket = io(getSocketUrl(user?.auctionId), {
+    const newSocket = io(getSocketUrl(auctionId), {
       transports: ['websocket', 'polling'],
       upgrade: true,
       withCredentials: true,
@@ -284,6 +288,10 @@ function HostDashboard({ user }) {
       // Active background image preloading into browser cache
       if (Array.isArray(data)) {
         data.forEach(p => {
+          if (p.thumb_url) {
+            const imgThumb = new Image();
+            imgThumb.src = getImageUrl(p.thumb_url);
+          }
           if (p.image) {
             const img = new Image();
             img.src = getImageUrl(p.image);

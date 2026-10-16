@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { getSocketUrl } from '../config';
+import { getSocketUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
 import { getPublicPlayers, getPublicTeams } from '../services/public';
 import { getImageUrl } from '../utils/imageUtils';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
 
 function PublicLive() {
+    const { auctionId: routeAuctionId } = useParams();
+    const auctionId = routeAuctionId || getCurrentAuctionId();
+
     const [viewMode, setViewMode] = useState('live'); // 'live' or 'catalog'
     
     // Live Auction State
@@ -28,8 +32,12 @@ function PublicLive() {
     const [previewImage, setPreviewImage] = useState(null);
 
     useEffect(() => {
+        if (auctionId) {
+            setCurrentAuctionId(auctionId);
+        }
+
         // --- WEBSOCKET CONNECTION ---
-        const newSocket = io(getSocketUrl(), {
+        const newSocket = io(getSocketUrl(auctionId), {
             transports: ['websocket', 'polling'],
             upgrade: true,
             withCredentials: true,
@@ -128,6 +136,20 @@ function PublicLive() {
                 ]);
                 setPlayers(playersData);
                 setTeams(teamsData);
+
+                // Preload player images (both thumbnail and full) into browser cache
+                if (Array.isArray(playersData)) {
+                    playersData.forEach(p => {
+                        if (p.thumb_url) {
+                            const img = new Image();
+                            img.src = getImageUrl(p.thumb_url);
+                        }
+                        if (p.image) {
+                            const img = new Image();
+                            img.src = getImageUrl(p.image);
+                        }
+                    });
+                }
             } catch (err) {
                 console.error("Failed to load catalog data", err);
             } finally {

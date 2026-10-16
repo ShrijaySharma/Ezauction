@@ -28,15 +28,15 @@ export const getCurrentAuctionId = () => {
     return window.__currentAuctionId || localStorage.getItem('currentAuctionId') || null;
 };
 
-export const getAuctionApiPath = (path) => {
-    const auctionId = getCurrentAuctionId();
+export const getAuctionApiPath = (path, explicitAuctionId = null) => {
+    const auctionId = explicitAuctionId || getCurrentAuctionId();
     if (!auctionId || path.startsWith('/auction/') || path.startsWith('/super-admin/')) {
         return path;
     }
     return `/auction/${encodeURIComponent(auctionId)}${path}`;
 };
 
-export const getAuctionApiUrl = (path) => `${getApiUrl()}${getAuctionApiPath(path)}`;
+export const getAuctionApiUrl = (path, explicitAuctionId = null) => `${getApiUrl()}${getAuctionApiPath(path, explicitAuctionId)}`;
 
 export const getSocketUrl = (auctionId = null) => {
     const aid = auctionId || getCurrentAuctionId();

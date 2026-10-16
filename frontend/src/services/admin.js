@@ -2,7 +2,7 @@ import api from './auth';
 import { getAuctionApiUrl } from '../config';
 
 export const clearAuctionData = async () => {
-  const response = await api.delete('/admin/clear-data');
+  const response = await api.delete('/admin/players-all');
   return response.data;
 };
 

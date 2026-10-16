@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { logout } from '../services/auth';
 import * as adminService from '../services/admin';
@@ -8,7 +8,7 @@ import BidNotification from '../components/BidNotification';
 import BulkUploadModal from '../components/BulkUploadModal';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
-import { getSocketUrl, getAuctionApiUrl, setCurrentAuctionId } from '../config';
+import { getSocketUrl, getAuctionApiUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -22,6 +22,8 @@ const getApiUrl = () => {
 const API_URL = getApiUrl();
 
 function AdminDashboard({ user }) {
+  const { auctionId: routeAuctionId } = useParams();
+  const auctionId = routeAuctionId || user?.auctionId || getCurrentAuctionId();
   const navigate = useNavigate();
   const [socket, setSocket] = useState(null);
   const [auctionState, setAuctionState] = useState({ status: 'STOPPED', biddingLocked: false, baseBidAmount: 1000 });
@@ -134,12 +136,12 @@ function AdminDashboard({ user }) {
     audio.preload = 'auto';
     audioElementRef.current = audio;
 
-    if (user?.auctionId) {
-      setCurrentAuctionId(user.auctionId);
+    if (auctionId) {
+      setCurrentAuctionId(auctionId);
     }
 
     console.log('AdminDashboard mounted');
-    const newSocket = io(getSocketUrl(user?.auctionId), {
+    const newSocket = io(getSocketUrl(auctionId), {
       transports: ['websocket', 'polling'], // Allow polling fallback so UI never freezes on network hiccups
       upgrade: true,
       withCredentials: true,
