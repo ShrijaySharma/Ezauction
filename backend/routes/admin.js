@@ -1357,8 +1357,9 @@ router.post('/players-bulk-with-photos',
           playerRows.push(row);
         }
       } else {
-        // Parse Excel using xlsx library directly from temporary disk file
-        const workbook = XLSX.readFile(playerFile.path);
+        // Parse Excel using xlsx library from temporary file buffer
+        const fileBuffer = fs.readFileSync(playerFile.path);
+        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
         // Normalize headers to lowercase
