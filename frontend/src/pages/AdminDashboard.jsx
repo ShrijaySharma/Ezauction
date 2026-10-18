@@ -1999,6 +1999,7 @@ function AdminDashboard({ user }) {
 
         {showBulkModal && (
           <BulkUploadModal
+            auctionId={auctionId}
             onClose={() => setShowBulkModal(false)}
             onSuccess={() => {
               loadPlayers();

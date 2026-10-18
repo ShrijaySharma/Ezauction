@@ -67,13 +67,18 @@ export const getAuctionHistory = async () => {
 };
 
 // Bulk add players
-export const addPlayersBulk = async (players) => {
-  const response = await api.post('/admin/players-bulk', { players });
+export const addPlayersBulk = async (players, auctionId = null) => {
+  const targetAuctionId = auctionId || getCurrentAuctionId();
+  const url = targetAuctionId ? `/auction/${encodeURIComponent(targetAuctionId)}/admin/players-bulk` : '/admin/players-bulk';
+  const response = await api.post(url, { players }, {
+    headers: targetAuctionId ? { 'x-auction-id': targetAuctionId } : {},
+    timeout: 120000
+  });
   return response.data;
 };
 
 // Bulk import players with photos (multipart)
-export const bulkImportWithPhotos = async (playerFile, photoZip) => {
+export const bulkImportWithPhotos = async (playerFile, photoZip, auctionId = null) => {
   try {
     const formData = new FormData();
     formData.append('playerFile', playerFile);
@@ -81,21 +86,24 @@ export const bulkImportWithPhotos = async (playerFile, photoZip) => {
       formData.append('photoZip', photoZip);
     }
 
-    const response = await fetch(getAuctionApiUrl('/admin/players-bulk-with-photos'), {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
+    const targetAuctionId = auctionId || getCurrentAuctionId();
+    const url = targetAuctionId
+      ? `/auction/${encodeURIComponent(targetAuctionId)}/admin/players-bulk-with-photos`
+      : '/admin/players-bulk-with-photos';
+
+    const response = await api.post(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        ...(targetAuctionId ? { 'x-auction-id': targetAuctionId } : {})
+      },
+      timeout: 600000 // 10 minutes timeout for processing & image uploads
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Bulk import failed' }));
-      throw new Error(errorData.error || 'Bulk import failed');
-    }
-
-    return await response.json();
+    return response.data;
   } catch (error) {
     console.error('Error in bulkImportWithPhotos:', error);
-    throw error;
+    const message = error.response?.data?.error || error.message || 'Bulk import failed';
+    throw new Error(message);
   }
 };
 

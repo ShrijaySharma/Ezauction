@@ -2,30 +2,50 @@ import React, { useState } from 'react';
 import * as adminService from '../services/admin';
 import * as XLSX from 'xlsx';
 
-// Simple CSV Parser
-const parseCSV = (text) => {
-    const lines = text.split('\n').filter(line => line.trim() !== '');
-    if (lines.length === 0) return [];
+import { useParams } from 'react-router-dom';
 
-    const headers = lines[0].split(',').map(h => h.trim());
-    const result = [];
+// Robust spreadsheet / CSV Parser using XLSX
+const parseSpreadsheetData = (text) => {
+    if (!text || !text.trim()) return [];
+    try {
+        const workbook = XLSX.read(text, { type: 'string' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
-    for (let i = 1; i < lines.length; i++) {
-        const currentLine = lines[i].split(','); // Simple split, doesn't handle quoted commas
-        if (currentLine.length === headers.length) {
-            const obj = {};
-            for (let j = 0; j < headers.length; j++) {
-                let value = currentLine[j].trim();
-                // Remove quotes if present
-                if (value.startsWith('"') && value.endsWith('"')) {
-                    value = value.slice(1, -1);
-                }
-                obj[headers[j]] = value;
-            }
-            result.push(obj);
-        }
+        return rawJson.map(row => {
+            const normalized = {};
+            Object.keys(row).forEach(key => {
+                const cleanKey = key.replace(/[\r\n\s]+/g, '_').toLowerCase();
+                normalized[cleanKey] = row[key];
+            });
+
+            const name = normalized.name || normalized.player_name || normalized.player || '';
+            const role = normalized.role || normalized.player_role || normalized.category || '';
+            const rawPrice = normalized.base_price !== undefined ? normalized.base_price : (normalized.price || normalized.baseprice || '');
+            const cleanPrice = String(rawPrice).replace(/[^0-9.]/g, '');
+            const base_price = cleanPrice ? parseFloat(cleanPrice) : '';
+            const country = normalized.country || normalized.nationality || '';
+            const age = normalized.age ? parseInt(normalized.age) || '' : '';
+            const serial_number = normalized.serial_number !== undefined ? normalized.serial_number : (normalized.serial || normalized.sn || '');
+            const image = normalized.image || normalized.photo || normalized.photo_url || '';
+            const thumb_url = normalized.thumb_url || normalized.thumbnail || '';
+
+            return {
+                name: String(name).trim(),
+                role: String(role).trim(),
+                base_price,
+                country: String(country).trim(),
+                age,
+                serial_number: serial_number !== '' ? parseInt(serial_number) || '' : '',
+                image: String(image).trim(),
+                thumb_url: String(thumb_url).trim()
+            };
+        }).filter(p => p.name || p.role || p.base_price !== '');
+    } catch (e) {
+        console.error('Error parsing spreadsheet data:', e);
+        return [];
     }
-    return result;
 };
 
 const SAMPLE_CSV = `name,role,base_price,country,age,serial_number,image
@@ -34,7 +54,10 @@ Rohit Sharma,Batsman,16000000,India,36,45,
 Jasprit Bumrah,Bowler,12000000,India,30,93,
 Ben Stokes,All Rounder,15000000,England,32,55,`;
 
-const BulkUploadModal = ({ onClose, onSuccess }) => {
+const BulkUploadModal = ({ onClose, onSuccess, auctionId: propAuctionId }) => {
+    const { auctionId: routeAuctionId } = useParams();
+    const auctionId = propAuctionId || routeAuctionId || null;
+
     const [csvText, setCsvText] = useState('');
     const [file, setFile] = useState(null);
     const [photoZip, setPhotoZip] = useState(null);
@@ -57,6 +80,7 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                     const worksheet = workbook.Sheets[firstSheetName];
                     const csvString = XLSX.utils.sheet_to_csv(worksheet);
                     setCsvText(csvString);
+                    setError(null);
                 } catch (err) {
                     setError('Error parsing file: ' + err.message);
                 }
@@ -79,13 +103,13 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
 
     const handlePreview = () => {
         try {
-            const parsed = parseCSV(csvText);
+            const parsed = parseSpreadsheetData(csvText);
             if (parsed.length === 0) {
-                setError('No valid data found in CSV.');
+                setError('No valid data found in CSV or Excel file.');
                 return;
             }
             // Basic validation
-            const valid = parsed.every(p => p.name && p.role && p.base_price);
+            const valid = parsed.every(p => p.name && p.role && p.base_price !== '');
             if (!valid) {
                 setError('Some rows are missing required fields (name, role, base_price).');
             }
@@ -105,7 +129,7 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
             if (photoZip && file) {
                 // Use the new bulk import with photos endpoint
                 setUploadProgress('Uploading files and processing images...');
-                const result = await adminService.bulkImportWithPhotos(file, photoZip);
+                const result = await adminService.bulkImportWithPhotos(file, photoZip, auctionId);
 
                 if (result.success) {
                     const photoInfo = result.photosMatched
@@ -119,19 +143,21 @@ const BulkUploadModal = ({ onClose, onSuccess }) => {
                 }
             } else {
                 // Use existing JSON bulk endpoint (original behavior preserved)
-                const result = await adminService.addPlayersBulk(previewData);
+                setUploadProgress('Importing players...');
+                const result = await adminService.addPlayersBulk(previewData, auctionId);
 
                 if (result.success) {
                     alert(`Successfully added ${result.count} players!`);
                     onSuccess();
                     onClose();
                 } else {
-                    setError('Upload failed: ' + result.error);
+                    setError('Upload failed: ' + (result.error || 'Unknown error'));
                 }
             }
         } catch (err) {
-            console.error(err);
-            setError('Upload error: ' + (err.message || err.response?.data?.error || 'Unknown error'));
+            console.error('Bulk upload error:', err);
+            const msg = err.response?.data?.error || err.message || 'Unknown upload error occurred';
+            setError('Upload error: ' + msg);
         } finally {
             setLoading(false);
             setUploadProgress('');

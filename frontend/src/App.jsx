@@ -34,7 +34,7 @@ function AuctionLoginWrapper({ user, onLogin }) {
     if (user.role === 'host') return <Navigate to={`/auction/${auctionId}/host`} replace />;
     if (user.role === 'super_admin') return <Navigate to="/super-admin" replace />;
   }
-  return <Login onLogin={onLogin} />;
+  return <Login onLogin={onLogin} auctionId={auctionId} />;
 }
 
 function App() {
@@ -91,7 +91,7 @@ function App() {
               user.role === 'owner' ? (user.auctionId ? `/auction/${user.auctionId}/owner` : '/owner') :
                 user.role === 'host' ? (user.auctionId ? `/auction/${user.auctionId}/host` : '/host') :
                   user.role === 'super_admin' ? '/super-admin' : '/login'
-          } /> : <Login onLogin={setUser} />}
+          } /> : <Login onLogin={setUser} auctionId={null} />}
         />
         <Route
           path="/admin"

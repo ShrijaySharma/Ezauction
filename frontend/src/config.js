@@ -19,11 +19,25 @@ export const setCurrentAuctionId = (id) => {
     }
 };
 
+export const clearCurrentAuctionId = () => {
+    window.__currentAuctionId = null;
+    try {
+        localStorage.removeItem('currentAuctionId');
+    } catch (e) {
+        console.error('Failed to clear currentAuctionId:', e);
+    }
+};
+
 export const getCurrentAuctionId = () => {
     const match = window.location.pathname.match(/\/auction\/([^/]+)/);
     if (match?.[1]) {
         setCurrentAuctionId(match[1]);
         return match[1];
+    }
+    // Prevent stale localStorage auction IDs on global pages
+    const isGlobalPage = /^\/(login|super-admin|app-owner)(\/|$)/.test(window.location.pathname);
+    if (isGlobalPage) {
+        return null;
     }
     return window.__currentAuctionId || localStorage.getItem('currentAuctionId') || null;
 };

@@ -1,13 +1,23 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { login } from '../services/auth';
+import { clearCurrentAuctionId } from '../config';
 
-function Login({ onLogin }) {
+function Login({ onLogin, auctionId: propAuctionId }) {
+  const { auctionId: routeAuctionId } = useParams();
+  const auctionId = propAuctionId !== undefined ? propAuctionId : (routeAuctionId || null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // If accessing generic /login, ensure no stale auction ID interferes
+    if (!auctionId) {
+      clearCurrentAuctionId();
+    }
+  }, [auctionId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,27 +25,32 @@ function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      const response = await login(username, password);
+      const response = await login(username, password, auctionId);
       if (response && response.success) {
         // Update global auth state first
         onLogin(response.user);
 
+        // Always send super_admin directly to super admin console
+        if (response.user.role === 'super_admin') {
+          navigate('/super-admin');
+          return;
+        }
+
         // Then navigate based on role and auction scope
-        const auctionId = response.user.auctionId || (window.location.pathname.match(/\/auction\/([^/]+)/)?.[1]);
+        const targetAuctionId = response.user.auctionId || auctionId;
         let redirectPath;
-        if (auctionId) {
+        if (targetAuctionId) {
           redirectPath =
-            response.user.role === 'admin' ? `/auction/${auctionId}/admin` :
-              response.user.role === 'owner' ? `/auction/${auctionId}/owner` :
-                response.user.role === 'host' ? `/auction/${auctionId}/host` :
-                  response.user.role === 'super_admin' ? '/super-admin' : `/auction/${auctionId}/login`;
+            response.user.role === 'admin' ? `/auction/${targetAuctionId}/admin` :
+              response.user.role === 'owner' ? `/auction/${targetAuctionId}/owner` :
+                response.user.role === 'host' ? `/auction/${targetAuctionId}/host` :
+                  `/auction/${targetAuctionId}/login`;
         } else {
           redirectPath =
             response.user.role === 'admin' ? '/admin' :
               response.user.role === 'owner' ? '/owner' :
                 response.user.role === 'host' ? '/host' :
-                  response.user.role === 'super_admin' ? '/super-admin' :
-                    response.user.role === 'app_owner' ? '/app-owner' : '/login';
+                  response.user.role === 'app_owner' ? '/app-owner' : '/login';
         }
         navigate(redirectPath);
       } else {

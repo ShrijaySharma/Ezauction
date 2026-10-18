@@ -18,7 +18,7 @@ import { refreshAuctionState, getAuctionState, getTradingWindowState, setTrading
 const router = express.Router({ mergeParams: true });
 
 function getAuctionId(req) {
-  return req.params.auctionId || req.session.auctionId || req.headers['x-auction-id'] || null;
+  return req.params.auctionId || req.body?.auctionId || req.query?.auctionId || req.headers['x-auction-id'] || req.session.auctionId || null;
 }
 
 function getAuctionIo(req) {
@@ -1260,17 +1260,23 @@ router.post('/players-bulk', async (req, res) => {
     // Pre-process and validate
     for (let i = 0; i < players.length; i++) {
       const p = players[i];
-      if (!p.name || !p.role || !p.base_price) {
+      if (!p.name || !p.role || p.base_price === undefined || p.base_price === null || String(p.base_price).trim() === '') {
         errors.push({ index: i, error: 'Missing required fields (Name, Role, Base Price)', data: p });
         continue;
       }
+      const cleanPrice = String(p.base_price).replace(/[^0-9.]/g, '');
+      const basePrice = parseFloat(cleanPrice);
+      if (isNaN(basePrice)) {
+        errors.push({ index: i, error: 'Invalid Base Price format: ' + p.base_price, data: p });
+        continue;
+      }
       validPlayers.push({
-        name: p.name,
-        role: p.role,
-        base_price: parseFloat(p.base_price),
-        country: p.country || null,
-        age: p.age ? parseInt(p.age) : null,
-        serial_number: p.serial_number ? parseInt(p.serial_number) : null,
+        name: String(p.name).trim(),
+        role: String(p.role).trim(),
+        base_price: basePrice,
+        country: p.country ? String(p.country).trim() : null,
+        age: p.age ? parseInt(p.age) || null : null,
+        serial_number: p.serial_number ? parseInt(p.serial_number) || null : null,
         status: 'AVAILABLE',
         image: p.image || null,
         thumb_url: p.thumb_url || null,
@@ -1322,56 +1328,49 @@ const bulkUpload = multer({
 });
 
 router.post('/players-bulk-with-photos',
-  bulkUpload.fields([
-    { name: 'playerFile', maxCount: 1 },
-    { name: 'photoZip', maxCount: 1 }
-  ]),
+  (req, res, next) => {
+    bulkUpload.fields([
+      { name: 'playerFile', maxCount: 1 },
+      { name: 'photoZip', maxCount: 1 }
+    ])(req, res, (err) => {
+      if (err) {
+        console.error('Multer upload error in bulk upload:', err);
+        return res.status(400).json({ error: err.message || 'File upload failed' });
+      }
+      next();
+    });
+  },
   async (req, res) => {
     const io = getAuctionIo(req);
     const auctionId = getAuctionId(req);
     let extractDir = null;
 
+    if (!auctionId) {
+      return res.status(400).json({ error: 'Auction ID is required for bulk player import' });
+    }
+
     try {
-      // 1. Parse the player file (xlsx or csv)
+      // 1. Parse the player file (xlsx, xls, or csv) using XLSX for robust quoted comma support
       const playerFileArr = req.files ? req.files['playerFile'] : null;
       if (!playerFileArr || playerFileArr.length === 0) {
         return res.status(400).json({ error: 'Player file (xlsx/csv) is required' });
       }
       const playerFile = playerFileArr[0];
-      const fileName = (playerFile.originalname || '').toLowerCase();
 
-      let playerRows = [];
+      const fileBuffer = fs.readFileSync(playerFile.path);
+      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
 
-      if (fileName.endsWith('.csv')) {
-        // Parse CSV directly from temporary disk file
-        const csvText = fs.readFileSync(playerFile.path, 'utf-8');
-        const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== '');
-        if (lines.length < 2) {
-          return res.status(400).json({ error: 'CSV file must have a header row and at least one data row' });
-        }
-        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-          const row = {};
-          headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
-          playerRows.push(row);
-        }
-      } else {
-        // Parse Excel using xlsx library from temporary file buffer
-        const fileBuffer = fs.readFileSync(playerFile.path);
-        const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-        // Normalize headers to lowercase
-        playerRows = jsonData.map(row => {
-          const normalized = {};
-          Object.keys(row).forEach(key => {
-            const cleanKey = key.replace(/[\r\n\s]+/g, '').toLowerCase();
-            normalized[cleanKey] = row[key];
-          });
-          return normalized;
+      // Normalize headers to lowercase and remove spaces
+      const playerRows = jsonData.map(row => {
+        const normalized = {};
+        Object.keys(row).forEach(key => {
+          const cleanKey = key.replace(/[\r\n\s]+/g, '').toLowerCase();
+          normalized[cleanKey] = row[key];
         });
-      }
+        return normalized;
+      });
 
       if (playerRows.length === 0) {
         return res.status(400).json({ error: 'No player data found in file' });
@@ -1382,17 +1381,25 @@ router.post('/players-bulk-with-photos',
       const errors = [];
       for (let i = 0; i < playerRows.length; i++) {
         const p = playerRows[i];
-        if (!p.name || !p.role || !p.base_price) {
+        if (!p.name || !p.role || p.base_price === undefined || p.base_price === null || String(p.base_price).trim() === '') {
           errors.push({ index: i, error: 'Missing required fields (name, role, base_price)', data: p });
           continue;
         }
+
+        const cleanPrice = String(p.base_price).replace(/[^0-9.]/g, '');
+        const basePrice = parseFloat(cleanPrice);
+        if (isNaN(basePrice)) {
+          errors.push({ index: i, error: 'Invalid base_price: ' + p.base_price, data: p });
+          continue;
+        }
+
         validPlayers.push({
           name: String(p.name).trim(),
           role: String(p.role).trim(),
-          base_price: parseFloat(p.base_price),
+          base_price: basePrice,
           country: p.country ? String(p.country).trim() : null,
-          age: p.age ? parseInt(p.age) : null,
-          serial_number: p.serial_number ? parseInt(p.serial_number) : null,
+          age: p.age ? parseInt(p.age) || null : null,
+          serial_number: p.serial_number ? parseInt(p.serial_number) || null : null,
           status: 'AVAILABLE',
           image: null,
           thumb_url: null,
@@ -1401,7 +1408,7 @@ router.post('/players-bulk-with-photos',
       }
 
       if (validPlayers.length === 0) {
-        return res.status(400).json({ error: 'No valid players found', detailedErrors: errors });
+        return res.status(400).json({ error: 'No valid players found in file', detailedErrors: errors });
       }
 
       // 2. Extract photos from ZIP to disk if provided

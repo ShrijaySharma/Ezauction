@@ -26,7 +26,8 @@ const ALLOWED_ORIGINS = [
   'https://app.ezauction.online',                                    // Custom domain
   'https://ezauction-git-main-shrijaysharmas-projects.vercel.app',   // Vercel main branch
   /^https:\/\/ezauction-.*-shrijaysharmas-projects\.vercel\.app$/,   // Vercel preview deployments
-  'http://localhost:5173',                                            // Dev Vite
+  /^http:\/\/localhost(:\d+)?$/,                                     // Dev Vite / any localhost port
+  /^http:\/\/127\.0\.0\.1(:\d+)?$/,                                  // Local IP loopback
   /^http:\/\/192\.168\.\d+\.\d+:\d+$/,                               // LAN dev access
   /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,                                // LAN dev access (10.x)
 ];
@@ -54,8 +55,8 @@ app.use(cors({
   origin: ALLOWED_ORIGINS,
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Serve uploaded images (Keep for backward compatibility if any local files remain, though we use Supabase now)
 app.use('/uploads', express.static(join(__dirname, 'uploads')));
@@ -144,6 +145,14 @@ app.get('/api/proxy-image', async (req, res) => {
     console.error('Proxy Error:', error);
     res.status(500).send('Internal Server Error while proxying image');
   }
+});
+
+// Centralized error handler to ensure JSON responses on errors (Multer, body-parser, etc.)
+app.use((err, req, res, next) => {
+  console.error('Unhandled request error:', err);
+  if (res.headersSent) return next(err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ error: err.message || 'Server error occurred during request' });
 });
 
 // ── Helper: Seed Super Admin if not exists ──────────────────────────────────

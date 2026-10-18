@@ -15,7 +15,7 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    let user;
+    let user = null;
 
     if (!targetAuctionId) {
       // Look up user by username across all accounts
@@ -36,34 +36,9 @@ router.post('/login', async (req, res) => {
       }
 
       user = matchedUsers[0];
-
-      // If user belongs to an auction, check that the auction exists and is active
-      if (user.auction_id) {
-        const { data: auction } = await supabase
-          .from('auctions')
-          .select('id, status')
-          .eq('id', user.auction_id)
-          .maybeSingle();
-
-        if (!auction || auction.status !== 'active') {
-          return res.status(404).json({ error: 'This auction is currently unavailable or archived' });
-        }
-      }
     } else {
-      // Validate auction exists and is active
-      const { data: auction, error: auctionError } = await supabase
-        .from('auctions')
-        .select('id, status')
-        .eq('id', targetAuctionId)
-        .maybeSingle();
-
-      if (auctionError) throw auctionError;
-      if (!auction || auction.status !== 'active') {
-        return res.status(404).json({ error: 'This auction is unavailable' });
-      }
-
-      // Check for user in this auction, or allow super_admin
-      let { data: matchedUser, error: userError } = await supabase
+      // Look for user scoped to targetAuctionId
+      const { data: matchedUser, error: userError } = await supabase
         .from('users')
         .select('*')
         .eq('username', username)
@@ -75,7 +50,10 @@ router.post('/login', async (req, res) => {
         return res.status(500).json({ error: 'Database error: ' + userError.message });
       }
 
-      if (!matchedUser) {
+      if (matchedUser) {
+        user = matchedUser;
+      } else {
+        // If not found in this auction, check if it's a super_admin
         const { data: saUser, error: saError } = await supabase
           .from('users')
           .select('*')
@@ -87,9 +65,22 @@ router.post('/login', async (req, res) => {
           console.error('Database error checking super_admin during login:', saError);
           return res.status(500).json({ error: 'Database error: ' + saError.message });
         }
-        matchedUser = saUser;
+
+        if (saUser) {
+          user = saUser;
+        } else {
+          // Fallback: check if username belongs to an admin or owner of another auction (e.g. stale auction link/storage)
+          const { data: fallbackUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('username', username)
+            .maybeSingle();
+
+          if (fallbackUser) {
+            user = fallbackUser;
+          }
+        }
       }
-      user = matchedUser;
     }
 
     if (!user) {
@@ -101,6 +92,26 @@ router.post('/login', async (req, res) => {
     if (!validPassword) {
       console.log('Login attempt failed: Invalid password for user -', username);
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Check auction availability (super_admins are NEVER blocked by auction status)
+    if (user.role !== 'super_admin') {
+      const auctionToCheck = user.auction_id || targetAuctionId;
+      if (auctionToCheck) {
+        const { data: auction, error: auctionError } = await supabase
+          .from('auctions')
+          .select('id, status')
+          .eq('id', auctionToCheck)
+          .maybeSingle();
+
+        if (auctionError) throw auctionError;
+        if (!auction) {
+          return res.status(404).json({ error: 'This auction does not exist or has been removed' });
+        }
+        if (auction.status !== 'active') {
+          return res.status(403).json({ error: 'This auction is currently unavailable or archived' });
+        }
+      }
     }
 
     // Map team data manually

@@ -517,7 +517,7 @@ export default function SuperAdminDashboard({ initialUser }) {
               {[
                 {
                   label: '🛠 Admin Console',
-                  sub: 'Login with auction credentials to run the auction',
+                  sub: 'Direct access as Super Admin · (Organizers must enter auction credentials)',
                   path: `/auction/${linksModalAuction.id}/admin`
                 },
                 {

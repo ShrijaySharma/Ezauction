@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { API_URL, getAuctionApiPath, getCurrentAuctionId, setCurrentAuctionId } from '../config';
+import { API_URL, getAuctionApiPath, getCurrentAuctionId, setCurrentAuctionId, clearCurrentAuctionId } from '../config';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -22,14 +22,16 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-export const login = async (username, password, auctionId = null) => {
+export const login = async (username, password, auctionId = undefined) => {
   try {
-    const aid = auctionId || getCurrentAuctionId();
+    const aid = auctionId !== undefined ? auctionId : getCurrentAuctionId();
     const url = aid ? `/auction/${aid}/auth/login` : '/auth/login';
     const response = await api.post(url, { username, password, auctionId: aid });
     const userAuctionId = response.data?.user?.auctionId || aid;
-    if (userAuctionId) {
+    if (userAuctionId && response.data?.user?.role !== 'super_admin') {
       setCurrentAuctionId(userAuctionId);
+    } else {
+      clearCurrentAuctionId();
     }
     return response.data;
   } catch (error) {
@@ -47,6 +49,7 @@ export const login = async (username, password, auctionId = null) => {
 export const superAdminLogin = async (username, password) => {
   try {
     const response = await api.post('/super-admin/login', { username, password });
+    clearCurrentAuctionId();
     return response.data;
   } catch (error) {
     console.error('Super admin login error:', error);
@@ -60,20 +63,25 @@ export const superAdminLogin = async (username, password) => {
   }
 };
 
-export const logout = async (auctionId = null) => {
-  const aid = auctionId || getCurrentAuctionId();
+export const logout = async (auctionId = undefined) => {
+  const aid = auctionId !== undefined ? auctionId : getCurrentAuctionId();
   const url = aid ? `/auction/${aid}/auth/logout` : '/auth/logout';
-  await api.post(url);
-  localStorage.removeItem('currentAuctionId');
+  try {
+    await api.post(url);
+  } finally {
+    clearCurrentAuctionId();
+  }
 };
 
-export const getCurrentUser = async (auctionId = null) => {
-  const aid = auctionId || getCurrentAuctionId();
+export const getCurrentUser = async (auctionId = undefined) => {
+  const aid = auctionId !== undefined ? auctionId : getCurrentAuctionId();
   const url = aid ? `/auction/${aid}/auth/me` : '/auth/me';
   const response = await api.get(url);
   const user = response.data.user;
-  if (user?.auctionId) {
+  if (user?.auctionId && user?.role !== 'super_admin') {
     setCurrentAuctionId(user.auctionId);
+  } else if (user?.role === 'super_admin') {
+    clearCurrentAuctionId();
   }
   return user;
 };
