@@ -7,6 +7,14 @@ import BidNotification from '../components/BidNotification';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
 import { getSocketUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
+import { getPublicBroadcastConfig } from '../services/public';
+import { getTheme, DEFAULT_THEME } from '../utils/themeEngine';
+import ThemeBlackGold from '../components/host-themes/ThemeBlackGold';
+import ThemeNavyGold from '../components/host-themes/ThemeNavyGold';
+import ThemeBlueBrush from '../components/host-themes/ThemeBlueBrush';
+import ThemeDarkTeal from '../components/host-themes/ThemeDarkTeal';
+import HostPurseView from '../components/host-themes/HostPurseView';
+import HostTeamsView from '../components/host-themes/HostTeamsView';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -46,6 +54,11 @@ function HostDashboard({ user }) {
   const [sponsorName, setSponsorName] = useState('');
   const [sponsorLogo, setSponsorLogo] = useState('');
 
+  // ── Broadcast Control State ──────────────────────────────────────────────
+  const [themeKey, setThemeKey] = useState(DEFAULT_THEME);
+  const [displayMode, setDisplayMode] = useState('main'); // 'main' | 'purse' | 'teams'
+  // ─────────────────────────────────────────────────────────────────────────
+
   const audioElementRef = useRef(null);
 
   // Refs for socket callbacks to access latest state
@@ -73,6 +86,12 @@ function HostDashboard({ user }) {
     const savedLogo = localStorage.getItem('ezauction_sponsor_logo');
     if (savedName) setSponsorName(savedName);
     if (savedLogo) setSponsorLogo(savedLogo);
+
+    // Load saved broadcast config (theme + display mode) — graceful, never blocks
+    getPublicBroadcastConfig().then(cfg => {
+      if (cfg && cfg.theme) setThemeKey(cfg.theme);
+      if (cfg && cfg.hostDisplayMode) setDisplayMode(cfg.hostDisplayMode);
+    }).catch(() => {/* silently use defaults */});
 
     // Create audio element for notifications
     const audio = new Audio('/notification_sound.wav');
@@ -207,11 +226,79 @@ function HostDashboard({ user }) {
       setAllBids([]);
     });
 
+    // ── Broadcast Control socket listeners (new — don't affect bidding) ─────
+    newSocket.on('theme-updated', (data) => {
+      if (data && data.theme) {
+        console.log('[Socket:Host] theme-updated →', data.theme);
+        setThemeKey(data.theme);
+      }
+    });
+
+    newSocket.on('host-display-mode', (data) => {
+      if (data && data.mode) {
+        console.log('[Socket:Host] host-display-mode →', data.mode);
+        setDisplayMode(data.mode);
+        // Auto-load purse data when admin switches to purse/teams view
+        if (data.mode === 'purse' || data.mode === 'teams') {
+          loadTeamPurses();
+        }
+      }
+    });
+    // ─────────────────────────────────────────────────────────────────────────
+
+    const handlePurseRefresh = () => {
+      loadTeamPurses();
+      loadTeams();
+      setTimeout(() => {
+        loadTeamPurses();
+        loadTeams();
+      }, 350);
+      setTimeout(() => {
+        loadTeamPurses();
+        loadTeams();
+      }, 800);
+    };
+
+    const handlePlayerSoldPurseUpdate = (data) => {
+      if (data && data.soldToTeam && data.soldPrice != null) {
+        setTeamPurses(prev => prev.map(t => {
+          if (t.id === data.soldToTeam || t.name === data.soldToTeam) {
+            const newBudget = (t.budget != null) ? Math.max(0, t.budget - Number(data.soldPrice)) : t.budget;
+            const newSpent = (t.totalSpent || 0) + Number(data.soldPrice);
+            const newBought = (t.playersBought || 0) + 1;
+            const currentPlayers = t.players || [];
+            const exists = currentPlayers.some(p => p.id === data.playerId);
+            const updatedPlayers = exists ? currentPlayers : [
+              ...currentPlayers,
+              {
+                id: data.playerId,
+                name: currentPlayerRef.current?.name || 'Player',
+                role: currentPlayerRef.current?.role || 'PLAYER',
+                image: currentPlayerRef.current?.image || null,
+                sold_price: data.soldPrice
+              }
+            ];
+            return {
+              ...t,
+              budget: newBudget,
+              totalSpent: newSpent,
+              playersBought: newBought,
+              players: updatedPlayers
+            };
+          }
+          return t;
+        }));
+      }
+      handlePurseRefresh();
+      loadUnsoldPlayers();
+    };
+
     newSocket.on('player-marked', (data) => {
       console.log('[Socket:Host] player-marked', data);
       if (data.status === 'SOLD') {
-        // Backend now sends soldToTeamName and soldToTeamLogo directly
-        // Fallback to local lookup if not present (backward compat)
+        handlePlayerSoldPurseUpdate(data);
+
+        // Backend sends soldToTeamName and soldToTeamLogo directly
         let teamName = data.soldToTeamName || '';
         let teamLogo = data.soldToTeamLogo || null;
         
@@ -230,12 +317,39 @@ function HostDashboard({ user }) {
           price: data.soldPrice || 0
         });
         setTimeout(() => setSoldAnimation(null), 4000);
+      } else {
+        handlePurseRefresh();
+        loadUnsoldPlayers();
       }
+    });
+
+    newSocket.on('player-sold', (data) => {
+      console.log('[Socket:Host] player-sold', data);
+      handlePlayerSoldPurseUpdate(data);
     });
 
     newSocket.on('team-budget-updated', (data) => {
       console.log('[Socket:Host] team-budget-updated', data);
-      // Team purses panel has manual "Refresh" button
+      if (data && data.teamId != null) {
+        setTeamPurses(prev => prev.map(t => (t.id === data.teamId || t.name === data.teamId) ? { ...t, budget: data.newBudget } : t));
+      }
+      handlePurseRefresh();
+    });
+
+    newSocket.on('player-removed-from-team', () => {
+      console.log('[Socket:Host] player-removed-from-team');
+      handlePurseRefresh();
+      loadUnsoldPlayers();
+    });
+
+    newSocket.on('trading-window-update', () => {
+      console.log('[Socket:Host] trading-window-update');
+      handlePurseRefresh();
+    });
+
+    newSocket.on('team-updated', () => {
+      console.log('[Socket:Host] team-updated');
+      handlePurseRefresh();
     });
 
     newSocket.on('reconnect', () => {
@@ -243,6 +357,7 @@ function HostDashboard({ user }) {
       setConnectionError(false);
       loadCurrentInfo();
       loadTeamPurses();
+      loadTeams();
     });
 
     return () => {
@@ -306,7 +421,7 @@ function HostDashboard({ user }) {
 
   const loadTeamPurses = async () => {
     try {
-      const data = await hostService.getTeamPurses();
+      const data = await hostService.getTeamPurses(auctionId);
       setTeamPurses(data || []);
     } catch (error) {
       console.error('Error loading team purses:', error);
@@ -362,8 +477,12 @@ function HostDashboard({ user }) {
     reader.readAsDataURL(file);
   };
 
+  // Derive theme object — pure computation, no side-effects
+  const theme = getTheme(themeKey);
+  const isLight = themeKey === 'blue_brush';
+
   return (
-    <div className="h-screen w-screen relative overflow-hidden bg-black font-sans selection:bg-yellow-400 selection:text-blue-900">
+    <div className={`h-screen w-screen relative overflow-hidden font-sans selection:bg-yellow-400 selection:text-blue-900 ${isLight ? 'bg-[#F4F7FC]' : 'bg-black'}`}>
       <TradingWindowBanner socket={socket} />
       {/* Connection Error Banner */}
       {connectionError && (
@@ -371,7 +490,7 @@ function HostDashboard({ user }) {
           Connection lost. Please refresh the page.
         </div>
       )}
-      {/* Bid Notification Overlay (Removed for now, sound kept) */}
+      {/* Bid Notification Overlay (sound kept) */}
       {false && notification && (
         <BidNotification
           key={notificationKey}
@@ -381,164 +500,148 @@ function HostDashboard({ user }) {
         />
       )}
 
+      {/* Theme components now render their own backgrounds — no outer cinematic BG needed */}
 
-
-      {/* Cinematic Background */}
-      <div
-        className="fixed inset-0 z-0"
-        style={{
-          backgroundImage: `url('/stadium_img.webp')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-900/60 via-black/40 to-black/80 backdrop-blur-[2px]"></div>
+      {/* Floating Menu Button (Top Left) — clean, elegant, always accessible */}
+      <div className="fixed top-4 left-4 md:top-5 md:left-5 z-50">
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className={`flex flex-col items-center justify-center w-10 h-10 md:w-11 md:h-11 backdrop-blur-2xl rounded-xl border transition-all shadow-xl group ${
+            isLight
+              ? 'bg-white/85 hover:bg-white border-blue-200/80 text-[#061E4E]'
+              : 'bg-black/50 hover:bg-black/75 border-white/15 text-white'
+          }`}
+          title="Host Menu"
+        >
+          <span className={`block w-5 h-0.5 transition-all ${isLight ? 'bg-[#061E4E]' : 'bg-white'} ${showMenu ? 'rotate-45 translate-y-[5px]' : ''}`}></span>
+          <span className={`block w-5 h-0.5 my-[3px] transition-all ${isLight ? 'bg-[#061E4E]' : 'bg-white'} ${showMenu ? 'opacity-0' : ''}`}></span>
+          <span className={`block w-5 h-0.5 transition-all ${isLight ? 'bg-[#061E4E]' : 'bg-white'} ${showMenu ? '-rotate-45 -translate-y-[5px]' : ''}`}></span>
+        </button>
       </div>
 
-      <div className="relative z-10 h-full w-full flex flex-col">
-        {/* Clean Header Row — in document flow, no overlap */}
-        <div className="shrink-0 flex items-center justify-between px-4 md:px-8 py-3 md:py-4 z-30">
-          <div className="flex items-center gap-3 flex-1">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="flex flex-col items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-black/30 hover:bg-black/50 backdrop-blur-xl rounded-xl border border-white/10 transition-all group"
-              title="Menu"
-            >
-              <span className={`block w-5 md:w-6 h-0.5 md:h-[2px] bg-white/80 group-hover:bg-white transition-all ${showMenu ? 'rotate-45 translate-y-[5px]' : ''}`}></span>
-              <span className={`block w-5 md:w-6 h-0.5 md:h-[2px] bg-white/80 group-hover:bg-white my-[4px] transition-all ${showMenu ? 'opacity-0' : ''}`}></span>
-              <span className={`block w-5 md:w-6 h-0.5 md:h-[2px] bg-white/80 group-hover:bg-white transition-all ${showMenu ? '-rotate-45 -translate-y-[5px]' : ''}`}></span>
-            </button>
-            <img src="/ezauction.png" alt="EzAuction Logo" className="h-8 sm:h-10 md:h-14 lg:h-16 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]" />
-          </div>
-          <div className="flex flex-col items-center animate-fade-in z-20">
-            {sponsorLogo && <img src={sponsorLogo} alt="Sponsor" className="h-8 sm:h-10 md:h-14 lg:h-16 object-contain drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]" />}
-            {sponsorName && <div className="text-white text-[8px] sm:text-[10px] md:text-xs lg:text-sm font-black mt-1 tracking-[0.3em] uppercase drop-shadow-md opacity-80">{sponsorName}</div>}
-          </div>
-          <div className="flex-1 flex justify-end">
-            {status === 'LIVE' && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600/20 backdrop-blur-xl rounded-xl border border-red-500/20">
-                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]"></span>
-                <span className="text-red-400 text-[10px] md:text-xs font-black uppercase tracking-widest">Live</span>
-              </div>
-            )}
-          </div>
+      {/* Floating Live Badge (Top Right) */}
+      {status === 'LIVE' && (
+        <div className="fixed top-4 right-6 md:top-5 md:right-8 z-50 flex items-center gap-2 px-3.5 py-1.5 bg-red-600/30 backdrop-blur-xl rounded-full border border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.3)]">
+          <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
+          <span className="text-white text-[10px] md:text-xs font-black uppercase tracking-widest">Live</span>
         </div>
+      )}
 
-        {/* Main Grid */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden md:overflow-hidden p-3 pt-2 md:px-8 md:py-4 md:pb-6 gap-3 md:gap-5 flex flex-col md:grid md:grid-cols-12 md:items-stretch scrollbar-none min-h-0">
-          {currentPlayer ? (
-            <>
-              {/* Left Column: Enhanced Player Profile */}
-              <div className="col-span-12 md:col-span-3 flex flex-col overflow-hidden order-2 md:order-1 md:justify-center">
-                <div className="w-full bg-gray-900/80 backdrop-blur-2xl rounded-2xl md:rounded-3xl p-4 md:p-6 lg:p-8 border border-white/10 shadow-2xl flex flex-row md:flex-col items-center relative overflow-hidden gap-4 md:gap-6 lg:gap-8">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 via-transparent to-yellow-400/5 opacity-50"></div>
+      {/* Main Full-Screen Content Area — perfectly seamless */}
+      <div className="relative z-10 h-full w-full flex flex-col overflow-hidden">
 
-
-
-                  {/* Left Side (Mobile) / Top (Desktop) */}
-                  <div className="relative z-10 flex flex-col items-start md:items-center gap-2 md:gap-4 w-1/2 md:w-full justify-center">
-                    <div className="px-3 py-1.5 md:px-5 md:py-3 bg-white/10 rounded-xl border border-yellow-400/40 backdrop-blur-xl md:self-end shadow-lg">
-                      <span className="text-white font-mono font-black text-lg md:text-3xl xl:text-4xl drop-shadow-lg">#{currentPlayer.serial_number || currentPlayer.id}</span>
-                    </div>
-                    <h2 className="text-white text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight drop-shadow-2xl leading-tight md:text-center">
-                      {currentPlayer.name}
-                    </h2>
-                    <div className="inline-block px-3 py-1.5 md:px-6 md:py-2.5 bg-yellow-400 text-black rounded-full text-[10px] md:text-sm lg:text-base font-black uppercase tracking-widest shadow-[0_0_20px_rgba(250,204,21,0.3)]">
-                      {currentPlayer.role}
-                    </div>
-                  </div>
-
-                  {/* Right Side (Mobile) / Bottom Grid (Desktop) */}
-                  <div className="relative z-10 flex flex-col gap-2 md:gap-4 w-1/2 md:w-full">
-                    <div className="bg-white/5 p-2 md:p-5 rounded-xl md:rounded-2xl border border-white/10 backdrop-blur-md flex flex-row md:flex-col justify-between items-center md:items-center">
-                      <span className="text-white/40 text-[8px] md:text-xs lg:text-sm font-black uppercase tracking-[0.1em] md:tracking-[0.2em] md:mb-2 md:text-center block">Age</span>
-                      <div className="text-white font-black text-sm md:text-3xl lg:text-4xl uppercase tracking-tight md:text-center">{currentPlayer.age || 'N/A'} <span className="hidden md:inline text-xl lg:text-2xl text-white/50 ml-1">YRS</span></div>
-                    </div>
-                    <div className="bg-gradient-to-r from-yellow-400/10 to-transparent p-2.5 md:p-6 rounded-xl md:rounded-2xl border border-yellow-400/20 backdrop-blur-md flex flex-col justify-center items-center h-full">
-                      <span className="block text-yellow-400/60 text-[8px] md:text-xs lg:text-sm font-black uppercase tracking-widest mb-1 md:mb-2 text-center">Base Price</span>
-                      <div className="text-yellow-400 font-black text-lg md:text-4xl lg:text-5xl font-mono tracking-tighter text-center drop-shadow-lg leading-none md:leading-normal">
-                        ₹{formatIndianNumber(currentPlayer.base_price || 0)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Center Column: Image */}
-              <div className="col-span-12 md:col-span-5 flex flex-col items-center justify-center relative overflow-hidden order-1 md:order-2">
-                <div className={`relative w-full max-w-[220px] sm:max-w-[280px] md:max-w-none md:h-full aspect-[3/4] transition-all duration-500 ${bidFlash ? 'scale-[1.02]' : 'scale-100'}`}>
-                  <div className={`w-full h-full rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 ${bidFlash ? 'shadow-yellow-400/30' : ''}`}>
-                    <img
-                      src={getImageUrl(currentPlayer.image)}
-                      alt={currentPlayer.name}
-                      className="w-full h-full object-cover object-top cursor-pointer"
-                      onClick={() => setPreviewImage(getImageUrl(currentPlayer.image))}
-                      onError={(e) => { e.target.src = '/deafult_player.png'; }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column: Bid Action - Optimized for Overflow */}
-              <div className="col-span-12 md:col-span-4 flex flex-col gap-2 shrink-0 mb-3 md:mb-0 order-3 z-10 md:justify-center">
-                <div className={`w-full flex flex-row md:flex-col bg-gradient-to-b from-yellow-300 to-yellow-500 rounded-2xl md:rounded-3xl p-3 md:p-6 lg:p-8 shadow-2xl border-2 md:border-4 border-white/80 items-center justify-between md:justify-center text-blue-900 transition-all duration-500 gap-3 md:gap-6 lg:gap-8 ${bidFlash ? 'scale-[1.01]' : ''}`}>
-
-                  {/* Mobile Left / Desktop Top: Bid Amount */}
-                  <div className="flex flex-col items-start md:items-center w-5/12 md:w-full">
-                    <div className="text-blue-900/60 md:text-blue-900/40 text-[10px] md:text-lg lg:text-xl xl:text-2xl font-black tracking-[0.2em] md:tracking-[0.5em] uppercase md:mb-2 text-left md:text-center">Current Bid</div>
-                    <div className={`font-black leading-none tracking-tighter transition-all drop-shadow-xl text-left md:text-center w-full break-words
-                      ${currentBid.toString().length > 7 ? 'text-xl md:text-3xl lg:text-5xl xl:text-6xl' : (currentBid.toString().length > 5 ? 'text-2xl md:text-4xl lg:text-6xl xl:text-7xl' : 'text-3xl md:text-5xl lg:text-7xl xl:text-8xl')}
-                      ${bidFlash ? 'scale-110' : ''}
-                    `}>
-                      ₹{formatIndianNumber(currentBid)}
-                    </div>
-                  </div>
-
-                  <div className="hidden md:block h-1.5 w-32 bg-blue-900/10 rounded-full mx-auto"></div>
-                  <div className="block md:hidden w-px h-12 bg-blue-900/20 mx-1"></div>
-
-                  {/* Mobile Right / Desktop Bottom: Leading Team */}
-                  <div className="flex flex-col items-end md:items-center w-7/12 md:w-auto animate-bounce-slow md:px-4">
-                    {highestBid ? (
-                      <>
-                        <div className="text-blue-900/60 text-[9px] md:text-xs lg:text-sm xl:text-base font-black uppercase tracking-[0.2em] md:tracking-[0.4em] mb-1 md:mb-4 text-right md:text-center">Leading Team</div>
-                        <div className="bg-blue-900 text-yellow-400 w-full px-3 py-2 md:px-6 md:py-4 lg:py-6 xl:py-8 rounded-xl md:rounded-[2rem] shadow-xl md:shadow-2xl border-2 md:border-4 border-white/20 flex flex-col md:flex-row items-center justify-center text-center md:text-left gap-2 md:gap-4 lg:gap-6">
-                          {(() => {
-                            const wTeam = teams.find(t => t.name === highestBid.team_name);
-                            if (wTeam && wTeam.logo) {
-                              return <img src={getImageUrl(wTeam.logo)} alt={wTeam.name} className="w-8 h-8 md:w-16 md:h-16 lg:w-20 lg:h-20 xl:w-24 xl:h-24 rounded-full object-cover border-2 border-white/20 shadow-lg drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] shrink-0" onError={(e) => { e.target.style.display = 'none'; }} />;
-                            }
-                            return null;
-                          })()}
-                          <span className={`font-black leading-tight break-words w-full truncate md:overflow-visible md:whitespace-normal
-                            ${highestBid.team_name.length > 15 ? 'text-sm md:text-xl lg:text-3xl xl:text-4xl' : 'text-base md:text-2xl lg:text-4xl xl:text-5xl'}
-                          `}>
-                            {highestBid.team_name}
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-blue-900/50 font-black italic text-sm md:text-2xl lg:text-3xl xl:text-4xl animate-pulse uppercase tracking-[0.1em] md:tracking-[0.2em] text-right md:text-center w-full">
-                        Awaiting Bid...
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="col-span-12 flex items-center justify-center md:h-full min-h-[60vh]">
-              <div className="bg-white/5 backdrop-blur-3xl rounded-[3rem] md:rounded-[4rem] p-8 md:p-24 border border-white/10 text-center shadow-2xl relative overflow-hidden group">
-                <div className="absolute inset-0 bg-yellow-400/5 blur-[120px]"></div>
-                <div className="relative">
-                  <div className="text-[12rem] mb-12 animate-bounce opacity-40">🏏</div>
-                  <h1 className="text-white text-8xl font-black tracking-tighter mb-6 opacity-90 drop-shadow-2xl">READY FOR ACTION</h1>
-                  <p className="text-yellow-400 text-3xl font-black tracking-[0.6em] uppercase opacity-60 animate-pulse">Waiting for host...</p>
-                </div>
-              </div>
-            </div>
+          {/* ── MODE: PURSE ─────────────────────────────────────────────────── */}
+          {displayMode === 'purse' && (
+            <HostPurseView
+              teamPurses={teamPurses}
+              theme={theme}
+              themeKey={themeKey}
+              getImageUrl={getImageUrl}
+              formatIndianNumber={formatIndianNumber}
+            />
           )}
+
+          {/* ── MODE: TEAMS ─────────────────────────────────────────────────── */}
+          {displayMode === 'teams' && (
+            <HostTeamsView
+              teamPurses={teamPurses}
+              theme={theme}
+              themeKey={themeKey}
+              getImageUrl={getImageUrl}
+              formatIndianNumber={formatIndianNumber}
+            />
+          )}
+
+          {/* ── MODE: MAIN (Theme layout components matching reference image) ── */}
+          {displayMode === 'main' && (
+            <>
+              {currentPlayer ? (
+                <>
+                  {themeKey === 'navy_gold' ? (
+                    <ThemeNavyGold
+                      currentPlayer={currentPlayer}
+                      currentBid={currentBid}
+                      highestBid={highestBid}
+                      bidFlash={bidFlash}
+                      teams={teams}
+                      sponsorName={sponsorName}
+                      sponsorLogo={sponsorLogo}
+                      getImageUrl={getImageUrl}
+                      formatIndianNumber={formatIndianNumber}
+                      setPreviewImage={setPreviewImage}
+                    />
+                  ) : themeKey === 'blue_brush' ? (
+                    <ThemeBlueBrush
+                      currentPlayer={currentPlayer}
+                      currentBid={currentBid}
+                      highestBid={highestBid}
+                      bidFlash={bidFlash}
+                      teams={teams}
+                      sponsorName={sponsorName}
+                      sponsorLogo={sponsorLogo}
+                      getImageUrl={getImageUrl}
+                      formatIndianNumber={formatIndianNumber}
+                      setPreviewImage={setPreviewImage}
+                    />
+                  ) : themeKey === 'dark_teal' ? (
+                    <ThemeDarkTeal
+                      currentPlayer={currentPlayer}
+                      currentBid={currentBid}
+                      highestBid={highestBid}
+                      bidFlash={bidFlash}
+                      teams={teams}
+                      sponsorName={sponsorName}
+                      sponsorLogo={sponsorLogo}
+                      getImageUrl={getImageUrl}
+                      formatIndianNumber={formatIndianNumber}
+                      setPreviewImage={setPreviewImage}
+                    />
+                  ) : (
+                    <ThemeBlackGold
+                      currentPlayer={currentPlayer}
+                      currentBid={currentBid}
+                      highestBid={highestBid}
+                      bidFlash={bidFlash}
+                      teams={teams}
+                      sponsorName={sponsorName}
+                      sponsorLogo={sponsorLogo}
+                      getImageUrl={getImageUrl}
+                      formatIndianNumber={formatIndianNumber}
+                      setPreviewImage={setPreviewImage}
+                    />
+                  )}
+                </>
+              ) : (
+                <div className="flex-1 flex items-center justify-center p-6">
+                  <div
+                    className={`rounded-[3rem] md:rounded-[4rem] p-8 md:p-20 text-center shadow-2xl relative overflow-hidden group max-w-2xl border ${
+                      isLight
+                        ? 'bg-white/90 border-blue-200 text-[#071E55]'
+                        : 'bg-white/5 backdrop-blur-3xl border-white/10 text-white'
+                    }`}
+                  >
+                    <div
+                      className="absolute inset-0 blur-[100px] opacity-20 pointer-events-none"
+                      style={{ background: theme.accent }}
+                    />
+                    <div className="relative z-10">
+                      <div className="text-8xl md:text-9xl mb-6 animate-bounce opacity-70">🏏</div>
+                      <h1 className="text-4xl md:text-6xl font-black tracking-tighter mb-4 drop-shadow-2xl uppercase">
+                        READY FOR ACTION
+                      </h1>
+                      <p
+                        className="font-black text-lg md:text-2xl tracking-[0.4em] uppercase animate-pulse"
+                        style={{ color: theme.accent }}
+                      >
+                        Waiting for host...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
         </div>
 
         {/* Burger Menu Dropdown */}
@@ -755,7 +858,6 @@ function HostDashboard({ user }) {
             </div>
           </div>
         )}
-      </div>
 
       {/* Silent Image Preloader for Main Images and Logos */}
       {/* We are preloading ALL unsold main images and team logos here so the browser caches them during random selection */}

@@ -9,6 +9,7 @@ import BulkUploadModal from '../components/BulkUploadModal';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
 import { getSocketUrl, getAuctionApiUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
+import { THEMES, getTheme, DEFAULT_THEME } from '../utils/themeEngine';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -108,6 +109,14 @@ function AdminDashboard({ user }) {
   const [connectionError, setConnectionError] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
 
+  // ── Broadcast Control State ────────────────────────────────────────────
+  const [showBroadcastControl, setShowBroadcastControl] = useState(false);
+  const [broadcastTheme, setBroadcastTheme] = useState(DEFAULT_THEME);
+  const [broadcastDisplayMode, setBroadcastDisplayMode] = useState('main');
+  const [broadcastSaving, setBroadcastSaving] = useState(false);
+  const [broadcastSaveMsg, setBroadcastSaveMsg] = useState('');
+  // ───────────────────────────────────────────────────────────
+
   const enableAudio = () => {
     if (audioElementRef.current) {
       audioElementRef.current.play().then(() => {
@@ -120,7 +129,7 @@ function AdminDashboard({ user }) {
 
   // Disable body scroll when any modal is open
   useEffect(() => {
-    if (showHistory || showPlayerModal || showTeamManagement || showTeamModal || showTeamSquads || showPurseMonitoring || showBiddingLogicModal || showCredentialsModal || showAdminBidding || showTradingModal) {
+    if (showHistory || showPlayerModal || showTeamManagement || showTeamModal || showTeamSquads || showPurseMonitoring || showBiddingLogicModal || showCredentialsModal || showAdminBidding || showTradingModal || showBroadcastControl) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
@@ -128,7 +137,7 @@ function AdminDashboard({ user }) {
     return () => {
       document.body.style.overflow = 'unset';
     };
-  }, [showHistory, showPlayerModal, showTeamManagement, showTeamModal, showTeamSquads, showPurseMonitoring, showBiddingLogicModal, showCredentialsModal, showAdminBidding, showTradingModal]);
+  }, [showHistory, showPlayerModal, showTeamManagement, showTeamModal, showTeamSquads, showPurseMonitoring, showBiddingLogicModal, showCredentialsModal, showAdminBidding, showTradingModal, showBroadcastControl]);
 
   useEffect(() => {
     // Initialize Audio
@@ -1321,6 +1330,28 @@ function AdminDashboard({ user }) {
                   >
                     <div className="font-semibold text-red-100">Delete All Data</div>
                     <div className="text-sm text-red-400">Permanently delete all players & bids</div>
+                  </button>
+                </div>
+
+                {/* ── Broadcast Control ── */}
+                <div className="pt-4 border-t border-gray-700 mt-2">
+                  <button
+                    onClick={async () => {
+                      setShowSidebar(false);
+                      // Pre-load current saved config before opening
+                      try {
+                        const cfg = await adminService.getBroadcastConfig();
+                        if (cfg && cfg.theme) setBroadcastTheme(cfg.theme);
+                        if (cfg && cfg.hostDisplayMode) setBroadcastDisplayMode(cfg.hostDisplayMode);
+                      } catch { /* silently use current state */ }
+                      setShowBroadcastControl(true);
+                    }}
+                    className="w-full px-4 py-3 bg-gradient-to-r from-violet-700 to-purple-700 hover:from-violet-600 hover:to-purple-600 text-white rounded-lg transition-colors text-left shadow-lg border border-violet-500"
+                  >
+                    <div className="font-bold flex items-center gap-2">
+                      <span>🎨</span> Broadcast Control
+                    </div>
+                    <div className="text-sm text-violet-200">Theme & host screen display</div>
                   </button>
                 </div>
               </div>
@@ -3406,6 +3437,137 @@ function AdminDashboard({ user }) {
           </div>
         </div>
       )}
+
+      {/* ── Broadcast Control Modal ───────────────────────────────────────── */}
+      {showBroadcastControl && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowBroadcastControl(false)} />
+          <div className="relative w-full max-w-lg bg-gray-900 border border-violet-500/40 rounded-2xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-gradient-to-r from-violet-900/40 to-transparent">
+              <div>
+                <h3 className="text-white font-black text-xl flex items-center gap-2">🎨 Broadcast Control</h3>
+                <p className="text-violet-300 text-xs mt-0.5 font-semibold uppercase tracking-widest">Theme & Host Screen Display</p>
+              </div>
+              <button onClick={() => setShowBroadcastControl(false)}
+                className="p-2 hover:bg-white/10 rounded-xl text-white/60 hover:text-white transition-all">
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+
+              {/* ── Section A: Theme ── */}
+              <div>
+                <p className="text-white/50 text-xs font-black uppercase tracking-[0.3em] mb-3">Theme</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.values(THEMES).map(t => {
+                    const isActive = broadcastTheme === t.key;
+                    return (
+                      <button
+                        key={t.key}
+                        onClick={() => setBroadcastTheme(t.key)}
+                        className={`relative flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                          isActive
+                            ? 'border-violet-400 bg-violet-500/20 scale-[1.02]'
+                            : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/8'
+                        }`}
+                      >
+                        {/* Colour swatch */}
+                        <span
+                          className="w-6 h-6 rounded-full border-2 border-white/20 shrink-0 shadow-lg"
+                          style={{ background: t.accent }}
+                        />
+                        <div className="min-w-0">
+                          <div className="text-white font-bold text-sm truncate">{t.name}</div>
+                          <div className="text-white/40 text-[10px]">{t.description}</div>
+                        </div>
+                        {isActive && (
+                          <span className="absolute top-2 right-2 text-violet-300 text-xs">✓</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── Section B: Host Display Mode ── */}
+              <div>
+                <p className="text-white/50 text-xs font-black uppercase tracking-[0.3em] mb-3">Host Screen Display</p>
+                <div className="flex flex-col gap-2">
+                  {[
+                    { mode: 'main',  icon: '🎬', label: 'Main',  desc: 'Player card, image & live bids' },
+                    { mode: 'purse', icon: '💰', label: 'Purse', desc: 'All team budgets & spending' },
+                    { mode: 'teams', icon: '🏆', label: 'Teams', desc: 'Team squads with bought players' },
+                  ].map(({ mode, icon, label, desc }) => {
+                    const isActive = broadcastDisplayMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        onClick={() => setBroadcastDisplayMode(mode)}
+                        className={`flex items-center gap-4 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                          isActive
+                            ? 'border-violet-400 bg-violet-500/20'
+                            : 'border-white/10 bg-white/5 hover:border-white/30'
+                        }`}
+                      >
+                        <span className="text-2xl">{icon}</span>
+                        <div className="flex-1">
+                          <div className="text-white font-bold">{label}</div>
+                          <div className="text-white/40 text-xs">{desc}</div>
+                        </div>
+                        {isActive && <span className="text-violet-300 font-bold">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── Save message ── */}
+              {broadcastSaveMsg && (
+                <div className={`text-center text-sm font-bold px-4 py-2 rounded-lg ${
+                  broadcastSaveMsg.startsWith('✓') ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400'
+                }`}>
+                  {broadcastSaveMsg}
+                </div>
+              )}
+
+              {/* ── Save Button ── */}
+              <div className="flex gap-3 pt-2 border-t border-white/10">
+                <button
+                  onClick={async () => {
+                    setBroadcastSaving(true);
+                    setBroadcastSaveMsg('');
+                    try {
+                      await adminService.updateBroadcastConfig({
+                        theme: broadcastTheme,
+                        hostDisplayMode: broadcastDisplayMode,
+                      });
+                      setBroadcastSaveMsg('✓ Applied live to host screen & overlay!');
+                      setTimeout(() => setBroadcastSaveMsg(''), 3000);
+                    } catch (err) {
+                      setBroadcastSaveMsg('⚠ Failed to save. Try again.');
+                    } finally {
+                      setBroadcastSaving(false);
+                    }
+                  }}
+                  disabled={broadcastSaving}
+                  className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 disabled:opacity-50 text-white font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-lg"
+                >
+                  {broadcastSaving ? 'Applying…' : '⚡ Apply Live'}
+                </button>
+                <button
+                  onClick={() => setShowBroadcastControl(false)}
+                  className="px-5 bg-white/5 text-white/70 font-bold rounded-xl hover:bg-white/10 transition-colors border border-white/10"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ─────────────────────────────────────────────────────────────────────── */}
 
       {/* Silent Image Preloader */}
       <div style={{ display: 'none' }}>

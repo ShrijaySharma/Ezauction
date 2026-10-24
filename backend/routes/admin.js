@@ -806,6 +806,7 @@ router.post('/mark-player', async (req, res) => {
 
       io.emit('player-marked', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam, soldToTeamName: team.name, soldToTeamLogo: team.logo });
       io.emit('team-budget-updated', { teamId: finalSoldToTeam, newBudget });
+      io.emit('player-sold', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam, soldToTeamName: team.name, soldToTeamLogo: team.logo });
 
     } else {
       // Mark as UNSOLD
@@ -2760,5 +2761,82 @@ router.post('/admin-assign-team', async (req, res) => {
   }
 });
 
+// ─── Broadcast Config (Theme + Host Display Mode) ─────────────────────────────
+// GET  /admin/broadcast-config  → returns current theme + display mode for this auction
+router.get('/broadcast-config', async (req, res) => {
+  try {
+    const auctionId = getAuctionId(req);
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('broadcast_config')
+      .eq('id', auctionId)
+      .maybeSingle();
+
+    if (error) throw error;
+    const cfg = (data && data.broadcast_config) || {};
+    res.json({
+      theme: cfg.theme || 'black_gold',
+      hostDisplayMode: cfg.hostDisplayMode || 'main',
+    });
+  } catch (err) {
+    console.error('Error getting broadcast-config:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /admin/broadcast-config  → saves theme and/or display mode, then emits socket events
+router.patch('/broadcast-config', async (req, res) => {
+  try {
+    const auctionId = getAuctionId(req);
+    const { theme, hostDisplayMode } = req.body;
+
+    const VALID_THEMES = ['black_gold', 'navy_gold', 'blue_brush', 'dark_teal'];
+    const VALID_MODES  = ['main', 'purse', 'teams'];
+
+    if (theme && !VALID_THEMES.includes(theme)) {
+      return res.status(400).json({ error: 'Invalid theme key' });
+    }
+    if (hostDisplayMode && !VALID_MODES.includes(hostDisplayMode)) {
+      return res.status(400).json({ error: 'Invalid hostDisplayMode' });
+    }
+
+    // Fetch existing config so we do a proper merge (don't overwrite unset fields)
+    const { data: existing, error: fetchErr } = await supabase
+      .from('auctions')
+      .select('broadcast_config')
+      .eq('id', auctionId)
+      .maybeSingle();
+    if (fetchErr) throw fetchErr;
+
+    const current = (existing && existing.broadcast_config) || {};
+    const merged  = {
+      theme: theme || current.theme || 'black_gold',
+      hostDisplayMode: hostDisplayMode || current.hostDisplayMode || 'main',
+    };
+
+    const { error: updateErr } = await supabase
+      .from('auctions')
+      .update({ broadcast_config: merged })
+      .eq('id', auctionId);
+    if (updateErr) throw updateErr;
+
+    // Emit to all clients on this auction's socket namespace
+    const io = getAuctionIo(req);
+    if (theme) {
+      io.emit('theme-updated', { theme: merged.theme });
+    }
+    if (hostDisplayMode) {
+      io.emit('host-display-mode', { mode: merged.hostDisplayMode });
+    }
+
+    res.json({ success: true, config: merged });
+  } catch (err) {
+    console.error('Error updating broadcast-config:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default router;
+
 

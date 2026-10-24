@@ -29,3 +29,24 @@ export const getPublicTradingWindowStatus = async () => {
     if (!res.ok) throw new Error('Failed to fetch trading window status');
     return res.json();
 };
+
+export const getPublicTeamPurses = async (auctionId = null) => {
+    try {
+        const res = await fetch(getAuctionApiUrl('/host/team-purses', auctionId));
+        if (!res.ok) return [];
+        return res.json();
+    } catch {
+        return [];
+    }
+};
+
+export const getPublicBroadcastConfig = async () => {
+    try {
+        const res = await fetch(getAuctionApiUrl('/public/broadcast-config'));
+        if (!res.ok) return { theme: 'black_gold', hostDisplayMode: 'main' };
+        return res.json();
+    } catch {
+        return { theme: 'black_gold', hostDisplayMode: 'main' };
+    }
+};
+

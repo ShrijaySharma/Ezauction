@@ -344,3 +344,16 @@ export const updateSequentialMode = async (enabled) => {
   const response = await api.post('/admin/sequential-mode', { enabled });
   return response.data;
 };
+
+// ─── Broadcast Config (Theme + Host Display Mode) ────────────────────────────
+
+export const getBroadcastConfig = async () => {
+  const response = await api.get('/admin/broadcast-config');
+  return response.data;
+};
+
+export const updateBroadcastConfig = async ({ theme, hostDisplayMode }) => {
+  const response = await api.patch('/admin/broadcast-config', { theme, hostDisplayMode });
+  return response.data;
+};
+

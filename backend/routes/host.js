@@ -223,7 +223,11 @@ router.get('/team-purses', async (req, res) => {
     const auctionId = getAuctionId(req);
 
     let tQuery = supabase.from('teams').select('id, name, budget, logo').order('name');
-    let pQuery = supabase.from('players').select('sold_to_team, sold_price').eq('status', 'SOLD');
+    let pQuery = supabase
+      .from('players')
+      .select('id, name, role, image, thumb_url, serial_number, sold_price, sold_to_team')
+      .eq('status', 'SOLD')
+      .order('serial_number', { ascending: true });
 
     tQuery = tQuery.eq('auction_id', auctionId);
     pQuery = pQuery.eq('auction_id', auctionId);
@@ -242,7 +246,15 @@ router.get('/team-purses', async (req, res) => {
       return {
         ...team,
         playersBought: teamPlayers.length,
-        totalSpent: totalSpent
+        totalSpent: totalSpent,
+        players: teamPlayers.map(p => ({
+          id: p.id,
+          name: p.name,
+          role: p.role,
+          image: p.image || p.thumb_url,
+          serial_number: p.serial_number,
+          sold_price: p.sold_price
+        }))
       };
     });
 

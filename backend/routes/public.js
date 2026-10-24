@@ -123,4 +123,27 @@ router.get('/trading-window', (req, res) => {
   }
 });
 
+// Get broadcast config (public, no auth) — used by Overlay and HostDashboard on mount
+router.get('/broadcast-config', async (req, res) => {
+  try {
+    const auctionId = getAuctionId(req);
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('broadcast_config')
+      .eq('id', auctionId)
+      .maybeSingle();
+
+    if (error) throw error;
+    const cfg = (data && data.broadcast_config) || {};
+    res.json({
+      theme: cfg.theme || 'black_gold',
+      hostDisplayMode: cfg.hostDisplayMode || 'main',
+    });
+  } catch (err) {
+    console.error('Error getting broadcast-config (public):', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
+
