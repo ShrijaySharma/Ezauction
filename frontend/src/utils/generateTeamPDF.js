@@ -1,405 +1,854 @@
 /**
  * generateTeamPDF.js
- * Renders beautiful themed HTML pages → html2canvas screenshots → jsPDF
- * Each team gets its own A4 page(s). Cover page included.
+ * Executive Luxury Team-wise Player Dossier Generator
+ * Designed for pixel-perfect html2canvas capture and crisp jsPDF compilation.
  */
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
-// ─── Theme tokens ────────────────────────────────────────────────────────────
+// ─── Theme Palettes ──────────────────────────────────────────────────────────
 const THEMES = {
   black_gold: {
-    pageBg:    'linear-gradient(160deg, #0a0a0a 0%, #111108 60%, #0a0a0a 100%)',
-    headerBg:  'linear-gradient(135deg, #1a1500 0%, #0a0a0a 100%)',
-    cardBg:    'rgba(22,20,8,0.95)',
-    cardBorder:'rgba(212,175,55,0.25)',
-    accent:    '#D4AF37',
-    accentDim: 'rgba(212,175,55,0.12)',
-    accentLine:'rgba(212,175,55,0.35)',
-    text:      '#FFFFFF',
-    textDim:   'rgba(255,255,255,0.45)',
-    textMuted: 'rgba(255,255,255,0.25)',
-    tag:       'rgba(212,175,55,0.15)',
-    tagText:   '#D4AF37',
-    tagBorder: 'rgba(212,175,55,0.4)',
-    rowEven:   'rgba(212,175,55,0.05)',
-    rowHover:  'rgba(212,175,55,0.10)',
-    separator: 'rgba(212,175,55,0.12)',
+    bg: '#0B0B0C',
+    pageGradient: 'radial-gradient(circle at 50% 0%, #1c1708 0%, #0c0b09 50%, #060606 100%)',
+    headerBg: 'linear-gradient(135deg, rgba(38,30,12,0.9) 0%, rgba(18,16,10,0.95) 100%)',
+    headerBorder: 'rgba(212,175,55,0.35)',
+    cardBg: 'rgba(24,22,16,0.85)',
+    cardBorder: 'rgba(212,175,55,0.22)',
+    accent: '#E5C058',
+    accentLight: '#FDF0CD',
+    accentDim: 'rgba(212,175,55,0.14)',
+    accentGlow: 'rgba(212,175,55,0.25)',
+    textPrimary: '#FFFFFF',
+    textSecondary: 'rgba(255,255,255,0.65)',
+    textMuted: 'rgba(255,255,255,0.35)',
+    rowEven: 'rgba(212,175,55,0.04)',
+    rowBorder: 'rgba(212,175,55,0.12)',
+    tableHeaderBg: 'rgba(30,26,14,0.9)',
+    isLight: false,
     name: 'Black & Gold',
-    cover: 'linear-gradient(160deg, #0a0a0a 0%, #1a1000 50%, #0a0a0a 100%)',
   },
   navy_gold: {
-    pageBg:    'linear-gradient(160deg, #071630 0%, #0b1e45 60%, #071630 100%)',
-    headerBg:  'linear-gradient(135deg, #0d1e4a 0%, #071630 100%)',
-    cardBg:    'rgba(13,27,68,0.95)',
-    cardBorder:'rgba(201,168,76,0.25)',
-    accent:    '#C9A84C',
-    accentDim: 'rgba(201,168,76,0.12)',
-    accentLine:'rgba(201,168,76,0.35)',
-    text:      '#FFFFFF',
-    textDim:   'rgba(200,215,255,0.5)',
-    textMuted: 'rgba(200,215,255,0.25)',
-    tag:       'rgba(201,168,76,0.15)',
-    tagText:   '#C9A84C',
-    tagBorder: 'rgba(201,168,76,0.4)',
-    rowEven:   'rgba(201,168,76,0.05)',
-    rowHover:  'rgba(201,168,76,0.10)',
-    separator: 'rgba(201,168,76,0.12)',
+    bg: '#061124',
+    pageGradient: 'radial-gradient(circle at 50% 0%, #0c2048 0%, #07142e 50%, #040916 100%)',
+    headerBg: 'linear-gradient(135deg, rgba(16,38,82,0.9) 0%, rgba(9,22,50,0.95) 100%)',
+    headerBorder: 'rgba(201,168,76,0.35)',
+    cardBg: 'rgba(12,27,60,0.85)',
+    cardBorder: 'rgba(201,168,76,0.22)',
+    accent: '#D8B658',
+    accentLight: '#FFF2D2',
+    accentDim: 'rgba(201,168,76,0.14)',
+    accentGlow: 'rgba(201,168,76,0.25)',
+    textPrimary: '#FFFFFF',
+    textSecondary: 'rgba(210,225,255,0.7)',
+    textMuted: 'rgba(210,225,255,0.35)',
+    rowEven: 'rgba(201,168,76,0.04)',
+    rowBorder: 'rgba(201,168,76,0.12)',
+    tableHeaderBg: 'rgba(14,32,70,0.9)',
+    isLight: false,
     name: 'Navy & Gold',
-    cover: 'linear-gradient(160deg, #050e22 0%, #0c1e50 50%, #050e22 100%)',
   },
   blue_brush: {
-    pageBg:    'linear-gradient(160deg, #e2eaf8 0%, #edf2fc 60%, #e2eaf8 100%)',
-    headerBg:  'linear-gradient(135deg, #c5d6f5 0%, #e2eaf8 100%)',
-    cardBg:    'rgba(255,255,255,0.97)',
-    cardBorder:'rgba(0,71,204,0.15)',
-    accent:    '#0047CC',
+    bg: '#EDF3FC',
+    pageGradient: 'radial-gradient(circle at 50% 0%, #dbe6fa 0%, #edf3fc 60%, #e2ecf9 100%)',
+    headerBg: 'linear-gradient(135deg, #ffffff 0%, #f0f5fd 100%)',
+    headerBorder: 'rgba(0,71,204,0.22)',
+    cardBg: '#FFFFFF',
+    cardBorder: 'rgba(0,71,204,0.14)',
+    accent: '#0047CC',
+    accentLight: '#002E8A',
     accentDim: 'rgba(0,71,204,0.08)',
-    accentLine:'rgba(0,71,204,0.3)',
-    text:      '#061E4E',
-    textDim:   'rgba(6,30,78,0.55)',
-    textMuted: 'rgba(6,30,78,0.3)',
-    tag:       'rgba(0,71,204,0.1)',
-    tagText:   '#0047CC',
-    tagBorder: 'rgba(0,71,204,0.3)',
-    rowEven:   'rgba(0,71,204,0.04)',
-    rowHover:  'rgba(0,71,204,0.08)',
-    separator: 'rgba(0,71,204,0.10)',
+    accentGlow: 'rgba(0,71,204,0.15)',
+    textPrimary: '#0A1E46',
+    textSecondary: 'rgba(10,30,70,0.65)',
+    textMuted: 'rgba(10,30,70,0.4)',
+    rowEven: 'rgba(0,71,204,0.03)',
+    rowBorder: 'rgba(0,71,204,0.09)',
+    tableHeaderBg: 'rgba(230,239,255,0.95)',
+    isLight: true,
     name: 'Blue Brush',
-    cover: 'linear-gradient(160deg, #c8d9f5 0%, #e2eaf8 50%, #c8d9f5 100%)',
   },
   dark_teal: {
-    pageBg:    'linear-gradient(160deg, #040e10 0%, #061820 60%, #040e10 100%)',
-    headerBg:  'linear-gradient(135deg, #071c20 0%, #040e10 100%)',
-    cardBg:    'rgba(6,24,28,0.95)',
-    cardBorder:'rgba(12,207,190,0.2)',
-    accent:    '#0CCFBE',
-    accentDim: 'rgba(12,207,190,0.1)',
-    accentLine:'rgba(12,207,190,0.3)',
-    text:      '#FFFFFF',
-    textDim:   'rgba(180,230,225,0.5)',
-    textMuted: 'rgba(180,230,225,0.25)',
-    tag:       'rgba(12,207,190,0.12)',
-    tagText:   '#0CCFBE',
-    tagBorder: 'rgba(12,207,190,0.35)',
-    rowEven:   'rgba(12,207,190,0.05)',
-    rowHover:  'rgba(12,207,190,0.10)',
-    separator: 'rgba(12,207,190,0.10)',
+    bg: '#030E10',
+    pageGradient: 'radial-gradient(circle at 50% 0%, #072228 0%, #030e12 50%, #010608 100%)',
+    headerBg: 'linear-gradient(135deg, rgba(8,36,42,0.9) 0%, rgba(4,18,22,0.95) 100%)',
+    headerBorder: 'rgba(12,207,190,0.35)',
+    cardBg: 'rgba(6,28,34,0.85)',
+    cardBorder: 'rgba(12,207,190,0.22)',
+    accent: '#10DFCD',
+    accentLight: '#D0FFF9',
+    accentDim: 'rgba(12,207,190,0.14)',
+    accentGlow: 'rgba(12,207,190,0.25)',
+    textPrimary: '#FFFFFF',
+    textSecondary: 'rgba(180,240,235,0.7)',
+    textMuted: 'rgba(180,240,235,0.35)',
+    rowEven: 'rgba(12,207,190,0.04)',
+    rowBorder: 'rgba(12,207,190,0.12)',
+    tableHeaderBg: 'rgba(8,34,40,0.9)',
+    isLight: false,
     name: 'Dark Teal',
-    cover: 'linear-gradient(160deg, #020809 0%, #051418 50%, #020809 100%)',
   },
 };
 
-const ROLE_COLORS = {
-  BATSMAN:       { bg: 'rgba(59,130,246,0.20)',  color: '#60A5FA', border: 'rgba(59,130,246,0.5)' },
-  BOWLER:        { bg: 'rgba(239,68,68,0.18)',   color: '#F87171', border: 'rgba(239,68,68,0.5)' },
-  ALLROUNDER:    { bg: 'rgba(168,85,247,0.18)',  color: '#C084FC', border: 'rgba(168,85,247,0.5)' },
-  'ALL-ROUNDER': { bg: 'rgba(168,85,247,0.18)',  color: '#C084FC', border: 'rgba(168,85,247,0.5)' },
-  WICKETKEEPER:  { bg: 'rgba(16,185,129,0.18)',  color: '#34D399', border: 'rgba(16,185,129,0.5)' },
-  WK:            { bg: 'rgba(16,185,129,0.18)',  color: '#34D399', border: 'rgba(16,185,129,0.5)' },
-  DEFAULT:       { bg: 'rgba(255,255,255,0.1)',  color: 'rgba(255,255,255,0.7)', border: 'rgba(255,255,255,0.3)' },
+const ROLE_BADGES = {
+  BATSMAN:       { bg: 'rgba(37,99,235,0.16)',   border: 'rgba(59,130,246,0.6)',  text: '#3B82F6', label: 'BATSMAN' },
+  BOWLER:        { bg: 'rgba(220,38,38,0.16)',   border: 'rgba(239,68,68,0.6)',   text: '#EF4444', label: 'BOWLER' },
+  ALLROUNDER:    { bg: 'rgba(147,51,234,0.16)',  border: 'rgba(168,85,247,0.6)',  text: '#A855F7', label: 'ALL-ROUNDER' },
+  'ALL-ROUNDER': { bg: 'rgba(147,51,234,0.16)',  border: 'rgba(168,85,247,0.6)',  text: '#A855F7', label: 'ALL-ROUNDER' },
+  WICKETKEEPER:  { bg: 'rgba(16,185,129,0.16)',  border: 'rgba(16,185,129,0.6)',  text: '#10B981', label: 'WICKET-KEEPER' },
+  WK:            { bg: 'rgba(16,185,129,0.16)',  border: 'rgba(16,185,129,0.6)',  text: '#10B981', label: 'WICKET-KEEPER' },
+  DEFAULT:       { bg: 'rgba(100,116,139,0.16)', border: 'rgba(148,163,184,0.6)', text: '#94A3B8', label: 'PLAYER' },
 };
 
-function roleStyle(role) {
-  if (!role) return ROLE_COLORS.DEFAULT;
-  return ROLE_COLORS[role.toUpperCase().replace(/\s+/g, '-')] || ROLE_COLORS.DEFAULT;
+function getRoleBadge(role) {
+  if (!role) return ROLE_BADGES.DEFAULT;
+  const k = role.toUpperCase().replace(/\s+/g, '-');
+  return ROLE_BADGES[k] || { ...ROLE_BADGES.DEFAULT, label: role.toUpperCase() };
 }
 
-function fmt(n) {
-  return '\u20B9' + Number(n || 0).toLocaleString('en-IN');
+function fmtINR(val) {
+  return '\u20B9' + Number(val || 0).toLocaleString('en-IN');
 }
 
-// ─── html2canvas helper ───────────────────────────────────────────────────────
-async function captureNode(node) {
-  return html2canvas(node, {
-    scale: 2.5,
-    useCORS: true,
-    allowTaint: true,
-    backgroundColor: null,
-    logging: false,
-    imageTimeout: 8000,
-  }).then(c => c.toDataURL('image/jpeg', 0.95));
-}
-
-// ─── Image to base64 helper ───────────────────────────────────────────────────
+// ─── Base64 Fetcher ──────────────────────────────────────────────────────────
 async function toBase64(url) {
   try {
     const res = await fetch(url, { mode: 'cors', cache: 'force-cache' });
     if (!res.ok) return null;
     const blob = await res.blob();
     return new Promise(resolve => {
-      const r = new FileReader();
-      r.onloadend = () => resolve(r.result);
-      r.onerror = () => resolve(null);
-      r.readAsDataURL(blob);
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
     });
   } catch { return null; }
 }
 
-// Page dimensions for consistent rendering (794 x 1123 = A4 at 96dpi)
-const PW = 794;
-const PH = 1123;
-const PAD = 48;
+// Fixed A4 dimensions at standard 96 DPI
+const A4_W = 794;
+const A4_H = 1123;
+const FONT_STACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
-// ─── Build COVER PAGE ─────────────────────────────────────────────────────────
-function buildCoverNode(tk, tournamentName, teams, logoBase64) {
-  const d = document.createElement('div');
-  d.style.cssText = `
-    width:${PW}px;height:${PH}px;box-sizing:border-box;
-    background:${tk.cover};
-    font-family:'Segoe UI','Inter',system-ui,sans-serif;
-    position:relative;overflow:hidden;
-    display:flex;flex-direction:column;align-items:center;
-    padding:${PAD}px;
-  `;
-
-  // Decorative left accent bar
-  add(d, 'div', `position:absolute;left:0;top:0;bottom:0;width:5px;background:${tk.accent};`);
-
-  // Top right accent corner
-  add(d, 'div', `position:absolute;top:0;right:0;width:120px;height:120px;
-    background:radial-gradient(circle at top right, ${tk.accent}15 0%, transparent 70%);`);
-
-  // Bottom subtle glow
-  add(d, 'div', `position:absolute;bottom:-40px;left:50%;transform:translateX(-50%);
-    width:500px;height:200px;border-radius:50%;
-    background:radial-gradient(circle, ${tk.accent}12 0%, transparent 70%);pointer-events:none;`);
-
-  // Spacer
-  add(d, 'div', `height:60px;flex-shrink:0;`);
-
-  // Logo
-  if (logoBase64) {
-    const wrap = add(d, 'div', `margin-bottom:32px;`);
-    const img = document.createElement('img');
-    img.src = logoBase64;
-    img.style.cssText = `height:56px;width:auto;object-fit:contain;`;
-    wrap.appendChild(img);
-  } else {
-    add(d, 'div', `font-size:32px;font-weight:900;color:${tk.accent};letter-spacing:0.08em;margin-bottom:32px;`, 'EZAuction');
-  }
-
-  // Accent line
-  add(d, 'div', `width:80px;height:3px;background:linear-gradient(90deg,transparent,${tk.accent},transparent);border-radius:2px;margin-bottom:40px;`);
-
-  // Tournament name
-  add(d, 'div', `
-    font-size:42px;font-weight:900;color:${tk.text};text-align:center;
-    line-height:1.15;margin-bottom:16px;letter-spacing:-0.025em;
-    max-width:${PW - PAD * 2 - 40}px;word-break:break-word;
-  `, tournamentName || 'Auction');
-
-  // Tagline
-  add(d, 'div', `font-size:15px;font-weight:800;color:${tk.accent};
-    letter-spacing:0.4em;text-transform:uppercase;margin-bottom:10px;`, 'Team-wise Player List');
-
-  // Date
-  add(d, 'div', `font-size:11px;color:${tk.textDim};letter-spacing:0.15em;margin-bottom:50px;`,
-    new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'long', year:'numeric' }));
-
-  // Stats row (only teams and players — no total spent)
-  const totalPlayers = teams.reduce((s, t) => s + (t.players || []).length, 0);
-  const statsRow = add(d, 'div', `display:flex;gap:24px;margin-bottom:50px;`);
-  [
-    { label: 'Teams', value: teams.length },
-    { label: 'Players Sold', value: totalPlayers },
-  ].forEach(stat => {
-    const box = add(statsRow, 'div', `
-      flex:1;min-width:140px;background:${tk.accentDim};border:1.5px solid ${tk.accentLine};
-      border-radius:16px;padding:22px 20px;text-align:center;
-    `);
-    add(box, 'div', `font-size:32px;font-weight:900;color:${tk.accent};line-height:1;`, String(stat.value));
-    add(box, 'div', `font-size:10px;color:${tk.textDim};text-transform:uppercase;letter-spacing:0.25em;margin-top:8px;font-weight:700;`, stat.label);
-  });
-
-  // Team directory label
-  add(d, 'div', `font-size:9px;color:${tk.textMuted};letter-spacing:0.4em;text-transform:uppercase;
-    font-weight:800;margin-bottom:14px;align-self:flex-start;padding-left:4px;`, 'Teams Included');
-
-  // Team directory list
-  const list = add(d, 'div', `width:100%;display:flex;flex-direction:column;gap:8px;`);
-  teams.forEach((t, i) => {
-    const teamName = t.team?.name || t.name || 'Unknown';
-    const playerCount = (t.players || []).length;
-    const row = add(list, 'div', `
-      display:flex;align-items:center;justify-content:space-between;
-      background:${tk.accentDim};border:1.5px solid ${tk.cardBorder};
-      border-radius:12px;padding:12px 18px;
-    `);
-    const left = add(row, 'div', `display:flex;align-items:center;gap:14px;`);
-    add(left, 'div', `font-size:12px;color:${tk.textMuted};font-weight:800;min-width:24px;`, String(i + 1).padStart(2, '0'));
-    add(left, 'div', `font-size:14px;color:${tk.text};font-weight:700;`, teamName);
-    add(row, 'div', `font-size:12px;color:${tk.accent};font-weight:700;`, `${playerCount} player${playerCount !== 1 ? 's' : ''}`);
-  });
-
-  // Footer
-  add(d, 'div', `position:absolute;bottom:24px;left:0;right:0;text-align:center;
-    font-size:9px;color:${tk.textMuted};letter-spacing:0.25em;text-transform:uppercase;`, 'Powered by EZAuction');
-
-  return d;
-}
-
-// ─── Build TEAM PAGE ──────────────────────────────────────────────────────────
-function buildTeamNode(tk, team, players, tournamentName, includeBidPrice, logoBase64, teamLogoBase64) {
-  const teamName = team.team?.name || team.name || 'Unknown';
-
-  const d = document.createElement('div');
-  d.style.cssText = `
-    width:${PW}px;height:${PH}px;box-sizing:border-box;
-    background:${tk.pageBg};
-    font-family:'Segoe UI','Inter',system-ui,sans-serif;
-    position:relative;overflow:hidden;
-  `;
-
-  // Left accent bar
-  add(d, 'div', `position:absolute;left:0;top:0;bottom:0;width:5px;background:${tk.accent};`);
-
-  // ── Header ──────────────────────────────────────────────────────────────────
-  const header = add(d, 'div', `
-    background:${tk.headerBg};
-    border-bottom:2px solid ${tk.accentLine};
-    padding:28px ${PAD}px 28px ${PAD + 4}px;
-    display:flex;align-items:center;gap:22px;position:relative;
-  `);
-
-  // Team logo
-  const logoBox = add(header, 'div', `
-    width:68px;height:68px;border-radius:16px;overflow:hidden;
-    background:${tk.accentDim};border:2px solid ${tk.accentLine};
-    display:flex;align-items:center;justify-content:center;flex-shrink:0;
-  `);
-  if (teamLogoBase64) {
-    const img = document.createElement('img');
-    img.src = teamLogoBase64;
-    img.style.cssText = `width:100%;height:100%;object-fit:cover;`;
-    logoBox.appendChild(img);
-  } else {
-    add(logoBox, 'div', `font-size:28px;font-weight:900;color:${tk.accent};`, teamName.charAt(0).toUpperCase());
-  }
-
-  // Team info
-  const info = add(header, 'div', `flex:1;`);
-  add(info, 'div', `font-size:26px;font-weight:900;color:${tk.text};line-height:1.1;`, teamName);
-  add(info, 'div', `font-size:12px;color:${tk.textDim};margin-top:5px;font-weight:600;letter-spacing:0.06em;`,
-    `${players.length} Player${players.length !== 1 ? 's' : ''}  •  ${tournamentName || 'Auction'}`);
-
-  // EZAuction logo in header
-  if (logoBase64) {
-    const eLogo = document.createElement('img');
-    eLogo.src = logoBase64;
-    eLogo.style.cssText = `height:26px;width:auto;object-fit:contain;opacity:0.5;flex-shrink:0;`;
-    header.appendChild(eLogo);
-  }
-
-  // ── Player table ────────────────────────────────────────────────────────────
-  const tableWrap = add(d, 'div', `padding:22px ${PAD}px 60px ${PAD + 4}px;`);
-
-  // Grid columns
-  const cols = includeBidPrice
-    ? '36px 50px 1fr 120px 54px 120px'
-    : '36px 50px 1fr 130px 60px';
-
-  // Column headers
-  const colH = add(tableWrap, 'div', `
-    display:grid;grid-template-columns:${cols};gap:10px;align-items:center;
-    padding:8px 14px;margin-bottom:6px;
-    border-bottom:2px solid ${tk.accentLine};
-  `);
-  const colLabels = ['#', '', 'Player', 'Role', 'Age'];
-  if (includeBidPrice) colLabels.push('Sold For');
-  colLabels.forEach((h, i) => {
-    const el = add(colH, 'div', `font-size:9px;font-weight:800;color:${tk.textMuted};
-      text-transform:uppercase;letter-spacing:0.25em;
-      ${i === colLabels.length - 1 && includeBidPrice ? 'text-align:right;' : ''}`);
-    el.textContent = h;
-  });
-
-  // Player rows
-  players.forEach((player, idx) => {
-    const row = add(tableWrap, 'div', `
-      display:grid;grid-template-columns:${cols};gap:10px;align-items:center;
-      padding:9px 14px;
-      background:${idx % 2 === 0 ? tk.rowEven : 'transparent'};
-      border-radius:10px;
-      border-bottom:1px solid ${tk.separator};
-      min-height:52px;
-    `);
-
-    // #
-    add(row, 'div', `font-size:12px;color:${tk.textMuted};font-weight:800;`, String(idx + 1).padStart(2, '0'));
-
-    // Photo
-    const photoWrap = add(row, 'div', `
-      width:42px;height:42px;border-radius:10px;overflow:hidden;
-      border:1.5px solid ${tk.accentLine};background:${tk.accentDim};
-      display:flex;align-items:center;justify-content:center;flex-shrink:0;
-    `);
-    if (player._imgBase64) {
-      const pImg = document.createElement('img');
-      pImg.src = player._imgBase64;
-      pImg.style.cssText = `width:100%;height:100%;object-fit:cover;object-position:top center;`;
-      photoWrap.appendChild(pImg);
-    } else {
-      add(photoWrap, 'div', `font-size:16px;font-weight:900;color:${tk.accent};`, (player.name || '?').charAt(0).toUpperCase());
-    }
-
-    // Name
-    add(row, 'div', `font-size:14px;font-weight:700;color:${tk.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`, player.name || '—');
-
-    // Role pill
-    const rs = roleStyle(player.role);
-    add(row, 'div', `
-      font-size:9.5px;font-weight:700;padding:4px 10px;border-radius:20px;
-      background:${rs.bg};color:${rs.color};border:1px solid ${rs.border};
-      text-transform:uppercase;letter-spacing:0.08em;
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-      display:inline-block;max-width:110px;line-height:1.3;
-    `, player.role || '—');
-
-    // Age
-    add(row, 'div', `font-size:13px;color:${tk.textDim};font-weight:600;`, player.age ? String(player.age) : '—');
-
-    // Price
-    if (includeBidPrice) {
-      add(row, 'div', `font-size:14px;font-weight:800;color:${tk.accent};text-align:right;`,
-        player.sold_price ? fmt(player.sold_price) : '—');
-    }
-  });
-
-  if (players.length === 0) {
-    add(tableWrap, 'div', `text-align:center;padding:50px;color:${tk.textMuted};font-size:14px;font-style:italic;`, 'No players assigned to this team yet.');
-  }
-
-  // ── Footer ──────────────────────────────────────────────────────────────────
-  const footer = add(d, 'div', `
-    position:absolute;bottom:0;left:0;right:0;
-    padding:14px ${PAD}px 14px ${PAD + 4}px;
-    border-top:1.5px solid ${tk.separator};
-    display:flex;justify-content:space-between;align-items:center;
-  `);
-  add(footer, 'div', `font-size:9px;color:${tk.textMuted};letter-spacing:0.15em;text-transform:uppercase;font-weight:600;`,
-    `${teamName}  •  ${tournamentName || 'Auction'}`);
-  add(footer, 'div', `font-size:9px;color:${tk.textMuted};letter-spacing:0.15em;text-transform:uppercase;font-weight:600;`,
-    'Powered by EZAuction');
-
-  return d;
-}
-
-// Utility: add child element
-function add(parent, tag, style, text) {
+// ─── Node Builder Helpers ────────────────────────────────────────────────────
+function createEl(tag, styles, content) {
   const el = document.createElement(tag);
-  el.style.cssText = style || '';
-  if (text) el.textContent = text;
-  parent.appendChild(el);
+  if (styles) el.style.cssText = styles;
+  if (content !== undefined && content !== null) el.innerHTML = content;
   return el;
 }
 
-// Split players into chunks that fit a page
-// Header takes ~130px, footer ~40px, col header ~30px, each row ~52px
-// Available: 1123 - 130 - 40 - 30 = 923px. Per row ~55px → ~16 players per page
-const PLAYERS_PER_PAGE = 14; // safe with larger fonts
+// ─── COVER PAGE BUILDER ──────────────────────────────────────────────────────
+function buildCoverPage(tk, tournamentName, teams, logoBase64) {
+  const page = createEl('div', `
+    width: ${A4_W}px;
+    height: ${A4_H}px;
+    box-sizing: border-box;
+    background: ${tk.pageGradient};
+    position: relative;
+    overflow: hidden;
+    padding: 60px 56px 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: ${FONT_STACK};
+  `);
 
-// ─── Main export ──────────────────────────────────────────────────────────────
+  // Outer Luxury Border Frame
+  const frame = createEl('div', `
+    position: absolute;
+    inset: 20px;
+    border: 1px solid ${tk.headerBorder};
+    border-radius: 20px;
+    pointer-events: none;
+    box-shadow: inset 0 0 40px ${tk.accentDim};
+  `);
+  page.appendChild(frame);
+
+  // Inner Accent Corner Notches
+  const cornerSize = 16;
+  const corners = [
+    `top: 24px; left: 24px; border-top: 2px solid ${tk.accent}; border-left: 2px solid ${tk.accent};`,
+    `top: 24px; right: 24px; border-top: 2px solid ${tk.accent}; border-right: 2px solid ${tk.accent};`,
+    `bottom: 24px; left: 24px; border-bottom: 2px solid ${tk.accent}; border-left: 2px solid ${tk.accent};`,
+    `bottom: 24px; right: 24px; border-bottom: 2px solid ${tk.accent}; border-right: 2px solid ${tk.accent};`,
+  ];
+  corners.forEach(c => {
+    page.appendChild(createEl('div', `position: absolute; width: ${cornerSize}px; height: ${cornerSize}px; ${c}`));
+  });
+
+  // Top Atmosphere Glow
+  page.appendChild(createEl('div', `
+    position: absolute;
+    top: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 500px;
+    height: 350px;
+    border-radius: 50%;
+    background: radial-gradient(circle, ${tk.accentGlow} 0%, transparent 70%);
+    pointer-events: none;
+  `));
+
+  // Top Brand Section
+  const brandSection = createEl('div', `
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 40px;
+    margin-bottom: 24px;
+  `);
+
+  if (logoBase64) {
+    const img = createEl('img', `
+      height: 60px;
+      width: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 16px ${tk.accentDim});
+      margin-bottom: 12px;
+    `);
+    img.src = logoBase64;
+    brandSection.appendChild(img);
+  } else {
+    brandSection.appendChild(createEl('div', `
+      font-size: 32px;
+      font-weight: 900;
+      color: ${tk.accent};
+      line-height: 38px;
+      letter-spacing: 2px;
+    `, 'EZAuction'));
+  }
+
+  const liveBadge = createEl('div', `
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: ${tk.accentDim};
+    border: 1px solid ${tk.headerBorder};
+    border-radius: 20px;
+    padding: 4px 14px;
+    margin-top: 8px;
+  `);
+  liveBadge.appendChild(createEl('span', `
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: ${tk.accent};
+    display: inline-block;
+  `));
+  liveBadge.appendChild(createEl('span', `
+    font-size: 10px;
+    font-weight: 800;
+    color: ${tk.accent};
+    letter-spacing: 1.5px;
+    line-height: 14px;
+  `, 'OFFICIAL AUCTION RECORD'));
+  brandSection.appendChild(liveBadge);
+
+  page.appendChild(brandSection);
+
+  // Tournament Title & Subtitle Card
+  const titleBox = createEl('div', `
+    text-align: center;
+    max-width: 620px;
+    margin-bottom: 32px;
+    padding: 0 16px;
+  `);
+
+  titleBox.appendChild(createEl('div', `
+    font-size: 40px;
+    font-weight: 900;
+    color: ${tk.textPrimary};
+    line-height: 48px;
+    margin-bottom: 10px;
+    text-shadow: 0 2px 14px rgba(0,0,0,0.4);
+  `, tournamentName || 'Premier Auction'));
+
+  titleBox.appendChild(createEl('div', `
+    font-size: 15px;
+    font-weight: 800;
+    color: ${tk.accent};
+    letter-spacing: 3px;
+    line-height: 22px;
+    margin-bottom: 6px;
+  `, 'TEAM-WISE PLAYER DOSSIER'));
+
+  titleBox.appendChild(createEl('div', `
+    font-size: 12px;
+    font-weight: 600;
+    color: ${tk.textSecondary};
+    line-height: 18px;
+  `, `Generated on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}`));
+
+  page.appendChild(titleBox);
+
+  // Key Summary Metrics Bar
+  const totalPlayersSold = teams.reduce((s, t) => s + (t.players || []).length, 0);
+  const metricsBar = createEl('div', `
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 440px;
+    margin-bottom: 36px;
+  `);
+
+  const statItems = [
+    { label: 'TEAMS PARTICIPATING', val: teams.length },
+    { label: 'PLAYERS ACQUIRED', val: totalPlayersSold },
+  ];
+
+  statItems.forEach(s => {
+    const card = createEl('div', `
+      flex: 1;
+      background: ${tk.cardBg};
+      border: 1px solid ${tk.cardBorder};
+      border-radius: 14px;
+      padding: 16px 20px;
+      text-align: center;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    `);
+    card.appendChild(createEl('div', `
+      font-size: 30px;
+      font-weight: 900;
+      color: ${tk.accent};
+      line-height: 36px;
+    `, String(s.val)));
+    card.appendChild(createEl('div', `
+      font-size: 10px;
+      font-weight: 800;
+      color: ${tk.textSecondary};
+      letter-spacing: 1px;
+      line-height: 14px;
+      margin-top: 2px;
+    `, s.label));
+    metricsBar.appendChild(card);
+  });
+
+  page.appendChild(metricsBar);
+
+  // Team Directory Section
+  const dirContainer = createEl('div', `
+    width: 100%;
+    max-width: 640px;
+    background: ${tk.cardBg};
+    border: 1px solid ${tk.cardBorder};
+    border-radius: 16px;
+    padding: 20px 24px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  `);
+
+  const dirHeader = createEl('div', `
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid ${tk.rowBorder};
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  `);
+  dirHeader.appendChild(createEl('div', `
+    font-size: 11px;
+    font-weight: 800;
+    color: ${tk.accent};
+    letter-spacing: 1.5px;
+    line-height: 16px;
+  `, 'TEAMS INCLUDED IN THIS REPORT'));
+  dirHeader.appendChild(createEl('div', `
+    font-size: 11px;
+    font-weight: 700;
+    color: ${tk.textMuted};
+    line-height: 16px;
+  `, 'PLAYERS SOLD'));
+  dirContainer.appendChild(dirHeader);
+
+  const teamList = createEl('div', `
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+  `);
+
+  teams.forEach((t, idx) => {
+    const tName = t.team?.name || t.name || 'Team';
+    const count = (t.players || []).length;
+    const row = createEl('div', `
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: ${idx % 2 === 0 ? tk.rowEven : 'transparent'};
+      border-radius: 8px;
+    `);
+
+    const left = createEl('div', `display: flex; align-items: center; gap: 12px;`);
+    left.appendChild(createEl('span', `
+      font-size: 11px;
+      font-weight: 800;
+      color: ${tk.accent};
+      min-width: 20px;
+      line-height: 16px;
+    `, `#${String(idx + 1).padStart(2, '0')}`));
+    left.appendChild(createEl('span', `
+      font-size: 13px;
+      font-weight: 700;
+      color: ${tk.textPrimary};
+      line-height: 18px;
+    `, tName));
+
+    const right = createEl('div', `
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: ${tk.accentDim};
+      padding: 3px 10px;
+      border-radius: 12px;
+      border: 1px solid ${tk.cardBorder};
+    `);
+    right.appendChild(createEl('span', `
+      font-size: 11px;
+      font-weight: 800;
+      color: ${tk.accent};
+      line-height: 14px;
+    `, `${count} Player${count !== 1 ? 's' : ''}`));
+
+    row.appendChild(left);
+    row.appendChild(right);
+    teamList.appendChild(row);
+  });
+
+  dirContainer.appendChild(teamList);
+  page.appendChild(dirContainer);
+
+  // Footer branding
+  page.appendChild(createEl('div', `
+    position: absolute;
+    bottom: 30px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: ${tk.textMuted};
+    letter-spacing: 2px;
+    line-height: 14px;
+  `, 'POWERED BY EZAUCTION BROADCAST ENGINE'));
+
+  return page;
+}
+
+// ─── TEAM SQUAD PAGE BUILDER ─────────────────────────────────────────────────
+function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoBase64, teamLogoBase64, pageNumber, totalPages) {
+  const teamName = team.team?.name || team.name || 'Team';
+
+  const page = createEl('div', `
+    width: ${A4_W}px;
+    height: ${A4_H}px;
+    box-sizing: border-box;
+    background: ${tk.pageGradient};
+    position: relative;
+    overflow: hidden;
+    padding: 32px 36px 30px;
+    display: flex;
+    flex-direction: column;
+    font-family: ${FONT_STACK};
+  `);
+
+  // Outer Border Frame
+  page.appendChild(createEl('div', `
+    position: absolute;
+    inset: 14px;
+    border: 1px solid ${tk.headerBorder};
+    border-radius: 16px;
+    pointer-events: none;
+  `));
+
+  // Top Left Decorative Stripe
+  page.appendChild(createEl('div', `
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    width: 6px;
+    height: 160px;
+    background: ${tk.accent};
+    border-radius: 16px 0 0 0;
+  `));
+
+  // ── HEADER BANNER ──────────────────────────────────────────────────────────
+  const header = createEl('div', `
+    background: ${tk.headerBg};
+    border: 1px solid ${tk.headerBorder};
+    border-radius: 14px;
+    padding: 18px 24px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  `);
+
+  const headerLeft = createEl('div', `display: flex; align-items: center; gap: 18px;`);
+
+  // Team Logo container
+  const logoWrap = createEl('div', `
+    width: 68px;
+    height: 68px;
+    border-radius: 14px;
+    overflow: hidden;
+    background: ${tk.cardBg};
+    border: 2px solid ${tk.accent};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 14px ${tk.accentDim};
+  `);
+
+  if (teamLogoBase64) {
+    const tImg = createEl('img', `width: 100%; height: 100%; object-fit: cover; display: block;`);
+    tImg.src = teamLogoBase64;
+    logoWrap.appendChild(tImg);
+  } else {
+    logoWrap.appendChild(createEl('div', `
+      font-size: 28px;
+      font-weight: 900;
+      color: ${tk.accent};
+      line-height: 32px;
+    `, teamName.charAt(0).toUpperCase()));
+  }
+  headerLeft.appendChild(logoWrap);
+
+  // Team Title info
+  const titleInfo = createEl('div', `display: flex; flex-direction: column; justify-content: center;`);
+  titleInfo.appendChild(createEl('div', `
+    font-size: 26px;
+    font-weight: 900;
+    color: ${tk.textPrimary};
+    line-height: 32px;
+    letter-spacing: -0.3px;
+  `, teamName));
+
+  const subRow = createEl('div', `display: flex; align-items: center; gap: 10px; margin-top: 4px;`);
+  subRow.appendChild(createEl('span', `
+    background: ${tk.accentDim};
+    color: ${tk.accent};
+    border: 1px solid ${tk.cardBorder};
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 16px;
+  `, `${players.length} PLAYER${players.length !== 1 ? 'S' : ''}`));
+
+  subRow.appendChild(createEl('span', `
+    color: ${tk.textSecondary};
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+  `, tournamentName || 'Official Auction Squad'));
+
+  titleInfo.appendChild(subRow);
+  headerLeft.appendChild(titleInfo);
+  header.appendChild(headerLeft);
+
+  // Header Right: Official ezAuction badge
+  const headerRight = createEl('div', `display: flex; flex-direction: column; align-items: flex-end;`);
+  if (logoBase64) {
+    const ezImg = createEl('img', `height: 32px; width: auto; object-fit: contain; opacity: 0.85;`);
+    ezImg.src = logoBase64;
+    headerRight.appendChild(ezImg);
+  } else {
+    headerRight.appendChild(createEl('div', `
+      font-size: 18px;
+      font-weight: 900;
+      color: ${tk.accent};
+      line-height: 22px;
+    `, 'EZAuction'));
+  }
+  headerRight.appendChild(createEl('div', `
+    font-size: 9px;
+    font-weight: 800;
+    color: ${tk.textMuted};
+    letter-spacing: 1.5px;
+    margin-top: 4px;
+    line-height: 12px;
+  `, 'OFFICIAL ROSTER'));
+  header.appendChild(headerRight);
+
+  page.appendChild(header);
+
+  // ── SQUAD TABLE ────────────────────────────────────────────────────────────
+  const tableContainer = createEl('div', `
+    background: ${tk.cardBg};
+    border: 1px solid ${tk.cardBorder};
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  `);
+
+  // Table Columns Width Calculation
+  // Total usable width ~ 720px
+  // Col 1 (#): 40px
+  // Col 2 (Photo): 52px
+  // Col 3 (Player Name): flex: 1 (~260px)
+  // Col 4 (Role): 160px
+  // Col 5 (Age): 50px
+  // Col 6 (Price - optional): 120px
+
+  const priceColHtml = includeBidPrice ? `
+    <div style="width: 120px; text-align: right; padding-right: 18px; font-size: 10px; font-weight: 800; color: ${tk.accent}; letter-spacing: 1px; line-height: 14px;">
+      SOLD PRICE
+    </div>
+  ` : '';
+
+  const tableHeader = createEl('div', `
+    display: flex;
+    align-items: center;
+    background: ${tk.tableHeaderBg};
+    border-bottom: 1.5px solid ${tk.headerBorder};
+    padding: 10px 0;
+  `, `
+    <div style="width: 44px; text-align: center; font-size: 10px; font-weight: 800; color: ${tk.textMuted}; line-height: 14px;">#</div>
+    <div style="width: 52px; text-align: center; font-size: 10px; font-weight: 800; color: ${tk.textMuted}; line-height: 14px;">PHOTO</div>
+    <div style="flex: 1; padding-left: 14px; font-size: 10px; font-weight: 800; color: ${tk.textMuted}; letter-spacing: 1px; line-height: 14px;">PLAYER NAME</div>
+    <div style="width: 160px; text-align: center; font-size: 10px; font-weight: 800; color: ${tk.textMuted}; letter-spacing: 1px; line-height: 14px;">ROLE</div>
+    <div style="width: 54px; text-align: center; font-size: 10px; font-weight: 800; color: ${tk.textMuted}; line-height: 14px;">AGE</div>
+    ${priceColHtml}
+  `);
+
+  tableContainer.appendChild(tableHeader);
+
+  // Table Body Rows
+  const tableBody = createEl('div', `display: flex; flex-direction: column;`);
+
+  players.forEach((player, idx) => {
+    const roleMeta = getRoleBadge(player.role);
+    const rowBg = idx % 2 === 0 ? tk.rowEven : 'transparent';
+    const isLast = idx === players.length - 1;
+
+    const row = createEl('div', `
+      display: flex;
+      align-items: center;
+      height: 56px;
+      background: ${rowBg};
+      border-bottom: ${isLast ? 'none' : `1px solid ${tk.rowBorder}`};
+      box-sizing: border-box;
+    `);
+
+    // Rank #
+    row.appendChild(createEl('div', `
+      width: 44px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      color: ${tk.accent};
+      line-height: 16px;
+    `, `#${String(idx + 1).padStart(2, '0')}`));
+
+    // Photo avatar (40x40)
+    const photoCell = createEl('div', `
+      width: 52px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    `);
+
+    const avatarBox = createEl('div', `
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: ${tk.cardBg};
+      border: 1.5px solid ${tk.cardBorder};
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    `);
+
+    if (player._imgBase64) {
+      const pImg = createEl('img', `width: 100%; height: 100%; object-fit: cover; object-position: top center; display: block;`);
+      pImg.src = player._imgBase64;
+      avatarBox.appendChild(pImg);
+    } else {
+      avatarBox.appendChild(createEl('span', `
+        font-size: 16px;
+        font-weight: 900;
+        color: ${tk.accent};
+        line-height: 20px;
+      `, (player.name || '?').charAt(0).toUpperCase()));
+    }
+    photoCell.appendChild(avatarBox);
+    row.appendChild(photoCell);
+
+    // Player Name
+    const nameCell = createEl('div', `
+      flex: 1;
+      padding-left: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    `);
+    nameCell.appendChild(createEl('div', `
+      font-size: 14px;
+      font-weight: 800;
+      color: ${tk.textPrimary};
+      line-height: 20px;
+      letter-spacing: -0.1px;
+    `, player.name || 'Unnamed Player'));
+    row.appendChild(nameCell);
+
+    // Role Badge (Crisp & no clipping)
+    const roleCell = createEl('div', `
+      width: 160px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    `);
+    roleCell.appendChild(createEl('div', `
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: ${roleMeta.bg};
+      border: 1px solid ${roleMeta.border};
+      color: ${roleMeta.text};
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 16px;
+      letter-spacing: 0.6px;
+    `, roleMeta.label));
+    row.appendChild(roleCell);
+
+    // Age Cell
+    row.appendChild(createEl('div', `
+      width: 54px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: ${tk.textSecondary};
+      line-height: 18px;
+    `, player.age ? String(player.age) : '—'));
+
+    // Price Cell (optional)
+    if (includeBidPrice) {
+      row.appendChild(createEl('div', `
+        width: 120px;
+        text-align: right;
+        padding-right: 18px;
+        font-size: 14px;
+        font-weight: 900;
+        color: ${tk.accent};
+        line-height: 20px;
+      `, player.sold_price ? fmtINR(player.sold_price) : '—'));
+    }
+
+    tableBody.appendChild(row);
+  });
+
+  tableContainer.appendChild(tableBody);
+  page.appendChild(tableContainer);
+
+  // ── SQUAD INSIGHTS CARD (Fills empty space beautifully when players <= 6) ─────
+  if (players.length <= 6) {
+    const insightCard = createEl('div', `
+      background: ${tk.cardBg};
+      border: 1px solid ${tk.cardBorder};
+      border-radius: 14px;
+      padding: 20px 24px;
+      margin-bottom: auto;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    `);
+
+    const inHeader = createEl('div', `
+      font-size: 11px;
+      font-weight: 800;
+      color: ${tk.accent};
+      letter-spacing: 1.5px;
+      line-height: 16px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    `);
+    inHeader.appendChild(createEl('span', ``, '📊 ROSTER SUMMARY & STATUS'));
+    insightCard.appendChild(inHeader);
+
+    // Count roles
+    const counts = { Batsman: 0, Bowler: 0, 'All-Rounder': 0, 'Wicket-Keeper': 0 };
+    players.forEach(p => {
+      const r = (p.role || '').toUpperCase();
+      if (r.includes('BAT')) counts.Batsman++;
+      else if (r.includes('BOWL')) counts.Bowler++;
+      else if (r.includes('ALL') || r.includes('ROUND')) counts['All-Rounder']++;
+      else if (r.includes('KEEP') || r.includes('WK')) counts['Wicket-Keeper']++;
+      else counts['All-Rounder']++;
+    });
+
+    const grid = createEl('div', `display: flex; gap: 14px;`);
+    Object.entries(counts).forEach(([k, v]) => {
+      const b = createEl('div', `
+        flex: 1;
+        background: ${tk.rowEven};
+        border: 1px solid ${tk.rowBorder};
+        border-radius: 10px;
+        padding: 12px 14px;
+        text-align: center;
+      `);
+      b.appendChild(createEl('div', `
+        font-size: 20px;
+        font-weight: 900;
+        color: ${tk.textPrimary};
+        line-height: 24px;
+      `, String(v)));
+      b.appendChild(createEl('div', `
+        font-size: 9px;
+        font-weight: 800;
+        color: ${tk.textMuted};
+        letter-spacing: 0.5px;
+        line-height: 14px;
+        margin-top: 2px;
+      `, k.toUpperCase()));
+      grid.appendChild(b);
+    });
+
+    insightCard.appendChild(grid);
+    page.appendChild(insightCard);
+  }
+
+  // ── FOOTER ────────────────────────────────────────────────────────────────
+  const footer = createEl('div', `
+    margin-top: auto;
+    border-top: 1px solid ${tk.rowBorder};
+    padding-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  `);
+
+  footer.appendChild(createEl('div', `
+    font-size: 10px;
+    font-weight: 700;
+    color: ${tk.textMuted};
+    letter-spacing: 1px;
+    line-height: 14px;
+  `, `${teamName.toUpperCase()} • ${tournamentName || 'AUCTION'} • OFFICIAL DOSSIER`));
+
+  footer.appendChild(createEl('div', `
+    font-size: 10px;
+    font-weight: 800;
+    color: ${tk.accent};
+    letter-spacing: 1px;
+    line-height: 14px;
+  `, `PAGE ${pageNumber} OF ${totalPages}`));
+
+  page.appendChild(footer);
+
+  return page;
+}
+
+// ─── Main PDF Export Function ────────────────────────────────────────────────
 export async function generateTeamPDF({
   tournamentName,
   includeBidPrice,
@@ -411,15 +860,15 @@ export async function generateTeamPDF({
   const teamsWithPlayers = (teamSquads || []).filter(t => (t.players || []).length > 0);
 
   if (teamsWithPlayers.length === 0) {
-    alert('No teams with sold players to export.');
+    alert('No teams with sold players found to export.');
     return;
   }
 
-  // Pre-fetch logo
+  // Pre-fetch EZAuction logo
   let logoBase64 = null;
   try { logoBase64 = await toBase64('/ezauction.png'); } catch {}
 
-  // Pre-fetch all images in parallel
+  // Pre-fetch all player images in parallel
   const allPlayers = teamsWithPlayers.flatMap(t => t.players || []);
   await Promise.all(allPlayers.map(async p => {
     const src = p.image || p.thumb_url;
@@ -428,37 +877,62 @@ export async function generateTeamPDF({
     }
   }));
 
-  // Pre-fetch team logos
+  // Pre-fetch team logos in parallel
   await Promise.all(teamsWithPlayers.map(async t => {
-    const logoSrc = t.team?.logo || t.logo;
-    if (logoSrc) {
-      try { t._logoBase64 = await toBase64(getImageUrl(logoSrc)); } catch { t._logoBase64 = null; }
+    const lSrc = t.team?.logo || t.logo;
+    if (lSrc) {
+      try { t._logoBase64 = await toBase64(getImageUrl(lSrc)); } catch { t._logoBase64 = null; }
     }
   }));
 
-  // Off-screen container
-  const container = document.createElement('div');
-  container.style.cssText = `position:fixed;top:-9999px;left:-9999px;z-index:-1;width:${PW}px;pointer-events:none;`;
+  // Create isolated off-screen rendering canvas container
+  const container = createEl('div', `
+    position: fixed;
+    top: -12000px;
+    left: -12000px;
+    z-index: -9999;
+    width: ${A4_W}px;
+    pointer-events: none;
+  `);
   document.body.appendChild(container);
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
   const PAGE_W_MM = 210;
   const PAGE_H_MM = 297;
 
+  // Max players per team page (10 allows generous row heights + room for insights card/stats)
+  const PLAYERS_PER_PAGE = 10;
+
+  // Calculate total pages for page numbers
+  let totalReportPages = 1; // cover
+  teamsWithPlayers.forEach(t => {
+    const count = (t.players || []).length;
+    totalReportPages += Math.max(1, Math.ceil(count / PLAYERS_PER_PAGE));
+  });
+
+  let currentPageIndex = 1;
+
   try {
-    // ── Cover page ────────────────────────────────────────────────────────────
-    const coverNode = buildCoverNode(tk, tournamentName, teamsWithPlayers, logoBase64);
+    // ── 1. RENDER COVER PAGE ──────────────────────────────────────────────────
+    const coverNode = buildCoverPage(tk, tournamentName, teamsWithPlayers, logoBase64);
     container.appendChild(coverNode);
-    await new Promise(r => setTimeout(r, 100));
-    const coverImg = await captureNode(coverNode);
-    doc.addImage(coverImg, 'JPEG', 0, 0, PAGE_W_MM, PAGE_H_MM, undefined, 'FAST');
+    await new Promise(r => setTimeout(r, 120));
+
+    const coverCanvas = await html2canvas(coverNode, {
+      scale: 2.2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: tk.bg,
+      logging: false,
+      imageTimeout: 8000,
+    });
+    const coverData = coverCanvas.toDataURL('image/jpeg', 0.96);
+    doc.addImage(coverData, 'JPEG', 0, 0, PAGE_W_MM, PAGE_H_MM, undefined, 'FAST');
     container.removeChild(coverNode);
 
-    // ── Per-team pages ────────────────────────────────────────────────────────
+    // ── 2. RENDER TEAM SQUAD PAGES ────────────────────────────────────────────
     for (const team of teamsWithPlayers) {
       const players = team.players || [];
-
-      // Split into page chunks to avoid overflow / text cutting
       const chunks = [];
       for (let i = 0; i < players.length; i += PLAYERS_PER_PAGE) {
         chunks.push(players.slice(i, i + PLAYERS_PER_PAGE));
@@ -466,33 +940,41 @@ export async function generateTeamPDF({
       if (chunks.length === 0) chunks.push([]);
 
       for (let ci = 0; ci < chunks.length; ci++) {
+        currentPageIndex++;
         doc.addPage();
         const chunk = chunks[ci];
 
-        // For continuation pages, modify the team object slightly
-        const teamObj = ci === 0 ? team : {
-          ...team,
-          team: {
-            ...(team.team || {}),
-            name: (team.team?.name || team.name || 'Unknown') + ` (Page ${ci + 1})`,
-          },
-        };
-
-        const teamNode = buildTeamNode(
-          tk, teamObj, chunk,
-          tournamentName, includeBidPrice,
-          logoBase64, team._logoBase64 || null
+        const teamPageNode = buildTeamPage(
+          tk,
+          team,
+          chunk,
+          tournamentName,
+          includeBidPrice,
+          logoBase64,
+          team._logoBase64 || null,
+          currentPageIndex,
+          totalReportPages
         );
-        container.appendChild(teamNode);
-        await new Promise(r => setTimeout(r, 100));
-        const teamImg = await captureNode(teamNode);
-        doc.addImage(teamImg, 'JPEG', 0, 0, PAGE_W_MM, PAGE_H_MM, undefined, 'FAST');
-        container.removeChild(teamNode);
+
+        container.appendChild(teamPageNode);
+        await new Promise(r => setTimeout(r, 120));
+
+        const teamCanvas = await html2canvas(teamPageNode, {
+          scale: 2.2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: tk.bg,
+          logging: false,
+          imageTimeout: 8000,
+        });
+        const teamData = teamCanvas.toDataURL('image/jpeg', 0.96);
+        doc.addImage(teamData, 'JPEG', 0, 0, PAGE_W_MM, PAGE_H_MM, undefined, 'FAST');
+        container.removeChild(teamPageNode);
       }
     }
 
-    const filename = `${(tournamentName || 'Auction').replace(/[^a-z0-9]/gi, '_')}_Team_Players.pdf`;
-    doc.save(filename);
+    const safeFilename = `${(tournamentName || 'Auction').replace(/[^a-z0-9]/gi, '_')}_Official_Squad_List.pdf`;
+    doc.save(safeFilename);
   } finally {
     document.body.removeChild(container);
   }
