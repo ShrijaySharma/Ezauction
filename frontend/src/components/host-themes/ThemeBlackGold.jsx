@@ -135,11 +135,11 @@ export default function ThemeBlackGold({
 
       {/* ── SPONSOR BAR (only if user has set sponsor) ── */}
       {(sponsorName || sponsorLogo) && (
-        <div className="relative z-20 shrink-0 h-14 md:h-16 w-full bg-[#050505] border-t-2 border-[#D4AF37]/50 flex items-center justify-center gap-4 px-6">
-          <span className="text-[#D4AF37]/80 text-xs md:text-sm font-black uppercase tracking-[0.3em]">SPONSOR</span>
-          <div className="w-px h-6 bg-[#D4AF37]/40" />
-          {sponsorLogo && <img src={sponsorLogo} alt={sponsorName || 'Sponsor'} className="max-h-9 md:max-h-10 object-contain" />}
-          {sponsorName && <span className="text-white font-black text-sm md:text-base tracking-[0.15em] uppercase">{sponsorName}</span>}
+        <div className="relative z-20 shrink-0 h-20 md:h-24 w-full bg-[#050505] border-t-2 border-[#D4AF37]/50 flex items-center justify-center gap-6 px-8">
+          <span className="text-[#D4AF37]/80 text-sm md:text-base font-black uppercase tracking-[0.3em]">SPONSOR</span>
+          <div className="w-px h-8 bg-[#D4AF37]/40" />
+          {sponsorLogo && <img src={sponsorLogo} alt={sponsorName || 'Sponsor'} className="max-h-12 md:max-h-14 object-contain" />}
+          {sponsorName && <span className="text-white font-black text-xl md:text-2xl tracking-[0.15em] uppercase">{sponsorName}</span>}
         </div>
       )}
     </div>
