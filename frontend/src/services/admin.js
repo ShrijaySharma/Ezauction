@@ -352,8 +352,17 @@ export const getBroadcastConfig = async () => {
   return response.data;
 };
 
-export const updateBroadcastConfig = async ({ theme, hostDisplayMode }) => {
-  const response = await api.patch('/admin/broadcast-config', { theme, hostDisplayMode });
+export const updateBroadcastConfig = async ({ theme, hostDisplayMode, topPlayersCount }) => {
+  const payload = {};
+  if (theme !== undefined) payload.theme = theme;
+  if (hostDisplayMode !== undefined) payload.hostDisplayMode = hostDisplayMode;
+  if (topPlayersCount !== undefined) payload.topPlayersCount = topPlayersCount;
+  const response = await api.patch('/admin/broadcast-config', payload);
+  return response.data;
+};
+
+export const getTopSoldPlayers = async (limit = 10) => {
+  const response = await api.get(`/admin/top-sold-players?limit=${limit}`);
   return response.data;
 };
 

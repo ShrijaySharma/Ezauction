@@ -138,6 +138,7 @@ router.get('/broadcast-config', async (req, res) => {
     res.json({
       theme: cfg.theme || 'black_gold',
       hostDisplayMode: cfg.hostDisplayMode || 'main',
+      topPlayersCount: cfg.topPlayersCount || 10,
     });
   } catch (err) {
     console.error('Error getting broadcast-config (public):', err);

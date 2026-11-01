@@ -32,3 +32,11 @@ export const getTeamPurses = async (auctionId = null) => {
 };
 
 
+
+export const getTopSoldPlayers = async (auctionId = null, limit = 10) => {
+  const url = auctionId
+    ? getAuctionApiPath(`/host/top-sold-players?limit=${limit}`, auctionId)
+    : `/host/top-sold-players?limit=${limit}`;
+  const response = await api.get(url);
+  return response.data;
+};

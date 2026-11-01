@@ -2777,6 +2777,7 @@ router.get('/broadcast-config', async (req, res) => {
     res.json({
       theme: cfg.theme || 'black_gold',
       hostDisplayMode: cfg.hostDisplayMode || 'main',
+      topPlayersCount: cfg.topPlayersCount || 10,
     });
   } catch (err) {
     console.error('Error getting broadcast-config:', err);
@@ -2784,20 +2785,23 @@ router.get('/broadcast-config', async (req, res) => {
   }
 });
 
-// PATCH /admin/broadcast-config  → saves theme and/or display mode, then emits socket events
+// PATCH /admin/broadcast-config  → saves theme and/or display mode and topPlayersCount, then emits socket events
 router.patch('/broadcast-config', async (req, res) => {
   try {
     const auctionId = getAuctionId(req);
-    const { theme, hostDisplayMode } = req.body;
+    const { theme, hostDisplayMode, topPlayersCount } = req.body;
 
     const VALID_THEMES = ['black_gold', 'navy_gold', 'blue_brush', 'dark_teal'];
-    const VALID_MODES  = ['main', 'purse', 'teams'];
+    const VALID_MODES  = ['main', 'purse', 'teams', 'topplayers'];
 
     if (theme && !VALID_THEMES.includes(theme)) {
       return res.status(400).json({ error: 'Invalid theme key' });
     }
     if (hostDisplayMode && !VALID_MODES.includes(hostDisplayMode)) {
       return res.status(400).json({ error: 'Invalid hostDisplayMode' });
+    }
+    if (topPlayersCount !== undefined && ![5, 10].includes(Number(topPlayersCount))) {
+      return res.status(400).json({ error: 'topPlayersCount must be 5 or 10' });
     }
 
     // Fetch existing config so we do a proper merge (don't overwrite unset fields)
@@ -2812,6 +2816,7 @@ router.patch('/broadcast-config', async (req, res) => {
     const merged  = {
       theme: theme || current.theme || 'black_gold',
       hostDisplayMode: hostDisplayMode || current.hostDisplayMode || 'main',
+      topPlayersCount: topPlayersCount !== undefined ? Number(topPlayersCount) : (current.topPlayersCount || 10),
     };
 
     const { error: updateErr } = await supabase
@@ -2826,7 +2831,10 @@ router.patch('/broadcast-config', async (req, res) => {
       io.emit('theme-updated', { theme: merged.theme });
     }
     if (hostDisplayMode) {
-      io.emit('host-display-mode', { mode: merged.hostDisplayMode });
+      io.emit('host-display-mode', { mode: merged.hostDisplayMode, topPlayersCount: merged.topPlayersCount });
+    }
+    if (topPlayersCount !== undefined) {
+      io.emit('top-players-count-updated', { count: merged.topPlayersCount });
     }
 
     res.json({ success: true, config: merged });
@@ -2835,6 +2843,57 @@ router.patch('/broadcast-config', async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+// ─── Elite Leaderboard — Top N Sold Players ────────────────────────────────────
+// GET /admin/top-sold-players?limit=10  → returns top N players by sold_price DESC
+// Scoped strictly to this auction only (multi-tenant safe)
+router.get('/top-sold-players', async (req, res) => {
+  try {
+    const auctionId = getAuctionId(req);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
+
+    const { data: players, error: pErr } = await supabase
+      .from('players')
+      .select('id, name, age, role, image, thumb_url, sold_price, sold_to_team')
+      .eq('auction_id', auctionId)
+      .eq('status', 'SOLD')
+      .not('sold_price', 'is', null)
+      .order('sold_price', { ascending: false })
+      .limit(limit);
+
+    if (pErr) throw pErr;
+
+    if (!players || players.length === 0) {
+      return res.json({ players: [] });
+    }
+
+    const teamIds = [...new Set(players.map(p => p.sold_to_team).filter(Boolean))];
+    const teamMap = {};
+
+    if (teamIds.length > 0) {
+      const { data: teams, error: tErr } = await supabase
+        .from('teams')
+        .select('id, name, logo')
+        .in('id', teamIds)
+        .eq('auction_id', auctionId);
+
+      if (!tErr && teams) {
+        teams.forEach(t => { teamMap[t.id] = t; });
+      }
+    }
+
+    const enriched = players.map(p => ({
+      ...p,
+      teams: p.sold_to_team ? (teamMap[p.sold_to_team] || null) : null,
+    }));
+
+    res.json({ players: enriched });
+  } catch (err) {
+    console.error('Error fetching top-sold-players:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+// ─────────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default router;

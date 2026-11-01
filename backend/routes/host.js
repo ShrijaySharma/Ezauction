@@ -265,4 +265,64 @@ router.get('/team-purses', async (req, res) => {
   }
 });
 
+// GET /host/top-sold-players?limit=10
+// Returns top N sold players sorted by sold_price DESC, scoped to this auction
+router.get('/top-sold-players', async (req, res) => {
+  try {
+    const auctionId = getAuctionId(req);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 20);
+
+    console.log(`[top-sold-players] auctionId=${auctionId} limit=${limit}`);
+
+    // Step 1: fetch top sold players (no join — use the correct column name)
+    const { data: players, error: pErr } = await supabase
+      .from('players')
+      .select('id, name, age, role, image, thumb_url, sold_price, sold_to_team')
+      .eq('auction_id', auctionId)
+      .eq('status', 'SOLD')
+      .not('sold_price', 'is', null)
+      .order('sold_price', { ascending: false })
+      .limit(limit);
+
+    if (pErr) {
+      console.error('[top-sold-players] players query error:', pErr);
+      throw pErr;
+    }
+
+    console.log(`[top-sold-players] found ${players?.length || 0} sold players`);
+
+    if (!players || players.length === 0) {
+      return res.json({ players: [] });
+    }
+
+    // Step 2: batch-fetch team info for all unique team IDs
+    const teamIds = [...new Set(players.map(p => p.sold_to_team).filter(Boolean))];
+    const teamMap = {};
+
+    if (teamIds.length > 0) {
+      const { data: teams, error: tErr } = await supabase
+        .from('teams')
+        .select('id, name, logo')
+        .in('id', teamIds)
+        .eq('auction_id', auctionId);
+
+      if (!tErr && teams) {
+        teams.forEach(t => { teamMap[t.id] = t; });
+      }
+    }
+
+    // Step 3: enrich players with team data
+    const enriched = players.map(p => ({
+      ...p,
+      teams: p.sold_to_team ? (teamMap[p.sold_to_team] || null) : null,
+    }));
+
+    res.json({ players: enriched });
+  } catch (err) {
+    console.error('Error fetching top sold players (host):', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;
+

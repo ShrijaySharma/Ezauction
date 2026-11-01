@@ -10,6 +10,7 @@ import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
 import { getSocketUrl, getAuctionApiUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
 import { THEMES, getTheme, DEFAULT_THEME } from '../utils/themeEngine';
+import { generateTeamPDF } from '../utils/generateTeamPDF';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -113,8 +114,14 @@ function AdminDashboard({ user }) {
   const [showBroadcastControl, setShowBroadcastControl] = useState(false);
   const [broadcastTheme, setBroadcastTheme] = useState(DEFAULT_THEME);
   const [broadcastDisplayMode, setBroadcastDisplayMode] = useState('main');
+  const [broadcastTopCount, setBroadcastTopCount] = useState(10);
   const [broadcastSaving, setBroadcastSaving] = useState(false);
   const [broadcastSaveMsg, setBroadcastSaveMsg] = useState('');
+  // ── PDF Export State ───────────────────────────────────────────────────
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfTournamentName, setPdfTournamentName] = useState('');
+  const [pdfIncludePrice, setPdfIncludePrice] = useState(true);
+  const [pdfExporting, setPdfExporting] = useState(false);
   // ───────────────────────────────────────────────────────────
 
   const enableAudio = () => {
@@ -532,9 +539,9 @@ function AdminDashboard({ user }) {
       const role = (p.role || '').toLowerCase();
       const serial = p.serial_number != null ? String(p.serial_number) : '';
       return name.includes(term) ||
-             role.includes(term) ||
-             (cleanNum && serial === cleanNum) ||
-             (serial && serial.includes(term));
+        role.includes(term) ||
+        (cleanNum && serial === cleanNum) ||
+        (serial && serial.includes(term));
     });
   }, [availablePlayersToLoad]);
 
@@ -1268,18 +1275,16 @@ function AdminDashboard({ user }) {
                     handleToggleSequentialMode(!sequentialMode);
                     setShowSidebar(false);
                   }}
-                  className={`w-full px-4 py-3 rounded-lg transition-colors text-left border ${
-                    sequentialMode
+                  className={`w-full px-4 py-3 rounded-lg transition-colors text-left border ${sequentialMode
                       ? 'bg-teal-600 hover:bg-teal-700 border-teal-400 text-white'
                       : 'bg-gray-700 hover:bg-gray-600 border-gray-500 text-gray-200'
-                  }`}
+                    }`}
                 >
                   <div className="font-semibold flex items-center gap-2">
                     <span>🔢</span>
                     Sequential Auction
-                    <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-bold ${
-                      sequentialMode ? 'bg-teal-300 text-teal-900' : 'bg-gray-600 text-gray-300'
-                    }`}>
+                    <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-bold ${sequentialMode ? 'bg-teal-300 text-teal-900' : 'bg-gray-600 text-gray-300'
+                      }`}>
                       {sequentialMode ? 'ON' : 'OFF'}
                     </span>
                   </div>
@@ -1343,6 +1348,7 @@ function AdminDashboard({ user }) {
                         const cfg = await adminService.getBroadcastConfig();
                         if (cfg && cfg.theme) setBroadcastTheme(cfg.theme);
                         if (cfg && cfg.hostDisplayMode) setBroadcastDisplayMode(cfg.hostDisplayMode);
+                        if (cfg && cfg.topPlayersCount) setBroadcastTopCount(cfg.topPlayersCount);
                       } catch { /* silently use current state */ }
                       setShowBroadcastControl(true);
                     }}
@@ -1565,11 +1571,10 @@ function AdminDashboard({ user }) {
                     <button
                       onClick={handleAdminAssignTeam}
                       disabled={!adminBidTeamId}
-                      className={`px-4 py-2 rounded-lg transition-all font-semibold text-sm shadow-md whitespace-nowrap ${
-                        adminBidTeamId
+                      className={`px-4 py-2 rounded-lg transition-all font-semibold text-sm shadow-md whitespace-nowrap ${adminBidTeamId
                           ? 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white hover:shadow-lg transform hover:scale-105'
                           : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                      }`}
+                        }`}
                     >
                       Assign Team
                     </button>
@@ -1676,11 +1681,10 @@ function AdminDashboard({ user }) {
                           setSelectedPlayerId(player.id.toString());
                           handleLoadPlayer(player.id);
                         }}
-                        className={`text-xs px-2.5 py-1 rounded-md border flex items-center gap-1.5 transition-all text-left ${
-                          String(selectedPlayerId) === String(player.id)
+                        className={`text-xs px-2.5 py-1 rounded-md border flex items-center gap-1.5 transition-all text-left ${String(selectedPlayerId) === String(player.id)
                             ? 'bg-blue-600 border-blue-400 text-white font-semibold'
                             : 'bg-gray-700/70 border-gray-600 text-gray-200 hover:bg-gray-600 hover:text-white'
-                        }`}
+                          }`}
                       >
                         {player.status === 'UNSOLD' && <span className="text-orange-400">🔄</span>}
                         {player.serial_number && <span className="text-blue-400 font-mono text-[11px]">#{player.serial_number}</span>}
@@ -1758,11 +1762,10 @@ function AdminDashboard({ user }) {
               <button
                 id="sequential-mode-toggle"
                 onClick={() => handleToggleSequentialMode(!sequentialMode)}
-                className={`w-full px-4 py-3 rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-105 ${
-                  sequentialMode
+                className={`w-full px-4 py-3 rounded-lg transition-all font-semibold shadow-md hover:shadow-lg transform hover:scale-105 ${sequentialMode
                     ? 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white'
                     : 'bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white'
-                }`}
+                  }`}
               >
                 {sequentialMode ? '🔢 Sequential: ON' : '🔀 Sequential: OFF'}
               </button>
@@ -3028,11 +3031,10 @@ function AdminDashboard({ user }) {
                         handleMarkPlayer('SOLD');
                       }}
                       disabled={isMarkingPlayer}
-                      className={`w-full py-3 rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                        highestBid
+                      className={`w-full py-3 rounded-lg font-bold text-lg shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${highestBid
                           ? 'bg-green-600 hover:bg-green-700 text-white'
                           : 'bg-orange-600 hover:bg-orange-700 text-white'
-                      }`}
+                        }`}
                       title={highestBid ? `Sell to ${highestBid.team_name}` : 'No bid placed yet — click to force SOLD'}
                     >
                       {isMarkingPlayer ? '⏳ Selling...' : (highestBid ? `SOLD → ${highestBid.team_name}` : '⚠ SOLD (no bid)')}
@@ -3112,11 +3114,10 @@ function AdminDashboard({ user }) {
                         getFilteredPlayersForLoad(consolePlayerSearch).map((player) => (
                           <div
                             key={player.id}
-                            className={`p-2 rounded-lg border flex items-center justify-between gap-2 transition-all ${
-                              String(selectedPlayerId) === String(player.id)
+                            className={`p-2 rounded-lg border flex items-center justify-between gap-2 transition-all ${String(selectedPlayerId) === String(player.id)
                                 ? 'bg-blue-900/40 border-blue-500'
                                 : 'bg-gray-700/40 border-gray-700 hover:bg-gray-700/80'
-                            }`}
+                              }`}
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               {player.serial_number ? (
@@ -3252,28 +3253,26 @@ function AdminDashboard({ user }) {
                           <button
                             onClick={() => handleAdminPlaceBid(team.id, 'INCREMENT', customBidIncrement)}
                             disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.team_id === team.id || !canAfford1}
-                            className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${
-                              highestBid?.team_id === team.id
+                            className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${highestBid?.team_id === team.id
                                 ? 'bg-green-600 text-white cursor-default'
                                 : canAfford1
                                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                                   : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                            }`}
+                              }`}
                             title={highestBid?.team_id === team.id ? 'Leading bidder' : isSquadFull ? 'Squad full' : !canAfford1 ? 'Exceeds max allowed bid' : `+₹${parseInt(customBidIncrement).toLocaleString('en-IN')}`}
                           >
-                            {highestBid?.team_id === team.id ? '✓ B1' : `+${(parseInt(customBidIncrement)/1000).toFixed(parseInt(customBidIncrement) % 1000 === 0 ? 0 : 1)}k`}
+                            {highestBid?.team_id === team.id ? '✓ B1' : `+${(parseInt(customBidIncrement) / 1000).toFixed(parseInt(customBidIncrement) % 1000 === 0 ? 0 : 1)}k`}
                           </button>
                           <button
                             onClick={() => handleAdminPlaceBid(team.id, 'INCREMENT', customBidIncrement2)}
                             disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.team_id === team.id || !canAfford2}
-                            className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${
-                              canAfford2 && highestBid?.team_id !== team.id
+                            className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${canAfford2 && highestBid?.team_id !== team.id
                                 ? 'bg-blue-600 hover:bg-blue-500 text-white'
                                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                            }`}
+                              }`}
                             title={isSquadFull ? 'Squad full' : !canAfford2 ? 'Exceeds max allowed bid' : `+₹${parseInt(customBidIncrement2).toLocaleString('en-IN')}`}
                           >
-                            +{(parseInt(customBidIncrement2)/1000).toFixed(parseInt(customBidIncrement2) % 1000 === 0 ? 0 : 1)}k
+                            +{(parseInt(customBidIncrement2) / 1000).toFixed(parseInt(customBidIncrement2) % 1000 === 0 ? 0 : 1)}k
                           </button>
                         </div>
                       </div>
@@ -3316,7 +3315,7 @@ function AdminDashboard({ user }) {
                 className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-md ${tradingWindowOpen
                   ? 'bg-red-600 hover:bg-red-700 text-white'
                   : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
+                  }`}
               >
                 {tradingWindowOpen ? 'Close Window' : 'Open Window'}
               </button>
@@ -3406,7 +3405,7 @@ function AdminDashboard({ user }) {
                     <button
                       onClick={handleExecuteTrade}
                       disabled={executingTrade}
-                      className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-bold text-lg transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" 
+                      className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-bold text-lg transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {executingTrade ? 'Executing...' : '⚡ Execute Trade'}
                     </button>
@@ -3467,11 +3466,10 @@ function AdminDashboard({ user }) {
                       <button
                         key={t.key}
                         onClick={() => setBroadcastTheme(t.key)}
-                        className={`relative flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                          isActive
+                        className={`relative flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${isActive
                             ? 'border-violet-400 bg-violet-500/20 scale-[1.02]'
                             : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/8'
-                        }`}
+                          }`}
                       >
                         {/* Colour swatch */}
                         <span
@@ -3496,20 +3494,20 @@ function AdminDashboard({ user }) {
                 <p className="text-white/50 text-xs font-black uppercase tracking-[0.3em] mb-3">Host Screen Display</p>
                 <div className="flex flex-col gap-2">
                   {[
-                    { mode: 'main',  icon: '🎬', label: 'Main',  desc: 'Player card, image & live bids' },
+                    { mode: 'main', icon: '🎬', label: 'Main', desc: 'Player card, image & live bids' },
                     { mode: 'purse', icon: '💰', label: 'Purse', desc: 'All team budgets & spending' },
                     { mode: 'teams', icon: '🏆', label: 'Teams', desc: 'Team squads with bought players' },
+                    { mode: 'topplayers', icon: '🥇', label: 'Elite Leaderboard', desc: 'Top sold players ranked by price' },
                   ].map(({ mode, icon, label, desc }) => {
                     const isActive = broadcastDisplayMode === mode;
                     return (
                       <button
                         key={mode}
                         onClick={() => setBroadcastDisplayMode(mode)}
-                        className={`flex items-center gap-4 px-4 py-3 rounded-xl border-2 transition-all text-left ${
-                          isActive
+                        className={`flex items-center gap-4 px-4 py-3 rounded-xl border-2 transition-all text-left ${isActive
                             ? 'border-violet-400 bg-violet-500/20'
                             : 'border-white/10 bg-white/5 hover:border-white/30'
-                        }`}
+                          }`}
                       >
                         <span className="text-2xl">{icon}</span>
                         <div className="flex-1">
@@ -3521,13 +3519,49 @@ function AdminDashboard({ user }) {
                     );
                   })}
                 </div>
+
+                {/* Top 5 / Top 10 toggle — only visible when Elite Leaderboard is selected */}
+                {broadcastDisplayMode === 'topplayers' && (
+                  <div className="mt-3 p-3 bg-white/5 border border-white/10 rounded-xl">
+                    <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mb-2">Show Top</p>
+                    <div className="flex gap-2">
+                      {[5, 10].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setBroadcastTopCount(n)}
+                          className={`flex-1 py-2 rounded-lg font-black text-sm border-2 transition-all ${broadcastTopCount === n
+                              ? 'border-yellow-400 bg-yellow-400/20 text-yellow-300'
+                              : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                            }`}
+                        >
+                          Top {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Section C: Export Team PDF ── */}
+              <div className="pt-4 border-t border-white/10">
+                <p className="text-white/50 text-xs font-black uppercase tracking-[0.3em] mb-3">Export</p>
+                <button
+                  onClick={() => { setShowPdfModal(true); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-400/60 transition-all text-left"
+                >
+                  <span className="text-2xl">📄</span>
+                  <div className="flex-1">
+                    <div className="text-white font-bold">Export Team PDF</div>
+                    <div className="text-white/40 text-xs">Beautiful team-wise player list PDF</div>
+                  </div>
+                  <span className="text-emerald-400 text-xs font-bold">↗</span>
+                </button>
               </div>
 
               {/* ── Save message ── */}
               {broadcastSaveMsg && (
-                <div className={`text-center text-sm font-bold px-4 py-2 rounded-lg ${
-                  broadcastSaveMsg.startsWith('✓') ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400'
-                }`}>
+                <div className={`text-center text-sm font-bold px-4 py-2 rounded-lg ${broadcastSaveMsg.startsWith('✓') ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400'
+                  }`}>
                   {broadcastSaveMsg}
                 </div>
               )}
@@ -3542,6 +3576,7 @@ function AdminDashboard({ user }) {
                       await adminService.updateBroadcastConfig({
                         theme: broadcastTheme,
                         hostDisplayMode: broadcastDisplayMode,
+                        topPlayersCount: broadcastTopCount,
                       });
                       setBroadcastSaveMsg('✓ Applied live to host screen & overlay!');
                       setTimeout(() => setBroadcastSaveMsg(''), 3000);
@@ -3588,6 +3623,129 @@ function AdminDashboard({ user }) {
       {previewImage && (
         <ImageModal src={previewImage} alt="Player" onClose={() => setPreviewImage(null)} />
       )}
+
+      {/* ── PDF Export Modal ─────────────────────────────────────────────── */}
+      {showPdfModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/85 backdrop-blur-sm" onClick={() => { if (!pdfExporting) setShowPdfModal(false); }} />
+          <div className="relative w-full max-w-md bg-gray-900 border border-emerald-500/40 rounded-2xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-gradient-to-r from-emerald-900/40 to-transparent">
+              <div>
+                <h3 className="text-white font-black text-xl flex items-center gap-2">📄 Export Team PDF</h3>
+                <p className="text-emerald-300 text-xs mt-0.5 font-semibold uppercase tracking-widest">Beautiful Team-wise Player List</p>
+              </div>
+              <button
+                onClick={() => { if (!pdfExporting) setShowPdfModal(false); }}
+                className="p-2 hover:bg-white/10 rounded-xl text-white/60 hover:text-white transition-all"
+              >✕</button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Tournament Name */}
+              <div>
+                <label className="block text-white/60 text-xs font-black uppercase tracking-widest mb-2">
+                  Tournament Name
+                </label>
+                <input
+                  type="text"
+                  value={pdfTournamentName}
+                  onChange={e => setPdfTournamentName(e.target.value)}
+                  placeholder="e.g. IPL 2025 Mini Auction"
+                  className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white placeholder-white/30 text-sm focus:outline-none focus:border-emerald-400/60 transition-colors"
+                />
+              </div>
+
+              {/* Include Bid Price */}
+              <div>
+                <label className="block text-white/60 text-xs font-black uppercase tracking-widest mb-3">
+                  Bid Price
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setPdfIncludePrice(true)}
+                    className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all text-left ${pdfIncludePrice
+                        ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
+                        : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                      }`}
+                  >
+                    <span className="text-lg">💰</span>
+                    <div>
+                      <div className="font-bold text-sm">Include</div>
+                      <div className="text-[10px] opacity-60">Show sold price</div>
+                    </div>
+                    {pdfIncludePrice && <span className="ml-auto text-emerald-300 font-bold">✓</span>}
+                  </button>
+                  <button
+                    onClick={() => setPdfIncludePrice(false)}
+                    className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all text-left ${!pdfIncludePrice
+                        ? 'border-rose-400 bg-rose-500/20 text-rose-300'
+                        : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                      }`}
+                  >
+                    <span className="text-lg">🚫</span>
+                    <div>
+                      <div className="font-bold text-sm">Exclude</div>
+                      <div className="text-[10px] opacity-60">Hide sold price</div>
+                    </div>
+                    {!pdfIncludePrice && <span className="ml-auto text-rose-300 font-bold">✓</span>}
+                  </button>
+                </div>
+              </div>
+
+              {/* Theme note */}
+              <p className="text-white/30 text-xs text-center">
+                PDF theme will match the currently selected broadcast theme ({THEMES[broadcastTheme]?.name || broadcastTheme})
+              </p>
+
+              {/* Action buttons */}
+              <div className="flex gap-3 pt-2 border-t border-white/10">
+                <button
+                  disabled={pdfExporting}
+                  onClick={async () => {
+                    setPdfExporting(true);
+                    try {
+                      // Use the existing team-squads endpoint — returns [{team, players}]
+                      const teamSquads = await adminService.getTeamSquads();
+
+                      await generateTeamPDF({
+                        tournamentName: pdfTournamentName.trim(),
+                        includeBidPrice: pdfIncludePrice,
+                        themeKey: broadcastTheme,
+                        teamSquads: teamSquads || [],
+                        getImageUrl,
+                      });
+
+                      setShowPdfModal(false);
+                      setPdfTournamentName('');
+                    } catch (err) {
+                      console.error('PDF export failed:', err);
+                      alert('PDF export failed. Please try again.');
+                    } finally {
+                      setPdfExporting(false);
+                    }
+                  }}
+                  className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+                >
+                  {pdfExporting ? (
+                    <><span className="animate-spin">⏳</span> Generating…</>
+                  ) : (
+                    <><span>📥</span> Export PDF</>
+                  )}
+                </button>
+                <button
+                  onClick={() => { if (!pdfExporting) setShowPdfModal(false); }}
+                  disabled={pdfExporting}
+                  className="px-5 bg-white/5 text-white/70 font-bold rounded-xl hover:bg-white/10 transition-colors border border-white/10 disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ─────────────────────────────────────────────────────────────────────── */}
 
     </div>
   );

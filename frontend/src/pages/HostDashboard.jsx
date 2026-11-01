@@ -15,6 +15,7 @@ import ThemeBlueBrush from '../components/host-themes/ThemeBlueBrush';
 import ThemeDarkTeal from '../components/host-themes/ThemeDarkTeal';
 import HostPurseView from '../components/host-themes/HostPurseView';
 import HostTeamsView from '../components/host-themes/HostTeamsView';
+import HostTopPlayersView from '../components/host-themes/HostTopPlayersView';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -54,20 +55,32 @@ function HostDashboard({ user }) {
   const [sponsorName, setSponsorName] = useState('');
   const [sponsorLogo, setSponsorLogo] = useState('');
 
-  // ── Broadcast Control State ──────────────────────────────────────────────
+  // -- Broadcast Control State --
   const [themeKey, setThemeKey] = useState(DEFAULT_THEME);
-  const [displayMode, setDisplayMode] = useState('main'); // 'main' | 'purse' | 'teams'
-  // ─────────────────────────────────────────────────────────────────────────
+  const [displayMode, setDisplayMode] = useState('main'); // 'main' | 'purse' | 'teams' | 'topplayers'
+  const [topPlayersCount, setTopPlayersCount] = useState(10);
+  const [topPlayers, setTopPlayers] = useState([]);
+  // ---------------------------------------------------------------------------
 
   const audioElementRef = useRef(null);
 
   // Refs for socket callbacks to access latest state
   const currentPlayerRef = useRef(null);
   const teamsRef = useRef([]);
+  // Ref so socket closures can always call the latest loadTopPlayers
+  const loadTopPlayersRef = useRef(null);
 
   // Sync state to refs
   useEffect(() => { currentPlayerRef.current = currentPlayer; }, [currentPlayer]);
   useEffect(() => { teamsRef.current = teams; }, [teams]);
+
+  // Whenever displayMode switches to topplayers, (re-)load the leaderboard
+  useEffect(() => {
+    if (displayMode === 'topplayers') {
+      loadTopPlayers(topPlayersCount);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayMode]);
 
   const enableAudio = () => {
     if (audioElementRef.current) {
@@ -91,6 +104,10 @@ function HostDashboard({ user }) {
     getPublicBroadcastConfig().then(cfg => {
       if (cfg && cfg.theme) setThemeKey(cfg.theme);
       if (cfg && cfg.hostDisplayMode) setDisplayMode(cfg.hostDisplayMode);
+      if (cfg && cfg.topPlayersCount) setTopPlayersCount(cfg.topPlayersCount);
+      if (cfg && cfg.hostDisplayMode === 'topplayers') {
+        loadTopPlayers(cfg.topPlayersCount || 10);
+      }
     }).catch(() => {/* silently use defaults */});
 
     // Create audio element for notifications
@@ -242,9 +259,23 @@ function HostDashboard({ user }) {
         if (data.mode === 'purse' || data.mode === 'teams') {
           loadTeamPurses();
         }
+        // Auto-load leaderboard when admin switches to topplayers (use ref to avoid stale closure)
+        if (data.mode === 'topplayers') {
+          const cnt = data.topPlayersCount || 10;
+          setTopPlayersCount(cnt);
+          if (loadTopPlayersRef.current) loadTopPlayersRef.current(cnt);
+        }
       }
     });
-    // ─────────────────────────────────────────────────────────────────────────
+
+    newSocket.on('top-players-count-updated', (data) => {
+      if (data && data.count) {
+        console.log('[Socket:Host] top-players-count-updated →', data.count);
+        setTopPlayersCount(data.count);
+        if (loadTopPlayersRef.current) loadTopPlayersRef.current(data.count);
+      }
+    });
+    // -------------------------------------------------------------------------
 
     const handlePurseRefresh = () => {
       loadTeamPurses();
@@ -297,6 +328,16 @@ function HostDashboard({ user }) {
       console.log('[Socket:Host] player-marked', data);
       if (data.status === 'SOLD') {
         handlePlayerSoldPurseUpdate(data);
+        // Refresh leaderboard if currently displaying it (use ref to avoid stale closure)
+        setDisplayMode(prev => {
+          if (prev === 'topplayers') {
+            setTopPlayersCount(cnt => {
+              if (loadTopPlayersRef.current) loadTopPlayersRef.current(cnt);
+              return cnt;
+            });
+          }
+          return prev;
+        });
 
         // Backend sends soldToTeamName and soldToTeamLogo directly
         let teamName = data.soldToTeamName || '';
@@ -428,6 +469,19 @@ function HostDashboard({ user }) {
     }
   };
 
+  const loadTopPlayers = async (limit = 10) => {
+    try {
+      console.log('[loadTopPlayers] fetching limit=', limit, 'auctionId=', auctionId);
+      const data = await hostService.getTopSoldPlayers(null, limit);
+      console.log('[loadTopPlayers] response:', data);
+      setTopPlayers(data?.players || []);
+    } catch (error) {
+      console.error('Error loading top sold players:', error);
+    }
+  };
+  // Keep ref in sync so socket closures always call the latest version
+  loadTopPlayersRef.current = loadTopPlayers;
+
   // Logout removed — host dashboard is now public
 
   const formatIndianNumber = (num) => {
@@ -551,8 +605,17 @@ function HostDashboard({ user }) {
               formatIndianNumber={formatIndianNumber}
             />
           )}
+          {/* -- MODE: ELITE LEADERBOARD -- */}
+          {displayMode === 'topplayers' && (
+            <HostTopPlayersView
+              players={topPlayers}
+              themeKey={themeKey}
+              topPlayersCount={topPlayersCount}
+              getImageUrl={getImageUrl}
+            />
+          )}
 
-          {/* ── MODE: MAIN (Theme layout components matching reference image) ── */}
+          {/* -- MODE: MAIN (Theme layout components matching reference image) -- */}
           {displayMode === 'main' && (
             <>
               {currentPlayer ? (
