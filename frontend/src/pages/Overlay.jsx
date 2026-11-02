@@ -250,6 +250,7 @@ function OverlayLowerThird({ theme, currentPlayer, currentBid, leadingTeam, bidF
                             {currentPlayer.role}
                             {currentPlayer.country ? ` · ${currentPlayer.country}` : ''}
                             {currentPlayer.age ? ` · Age ${currentPlayer.age}` : ''}
+                            {currentPlayer.category ? ` · 🏷️ ${currentPlayer.category}` : ''}
                         </span>
 
                         {/* Serial number badge on the LEFT of player name */}

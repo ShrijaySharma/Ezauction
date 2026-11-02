@@ -5,7 +5,8 @@ export default function CategoryQueueModal({
   availableCategories = [],
   categoryCounts = {},
   onSave,
-  onClose
+  onClose,
+  isActive = false  // true when a queue is already running mid-auction
 }) {
   const [slots, setSlots] = useState(() => {
     if (initialQueue && initialQueue.length > 0) {
@@ -18,6 +19,8 @@ export default function CategoryQueueModal({
   });
 
   const [customMode, setCustomMode] = useState({});
+  // If a queue is already running, default to keeping progress so saves don't restart accidentally
+  const [resetProgress, setResetProgress] = useState(!isActive);
 
   const addSlot = () => {
     setSlots(prev => [...prev, { category: availableCategories[0] || '', count: '' }]);
@@ -54,7 +57,7 @@ export default function CategoryQueueModal({
       return;
     }
 
-    onSave(valid);
+    onSave(valid, resetProgress);
   };
 
   return (
@@ -156,6 +159,9 @@ export default function CategoryQueueModal({
                         )}
                       </div>
                     )}
+                    {slot.category && availableInCat > 0 && (
+                      <p className="text-[10px] text-gray-500 mt-0.5 pl-1">{availableInCat} players available</p>
+                    )}
                   </div>
 
                   {/* Count Input */}
@@ -222,30 +228,45 @@ export default function CategoryQueueModal({
             <div>1. <span className="text-purple-300">Diamond × 4</span> (serves 4 diamond players)</div>
             <div>2. <span className="text-purple-300">Gold × All</span> (serves all gold players)</div>
             <div>3. <span className="text-purple-300">Silver × 4</span> (serves 4 silver players)</div>
-            <div>4. <span className="text-purple-300">Diamond × All</span> (returns to serve remaining fresh + unsold Diamond players)</div>
+            <div>4. <span className="text-purple-300">Diamond × All</span> (returns to serve remaining Diamond players)</div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-gray-800 flex justify-end gap-3 bg-[#131316] rounded-b-2xl">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-800 rounded-xl transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="px-6 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-900/40 rounded-xl transition-all"
-          >
-            Save & Activate Queue
-          </button>
+        <div className="p-5 border-t border-gray-800 flex items-center justify-between gap-3 bg-[#131316] rounded-b-2xl">
+          {/* Reset progress toggle */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={resetProgress}
+              onChange={e => setResetProgress(e.target.checked)}
+              className="w-4 h-4 rounded accent-purple-500"
+            />
+            <span className="text-xs">
+              {resetProgress
+                ? <span className="text-yellow-400 font-semibold">⚠ Restart from slot 1</span>
+                : <span className="text-green-400 font-semibold">✓ Keep current progress</span>}
+            </span>
+          </label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-gray-400 hover:text-white bg-gray-800/80 hover:bg-gray-800 rounded-xl transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="px-6 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-900/40 rounded-xl transition-all"
+            >
+              Save & Activate Queue
+            </button>
+          </div>
         </div>
 
       </div>
     </div>
   );
 }
-

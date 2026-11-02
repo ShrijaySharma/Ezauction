@@ -283,11 +283,12 @@ router.get('/category-queue', async (req, res) => {
 });
 
 // PUT /admin/category-queue — save or update queue sequence
+// resetProgress=true resets slot index to 0 (explicit restart). Default: preserve current progress.
 router.put('/category-queue', async (req, res) => {
   try {
     const auctionId = getAuctionId(req);
     const io = getAuctionIo(req);
-    const { queue } = req.body;
+    const { queue, resetProgress } = req.body;
 
     if (!Array.isArray(queue)) {
       return res.status(400).json({ error: 'Queue must be an array of slots' });
@@ -298,14 +299,19 @@ router.put('/category-queue', async (req, res) => {
       count: parseInt(slot.count) || 0
     })).filter(s => s.category.length > 0);
 
+    // Only reset slot progress if caller explicitly requests it (new queue from scratch)
+    const existing = await getCategoryQueueData(auctionId);
+    const newSlotIndex = resetProgress ? 0 : (existing.category_slot_index ?? 0);
+    const newSlotServed = resetProgress ? 0 : (existing.category_slot_served ?? 0);
+
     await updateCategoryQueueData(auctionId, {
       queue: cleanQueue.length > 0 ? cleanQueue : null,
-      slotIndex: 0,
-      slotServed: 0
+      slotIndex: newSlotIndex,
+      slotServed: newSlotServed
     });
 
-    io.emit('category-queue-updated', { queue: cleanQueue, slotIndex: 0, slotServed: 0 });
-    res.json({ success: true, queue: cleanQueue });
+    io.emit('category-queue-updated', { queue: cleanQueue, slotIndex: newSlotIndex, slotServed: newSlotServed });
+    res.json({ success: true, queue: cleanQueue, slotIndex: newSlotIndex, slotServed: newSlotServed });
   } catch (err) {
     console.error('Error updating category-queue:', err);
     res.status(500).json({ error: 'Server error saving category queue' });
@@ -1608,7 +1614,7 @@ router.post('/players-bulk-with-photos',
       }
       const playerFile = playerFileArr[0];
 
-      const fileBuffer = fs.readFileSync(playerFile.path);
+      const fileBuffer = readFileSync(playerFile.path);
       const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
@@ -1665,18 +1671,16 @@ router.post('/players-bulk-with-photos',
 
       // 2. Extract photos from ZIP to disk if provided
       const photoZipArr = req.files ? req.files['photoZip'] : null;
-      let imagePaths = []; // Array of temp disk paths
+      let imagePaths = [];
 
       if (photoZipArr && photoZipArr.length > 0) {
         try {
           extractDir = path.join(os.tmpdir(), `upload_${Date.now()}`);
           fs.mkdirSync(extractDir, { recursive: true });
 
-          // Load zip directly from disk path (avoids in-memory buffer)
           const zip = new AdmZip(photoZipArr[0].path);
           const entries = zip.getEntries();
 
-          // Filter only image files, ignore directories and __MACOSX
           let validEntries = entries.filter(entry => {
             if (entry.isDirectory) return false;
             const name = entry.entryName.toLowerCase();
@@ -1684,14 +1688,12 @@ router.post('/players-bulk-with-photos',
             return /\.(jpg|jpeg|png|webp|gif|bmp)$/i.test(name);
           });
 
-          // Sort alphabetically/naturally to establish sequence order
           validEntries.sort((a, b) => {
             const nameA = a.entryName.split('/').pop();
             const nameB = b.entryName.split('/').pop();
             return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
           });
 
-          // Only extract what is needed for valid players to avoid extracting extra images
           const maxToExtract = Math.min(validEntries.length, validPlayers.length);
           for (let i = 0; i < maxToExtract; i++) {
             const entry = validEntries[i];
@@ -1699,34 +1701,46 @@ router.post('/players-bulk-with-photos',
             const diskPath = path.join(extractDir, `img_${i}${ext}`);
             fs.writeFileSync(diskPath, entry.getData());
             imagePaths.push(diskPath);
-            // Help GC by removing the uncompressed buffer from AdmZip cache
             entry.setData(null);
           }
 
-          console.log(`[Auction ${auctionId}] Extracted ${imagePaths.length} images to disk for ${validPlayers.length} players`);
+          console.log(`[Auction ${auctionId}] Extracted ${imagePaths.length} images for ${validPlayers.length} players`);
         } catch (zipErr) {
           console.error('Error parsing ZIP:', zipErr);
           return res.status(400).json({ error: 'Failed to extract photos.zip: ' + zipErr.message });
         }
       }
 
-      // 3. Bulk insert all players first to get IDs and avoid timeouts
+      // 3. Deduplicate: skip players already in this auction (prevents double-insert on network retry)
+      const { data: existingPlayers } = await supabase
+        .from('players')
+        .select('name')
+        .eq('auction_id', auctionId);
+      const existingNames = new Set((existingPlayers || []).map(p => p.name.trim().toLowerCase()));
+      const dedupedPlayers = validPlayers.filter(p => !existingNames.has(p.name.trim().toLowerCase()));
+
+      if (dedupedPlayers.length === 0) {
+        return res.status(409).json({
+          error: 'All players already exist in this auction (possible duplicate upload). No players were added.'
+        });
+      }
+
       const { data: inserted, error: insertError } = await supabase
         .from('players')
-        .insert(validPlayers)
+        .insert(dedupedPlayers)
         .select();
 
       if (insertError) throw insertError;
 
-      console.log(`[Auction ${auctionId}] Bulk added ${inserted.length} players without photos initially`);
+      console.log(`[Auction ${auctionId}] Bulk added ${inserted.length} players`);
       io.emit('player-added', { count: inserted.length });
 
       // 4. Low-memory sequential photo processing:
-      // - sharp concurrency set to 1 to prevent libvips multi-thread memory multiplication
-      // - process 1 player at a time instead of parallel batches
-      // - create thumbnail from resized 800x1000 buffer (avoids re-reading huge camera raw files twice)
-      // - upload Buffer directly to Supabase storage without base64 conversions
-      // - immediately unlink extracted disk image after upload
+      //    - sharp concurrency=1 prevents libvips memory spikes
+      //    - .rotate() auto-corrects EXIF orientation (fixes sideways phone photos)
+      //    - skip images >15 MB to protect Render free-tier memory
+      //    - unlink each image immediately after upload
+      const MAX_IMG_BYTES = 15 * 1024 * 1024;
       const photoErrors = [];
       sharp.cache(false);
       sharp.concurrency(1);
@@ -1737,33 +1751,35 @@ router.post('/players-bulk-with-photos',
         const diskPath = imagePaths[i];
 
         try {
-          const playerName = player.name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, '_')
-            .replace(/^_+|_+$/g, '');
+          const stat = fs.statSync(diskPath);
+          if (stat.size > MAX_IMG_BYTES) {
+            console.warn(`[Auction ${auctionId}] Skipping oversized image for ${player.name} (${(stat.size/1024/1024).toFixed(1)} MB)`);
+            photoErrors.push({ player: player.name, error: `Image too large (${(stat.size/1024/1024).toFixed(1)} MB). Max 15 MB.` });
+            continue;
+          }
+
+          const playerName = player.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
           const uniqueId = `${Date.now()}_${player.id}`;
           const mainFilename = `${auctionId}/main/${uniqueId}_${playerName}.webp`;
           const thumbFilename = `${auctionId}/thumb/${uniqueId}_${playerName}.webp`;
 
-          // 1. Process main image (800x1000, WebP, 75 quality)
+          // EXIF auto-rotate then resize
           const mainBuffer = await sharp(diskPath)
+            .rotate()
             .resize(800, 1000, { fit: 'cover' })
             .webp({ quality: 75 })
             .toBuffer();
 
-          // 2. Process thumbnail (400x500, WebP, 70 quality) directly from the 800x1000 buffer
           const thumbBuffer = await sharp(mainBuffer)
             .resize(400, 500, { fit: 'cover' })
             .webp({ quality: 70 })
             .toBuffer();
 
-          // 3. Upload main image to Supabase storage (Buffer is directly supported)
           const { error: mainError } = await supabase.storage
             .from('auction-images')
             .upload(mainFilename, mainBuffer, { contentType: 'image/webp', upsert: true });
           if (mainError) throw mainError;
 
-          // 4. Upload thumbnail to Supabase storage
           const { error: thumbError } = await supabase.storage
             .from('auction-images')
             .upload(thumbFilename, thumbBuffer, { contentType: 'image/webp', upsert: true });
@@ -1779,15 +1795,12 @@ router.post('/players-bulk-with-photos',
             .eq('auction_id', auctionId);
           if (updateImageError) throw updateImageError;
 
-          console.log(`[Auction ${auctionId}] Uploaded & linked photo for ${player.name} (${i + 1}/${Math.min(inserted.length, imagePaths.length)})`);
+          console.log(`[Auction ${auctionId}] Photo uploaded for ${player.name} (${i+1}/${Math.min(inserted.length, imagePaths.length)})`);
         } catch (imgErr) {
-          console.error(`[Auction ${auctionId}] Error processing image for player ${player.name}:`, imgErr);
+          console.error(`[Auction ${auctionId}] Image error for ${player.name}:`, imgErr);
           photoErrors.push({ player: player.name, error: imgErr.message });
         } finally {
-          // Immediately unlink this single image file from disk to release disk space & OS caches
-          try {
-            if (diskPath && fs.existsSync(diskPath)) fs.unlinkSync(diskPath);
-          } catch (_) {}
+          try { if (diskPath && fs.existsSync(diskPath)) fs.unlinkSync(diskPath); } catch (_) {}
         }
       }
 
@@ -1796,7 +1809,7 @@ router.post('/players-bulk-with-photos',
         success: true,
         count: inserted.length,
         totalProcessed: playerRows.length,
-        photosMatched: Math.min(imagePaths.length, validPlayers.length),
+        photosMatched: Math.min(imagePaths.length, dedupedPlayers.length),
         errors: errors.length > 0 ? errors : undefined,
         photoErrors: photoErrors.length > 0 ? photoErrors : undefined,
         message: photoErrors.length
@@ -1808,26 +1821,13 @@ router.post('/players-bulk-with-photos',
       console.error(`[Auction ${auctionId}] Error in bulk import with photos:`, err);
       res.status(500).json({ error: 'Server error: ' + err.message });
     } finally {
-      // Clean up extracted folder if any remaining files exist
       if (extractDir) {
-        try {
-          fs.rmSync(extractDir, { recursive: true, force: true });
-        } catch (_) {}
+        try { fs.rmSync(extractDir, { recursive: true, force: true }); } catch (_) {}
       }
-      // Clean up uploaded playerFile from disk
-      const playerFileArr = req.files ? req.files['playerFile'] : null;
-      if (playerFileArr && playerFileArr[0]?.path) {
-        try {
-          if (fs.existsSync(playerFileArr[0].path)) fs.unlinkSync(playerFileArr[0].path);
-        } catch (_) {}
-      }
-      // Clean up uploaded photoZip from disk
-      const photoZipArr = req.files ? req.files['photoZip'] : null;
-      if (photoZipArr && photoZipArr[0]?.path) {
-        try {
-          if (fs.existsSync(photoZipArr[0].path)) fs.unlinkSync(photoZipArr[0].path);
-        } catch (_) {}
-      }
+      const pfArr = req.files ? req.files['playerFile'] : null;
+      if (pfArr && pfArr[0]?.path) { try { if (fs.existsSync(pfArr[0].path)) fs.unlinkSync(pfArr[0].path); } catch (_) {} }
+      const pzArr = req.files ? req.files['photoZip'] : null;
+      if (pzArr && pzArr[0]?.path) { try { if (fs.existsSync(pzArr[0].path)) fs.unlinkSync(pzArr[0].path); } catch (_) {} }
     }
   }
 );

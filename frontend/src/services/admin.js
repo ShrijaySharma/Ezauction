@@ -374,8 +374,8 @@ export const getCategoryQueue = async () => {
   return response.data;
 };
 
-export const saveCategoryQueue = async (queue) => {
-  const response = await api.put('/admin/category-queue', { queue });
+export const saveCategoryQueue = async (queue, resetProgress = false) => {
+  const response = await api.put('/admin/category-queue', { queue, resetProgress });
   return response.data;
 };
 

@@ -1474,6 +1474,9 @@ function AdminDashboard({ user }) {
                   <div className="flex-1">
                     <h2 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">{currentPlayer.name}</h2>
                     <div className="space-y-3 mb-4">
+                      {currentPlayer.category && (
+                        <p className="text-gray-200 text-lg"><span className="font-semibold text-purple-400">🏷️ Category:</span> <span className="px-2 py-0.5 bg-purple-600/25 text-purple-300 rounded text-sm font-bold border border-purple-500/30">{currentPlayer.category}</span></p>
+                      )}
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">🏏 Role:</span> {currentPlayer.role}</p>
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">👤 Age:</span> {currentPlayer.age || 'N/A'}</p>
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">🌍 Country:</span> {currentPlayer.country || 'N/A'}</p>
@@ -2204,9 +2207,10 @@ function AdminDashboard({ user }) {
             queue={categoryQueue}
             availableCategories={availableCategories}
             categoryCounts={categoryCounts}
-            onSave={async (newQueue) => {
+            isActive={categoryModeActive}
+            onSave={async (newQueue, resetProgress) => {
               try {
-                await adminService.saveCategoryQueue(newQueue);
+                await adminService.saveCategoryQueue(newQueue, resetProgress);
                 await loadCategoryQueue();
                 setShowCategoryModal(false);
               } catch (err) {
@@ -3193,6 +3197,7 @@ function AdminDashboard({ user }) {
                   <div className="flex gap-2 mb-6">
                     <span className="px-3 py-1 bg-gray-700 text-gray-300 rounded-full text-sm font-semibold">{currentPlayer.role}</span>
                     {currentPlayer.country && <span className="px-3 py-1 bg-gray-700 text-gray-300 rounded-full text-sm font-semibold">{currentPlayer.country}</span>}
+                    {currentPlayer.category && <span className="px-3 py-1 bg-purple-900/50 text-purple-300 rounded-full text-sm font-bold border border-purple-500/40">🏷️ {currentPlayer.category}</span>}
                   </div>
 
                   <div className="w-full bg-gray-700/50 rounded-xl p-4 mb-6 border border-gray-600">

@@ -278,6 +278,9 @@ function PublicLive() {
                                         <div className="flex justify-between items-start">
                                             <div>
                                                 <span className="px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider rounded-md border border-blue-500/30">{currentPlayer.role}</span>
+                                                {currentPlayer.category && (
+                                                  <span className="ml-2 px-3 py-1 bg-purple-500/20 text-purple-300 text-xs font-bold uppercase tracking-wider rounded-md border border-purple-500/30">🏷️ {currentPlayer.category}</span>
+                                                )}
                                                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white mt-4 uppercase tracking-tight">{currentPlayer.name}</h1>
                                             </div>
                                             <div className="text-right">
