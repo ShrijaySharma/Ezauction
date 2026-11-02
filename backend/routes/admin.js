@@ -1614,7 +1614,7 @@ router.post('/players-bulk-with-photos',
       }
       const playerFile = playerFileArr[0];
 
-      const fileBuffer = readFileSync(playerFile.path);
+      const fileBuffer = fs.readFileSync(playerFile.path);
       const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
