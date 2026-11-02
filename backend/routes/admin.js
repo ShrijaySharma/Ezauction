@@ -76,12 +76,12 @@ function pickNextPlayer(pendingPlayers, state, categoryFilter = null) {
     // No serial-numbered players remain — fall through to random
   }
 
-  // Original random logic (unchanged) — used when sequential_mode=0 OR as fallback
-  // Fresh players (was_unsold === 0) are always presented before unsold players (was_unsold === 1)
-  const priority0 = pool.filter(p => p.was_unsold === 0);
-  const priority1 = pool.filter(p => p.was_unsold === 1);
+  // Original random logic: fresh players first, then unsold players
+  const priority0 = pool.filter(p => !p.was_unsold || p.was_unsold === 0);
+  const priority1 = pool.filter(p => p.was_unsold === 1 || p.was_unsold === true);
   if (priority0.length > 0) return priority0[Math.floor(Math.random() * priority0.length)];
   if (priority1.length > 0) return priority1[Math.floor(Math.random() * priority1.length)];
+  if (pool.length > 0) return pool[Math.floor(Math.random() * pool.length)];
   return null;
 }
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1089,8 +1089,8 @@ router.post('/mark-player', async (req, res) => {
       // ─────────────────────────────────────────────────────────────────────
 
       let nextPlayer = pickNextPlayer(allPendingPlayers, sequentialBaseline, categoryFilter);
-      // Guarantee next player fallback so screen never gets stuck (only if no category filter active)
-      if (!nextPlayer && !categoryFilter && allPendingPlayers.length > 0) {
+      // Guarantee next player fallback so screen never gets stuck if pending players remain
+      if (!nextPlayer && allPendingPlayers.length > 0) {
         nextPlayer = allPendingPlayers[0];
       }
 
