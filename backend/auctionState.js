@@ -64,7 +64,8 @@ export async function refreshAuctionState(auctionId) {
                 ...data,
                 category_queue: categoryQueue,
                 category_slot_index: slotIndex,
-                category_slot_served: slotServed
+                category_slot_served: slotServed,
+                broadcast_config: bCfg
             });
         } else {
             // Create it if missing

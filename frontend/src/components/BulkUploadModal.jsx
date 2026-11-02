@@ -212,7 +212,6 @@ const BulkUploadModal = ({ onClose, onSuccess, auctionId: propAuctionId }) => {
                                         Upload a file with headers: <code className="bg-black px-1 rounded">name, role, base_price, country, age, serial_number, category, image</code>
                                     </p>
                                     <div className="mb-3 p-2.5 bg-purple-950/40 border border-purple-500/30 rounded text-xs text-purple-200 flex items-center gap-2">
-                                        <span>🏷️</span>
                                         <span><strong>Category column is optional</strong> (e.g. Diamond, Gold, Silver). Leave empty if you don't use category rounds.</span>
                                     </div>
                                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer hover:bg-[#333] transition-colors">

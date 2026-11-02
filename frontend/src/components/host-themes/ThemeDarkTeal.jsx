@@ -50,8 +50,7 @@ export default function ThemeDarkTeal({
             {/* Category badge — only if player has category */}
             {currentPlayer?.category && (
               <div className="mt-2 flex justify-center">
-                <span className="inline-flex items-center gap-1.5 bg-[#0CCFBE]/15 text-[#0CCFBE] border border-[#0CCFBE]/40 text-xs md:text-sm font-black uppercase tracking-[0.2em] px-4 py-1 rounded-full shadow-[0_0_16px_rgba(12,207,190,0.25)]">
-                  <span className="text-[10px] opacity-75">🏷️</span>
+                <span className="inline-flex items-center bg-[#0CCFBE]/15 text-[#0CCFBE] border border-[#0CCFBE]/40 text-xs md:text-sm font-black uppercase tracking-[0.2em] px-4 py-1 rounded-full shadow-[0_0_16px_rgba(12,207,190,0.25)]">
                   <span>{currentPlayer.category}</span>
                 </span>
               </div>

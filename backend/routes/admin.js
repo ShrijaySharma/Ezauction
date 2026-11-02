@@ -3020,14 +3020,21 @@ router.post('/admin-assign-team', async (req, res) => {
 router.get('/broadcast-config', async (req, res) => {
   try {
     const auctionId = getAuctionId(req);
-    const { data, error } = await supabase
-      .from('auctions')
-      .select('broadcast_config')
-      .eq('id', auctionId)
-      .maybeSingle();
+    const cachedState = getAuctionState(auctionId);
+    let cfg = cachedState?.broadcast_config;
 
-    if (error) throw error;
-    const cfg = (data && data.broadcast_config) || {};
+    if (!cfg) {
+      const { data, error } = await supabase
+        .from('auctions')
+        .select('broadcast_config')
+        .eq('id', auctionId)
+        .maybeSingle();
+
+      if (error) throw error;
+      cfg = (data && data.broadcast_config) || {};
+      if (cachedState) cachedState.broadcast_config = cfg;
+    }
+
     res.json({
       theme: cfg.theme || 'black_gold',
       hostDisplayMode: cfg.hostDisplayMode || 'main',
@@ -3078,6 +3085,15 @@ router.patch('/broadcast-config', async (req, res) => {
       .update({ broadcast_config: merged })
       .eq('id', auctionId);
     if (updateErr) throw updateErr;
+
+    // Keep in-memory cache in sync
+    const cachedState = getAuctionState(auctionId);
+    if (cachedState) {
+      cachedState.broadcast_config = {
+        ...(cachedState.broadcast_config || {}),
+        ...merged
+      };
+    }
 
     // Emit to all clients on this auction's socket namespace
     const io = getAuctionIo(req);

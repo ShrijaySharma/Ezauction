@@ -67,7 +67,6 @@ export default function CategoryQueueModal({
         {/* Header */}
         <div className="flex justify-between items-center p-5 border-b border-gray-800 bg-gradient-to-r from-purple-900/30 via-transparent to-transparent rounded-t-2xl">
           <div className="flex items-center gap-2.5">
-            <span className="text-2xl">🏷️</span>
             <div>
               <h2 className="text-xl font-black text-white tracking-wide">Category Auction Queue</h2>
               <p className="text-xs text-purple-300/80">Configure sequential rounds by player category</p>
