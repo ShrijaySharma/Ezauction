@@ -47,8 +47,21 @@ export default function ThemeBlackGold({
               </span>
             </div>
 
+            {/* Category badge — only if player has category */}
+            {currentPlayer?.category && (
+              <div className="mt-2 flex justify-center">
+                <span className="inline-flex items-center gap-1.5 bg-[#ECC867]/15 text-[#ECC867] border border-[#ECC867]/40 text-xs md:text-sm font-black uppercase tracking-[0.2em] px-4 py-1 rounded-full shadow-[0_0_16px_rgba(236,200,103,0.25)]">
+                  <span className="text-[10px] opacity-75">🏷️</span>
+                  <span>{currentPlayer.category}</span>
+                </span>
+              </div>
+            )}
+
+            {/* Elegant divider */}
+            <div className="w-32 h-[1px] my-1 opacity-30" style={{ background: 'linear-gradient(90deg, transparent, #ECC867, transparent)' }} />
+
             {/* Age + Base Price (centered) */}
-            <div className="flex flex-col items-center gap-3 mt-4 w-full">
+            <div className="flex flex-col items-center gap-3 mt-2 w-full">
               <div className="flex flex-col items-center">
                 <span className="text-[#ECC867] text-xs font-black uppercase tracking-[0.25em]">AGE</span>
                 <div className="text-white font-black text-2xl md:text-3xl leading-none mt-0.5">
@@ -65,24 +78,28 @@ export default function ThemeBlackGold({
           </div>
         </div>
 
-        {/* CENTER: Player Image (shifted left a bit) */}
+        {/* CENTER: Player Image with Stage-Lit Radial Spotlight */}
         <div className="flex-1 relative flex items-center justify-center -translate-x-6 md:-translate-x-10 lg:-translate-x-12 p-3 md:p-5 overflow-hidden">
+          {/* Ambient stage spotlight behind player */}
+          <div className="absolute w-[520px] h-[520px] rounded-full blur-[110px] pointer-events-none opacity-25"
+            style={{ background: 'radial-gradient(circle, #ECC867 0%, #D4AF37 40%, transparent 70%)' }}
+          />
           {currentPlayer?.image ? (
             <img
               src={getImageUrl(currentPlayer.image)}
               alt={currentPlayer.name}
               onClick={() => setPreviewImage?.(getImageUrl(currentPlayer.image))}
-              className="cursor-pointer max-h-[92vh] w-auto max-w-full object-contain rounded-2xl md:rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.8)] border border-[#D4AF37]/20 transition-transform duration-200 hover:scale-[1.01]"
+              className="relative z-10 cursor-pointer max-h-[92vh] w-auto max-w-full object-contain rounded-2xl md:rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.9)] border border-[#D4AF37]/30 transition-transform duration-200 hover:scale-[1.01]"
               onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }}
             />
           ) : (
-            <div className="text-9xl opacity-20">🏏</div>
+            <div className="relative z-10 text-9xl opacity-20">🏏</div>
           )}
         </div>
 
         {/* RIGHT: High-Contrast Bid Section inside Dedicated Glass Card */}
         <div className="flex flex-col justify-center items-center px-6 lg:px-8 py-8 relative z-20" style={{ width: '28%' }}>
-          <div className="w-full bg-[#121212]/90 border-2 border-[#D4AF37]/40 rounded-3xl p-6 md:p-8 backdrop-blur-2xl shadow-[0_0_40px_rgba(212,175,55,0.25)] flex flex-col items-center gap-2 text-center">
+          <div className="w-full bg-[#121212]/95 border-2 border-[#D4AF37]/50 rounded-3xl p-6 md:p-8 backdrop-blur-3xl shadow-[0_0_50px_rgba(212,175,55,0.3)] flex flex-col items-center gap-2 text-center">
             <span className="text-[#ECC867] text-xs md:text-sm font-black uppercase tracking-[0.3em]">
               CURRENT BID
             </span>

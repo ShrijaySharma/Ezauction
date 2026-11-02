@@ -366,3 +366,25 @@ export const getTopSoldPlayers = async (limit = 10) => {
   return response.data;
 };
 
+
+// ─── Category-Wise Auction Queue ─────────────────────────────────────────────
+
+export const getCategoryQueue = async () => {
+  const response = await api.get('/admin/category-queue');
+  return response.data;
+};
+
+export const saveCategoryQueue = async (queue) => {
+  const response = await api.put('/admin/category-queue', { queue });
+  return response.data;
+};
+
+export const advanceCategory = async () => {
+  const response = await api.post('/admin/advance-category');
+  return response.data;
+};
+
+export const clearCategoryQueue = async () => {
+  const response = await api.post('/admin/clear-category-queue');
+  return response.data;
+};

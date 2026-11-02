@@ -43,14 +43,26 @@ router.use((req, res, next) => {
   next();
 });
 
-// ─── Sequential Auction — Helper ─────────────────────────────────────────────
-// Picks the next player from pendingPlayers based on auction mode.
-// When sequential_mode=0 this executes the EXACT same logic as before.
-// When sequential_mode=1 it follows serial_number ascending, wrapping at end.
-function pickNextPlayer(pendingPlayers, state) {
-  if (state && state.sequential_mode === 1 && pendingPlayers.length > 0) {
+// ─── Sequential & Category-Wise Auction — Helper ─────────────────────────────
+// Picks the next player from pendingPlayers based on auction mode and category queue.
+// When categoryFilter is null and sequential_mode=0 this executes the EXACT same logic as before.
+// Fresh players (was_unsold === 0) are always prioritized before unsold players (was_unsold === 1).
+function pickNextPlayer(pendingPlayers, state, categoryFilter = null) {
+  let pool = pendingPlayers;
+
+  // Apply category filter if active
+  if (categoryFilter && categoryFilter.category) {
+    const targetCat = categoryFilter.category.trim().toLowerCase();
+    pool = pendingPlayers.filter(p =>
+      p.category && p.category.trim().toLowerCase() === targetCat
+    );
+    // If no players in this category, return null (caller handles slot advance)
+    if (pool.length === 0) return null;
+  }
+
+  if (state && state.sequential_mode === 1 && pool.length > 0) {
     // Only consider players that actually have a serial number
-    const serialPlayers = pendingPlayers.filter(p => p.serial_number != null);
+    const serialPlayers = pool.filter(p => p.serial_number != null);
     serialPlayers.sort((a, b) => a.serial_number - b.serial_number);
 
     if (serialPlayers.length > 0) {
@@ -65,8 +77,9 @@ function pickNextPlayer(pendingPlayers, state) {
   }
 
   // Original random logic (unchanged) — used when sequential_mode=0 OR as fallback
-  const priority0 = pendingPlayers.filter(p => p.was_unsold === 0);
-  const priority1 = pendingPlayers.filter(p => p.was_unsold === 1);
+  // Fresh players (was_unsold === 0) are always presented before unsold players (was_unsold === 1)
+  const priority0 = pool.filter(p => p.was_unsold === 0);
+  const priority1 = pool.filter(p => p.was_unsold === 1);
   if (priority0.length > 0) return priority0[Math.floor(Math.random() * priority0.length)];
   if (priority1.length > 0) return priority1[Math.floor(Math.random() * priority1.length)];
   return null;
@@ -104,7 +117,10 @@ router.get('/auction-state', async (req, res) => {
         enforceMaxBid: state.enforce_max_bid === 1,
         baseBidAmount: state.bid_increment_3 !== undefined ? state.bid_increment_3 : 1000,
         sequentialMode: state.sequential_mode === 1,
-        sequentialLastSerial: state.sequential_last_serial || null
+        sequentialLastSerial: state.sequential_last_serial || null,
+        categoryQueue: state.category_queue || null,
+        categorySlotIndex: state.category_slot_index || 0,
+        categorySlotServed: state.category_slot_served || 0
       });
     }
   } catch (err) {
@@ -170,6 +186,165 @@ router.post('/enforce-max-bid', async (req, res) => {
   } catch (err) {
     console.error('Unexpected error:', err);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ─── Category-Wise Auction Helpers & Endpoints ──────────────────────────────
+
+async function getCategoryQueueData(auctionId) {
+  let state = getAuctionState(auctionId);
+  if (state?.category_queue !== undefined && state?.category_queue !== null) {
+    return {
+      category_queue: state.category_queue,
+      category_slot_index: state.category_slot_index ?? 0,
+      category_slot_served: state.category_slot_served ?? 0
+    };
+  }
+  const { data } = await supabase
+    .from('auctions')
+    .select('broadcast_config')
+    .eq('id', auctionId)
+    .maybeSingle();
+  const cfg = data?.broadcast_config || {};
+  return {
+    category_queue: cfg.category_queue || null,
+    category_slot_index: cfg.category_slot_index ?? 0,
+    category_slot_served: cfg.category_slot_served ?? 0
+  };
+}
+
+async function updateCategoryQueueData(auctionId, { queue, slotIndex, slotServed }) {
+  const { data: existing } = await supabase
+    .from('auctions')
+    .select('broadcast_config')
+    .eq('id', auctionId)
+    .maybeSingle();
+  const current = existing?.broadcast_config || {};
+  const updated = {
+    ...current,
+    category_queue: queue !== undefined ? queue : (current.category_queue ?? null),
+    category_slot_index: slotIndex !== undefined ? slotIndex : (current.category_slot_index ?? 0),
+    category_slot_served: slotServed !== undefined ? slotServed : (current.category_slot_served ?? 0)
+  };
+  await supabase
+    .from('auctions')
+    .update({ broadcast_config: updated })
+    .eq('id', auctionId);
+
+  // Keep in-memory cache synchronized immediately
+  const state = getAuctionState(auctionId);
+  if (state) {
+    if (queue !== undefined) state.category_queue = queue;
+    if (slotIndex !== undefined) state.category_slot_index = slotIndex;
+    if (slotServed !== undefined) state.category_slot_served = slotServed;
+  }
+}
+
+// GET /admin/category-queue — returns current queue, slot index, served count, categories and counts
+router.get('/category-queue', async (req, res) => {
+  try {
+    const auctionId = getAuctionId(req);
+    const { category_queue, category_slot_index, category_slot_served } = await getCategoryQueueData(auctionId);
+
+    // Fetch distinct categories configured across all players for this auction
+    const { data: allPlayers, error: pErr } = await supabase
+      .from('players')
+      .select('category, status')
+      .eq('auction_id', auctionId);
+
+    if (pErr) throw pErr;
+
+    const categoriesSet = new Set();
+    const categoryCounts = {};
+
+    (allPlayers || []).forEach(p => {
+      const cat = p.category ? String(p.category).trim() : null;
+      if (cat) {
+        categoriesSet.add(cat);
+        if (p.status === 'AVAILABLE' || p.status === 'UNSOLD') {
+          categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+        }
+      }
+    });
+
+    const categories = Array.from(categoriesSet).sort((a, b) => a.localeCompare(b));
+
+    res.json({
+      queue: category_queue || [],
+      slotIndex: category_slot_index ?? 0,
+      slotServed: category_slot_served ?? 0,
+      categories,
+      categoryCounts
+    });
+  } catch (err) {
+    console.error('Error fetching category-queue:', err);
+    res.status(500).json({ error: 'Server error fetching category queue' });
+  }
+});
+
+// PUT /admin/category-queue — save or update queue sequence
+router.put('/category-queue', async (req, res) => {
+  try {
+    const auctionId = getAuctionId(req);
+    const io = getAuctionIo(req);
+    const { queue } = req.body;
+
+    if (!Array.isArray(queue)) {
+      return res.status(400).json({ error: 'Queue must be an array of slots' });
+    }
+
+    const cleanQueue = queue.map(slot => ({
+      category: String(slot.category || '').trim(),
+      count: parseInt(slot.count) || 0
+    })).filter(s => s.category.length > 0);
+
+    await updateCategoryQueueData(auctionId, {
+      queue: cleanQueue.length > 0 ? cleanQueue : null,
+      slotIndex: 0,
+      slotServed: 0
+    });
+
+    io.emit('category-queue-updated', { queue: cleanQueue, slotIndex: 0, slotServed: 0 });
+    res.json({ success: true, queue: cleanQueue });
+  } catch (err) {
+    console.error('Error updating category-queue:', err);
+    res.status(500).json({ error: 'Server error saving category queue' });
+  }
+});
+
+// POST /admin/advance-category — manual advance to next category slot
+router.post('/advance-category', async (req, res) => {
+  try {
+    const auctionId = getAuctionId(req);
+    const io = getAuctionIo(req);
+    const { category_queue, category_slot_index } = await getCategoryQueueData(auctionId);
+
+    const newIndex = (category_slot_index ?? 0) + 1;
+    await updateCategoryQueueData(auctionId, { slotIndex: newIndex, slotServed: 0 });
+
+    const nextCategory = (category_queue && category_queue[newIndex]) ? category_queue[newIndex].category : null;
+    io.emit('category-slot-changed', { slotIndex: newIndex, category: nextCategory, slotServed: 0 });
+
+    res.json({ success: true, slotIndex: newIndex, nextCategory });
+  } catch (err) {
+    console.error('Error advancing category:', err);
+    res.status(500).json({ error: 'Server error advancing category' });
+  }
+});
+
+// POST /admin/clear-category-queue — remove category queue and return to default auction mode
+router.post('/clear-category-queue', async (req, res) => {
+  try {
+    const auctionId = getAuctionId(req);
+    const io = getAuctionIo(req);
+
+    await updateCategoryQueueData(auctionId, { queue: null, slotIndex: 0, slotServed: 0 });
+    io.emit('category-queue-updated', { queue: [], slotIndex: 0, slotServed: 0 });
+
+    res.json({ success: true, message: 'Category queue cleared' });
+  } catch (err) {
+    console.error('Error clearing category queue:', err);
+    res.status(500).json({ error: 'Server error clearing category queue' });
   }
 });
 
@@ -835,23 +1010,80 @@ router.post('/mark-player', async (req, res) => {
       .order('was_unsold', { ascending: true });
     pendingQ = pendingQ.eq('auction_id', auctionId);
 
-    const { data: pendingPlayers, error: pendingError } = await pendingQ;
+    const { data: allPendingPlayers, error: pendingError } = await pendingQ;
 
     if (pendingError) {
       console.error('Error finding next player:', pendingError);
       return res.json({ success: true });
     }
 
-    if (pendingPlayers && pendingPlayers.length > 0) {
+    if (allPendingPlayers && allPendingPlayers.length > 0) {
       const currentState = getAuctionState(auctionId);
       const sequentialBaseline = (currentState && currentState.sequential_mode === 1)
         ? { ...currentState, sequential_last_serial: currentPlayer.serial_number ?? currentState.sequential_last_serial }
         : currentState;
 
-      let nextPlayer = pickNextPlayer(pendingPlayers, sequentialBaseline);
-      // Guarantee next player fallback so screen never gets stuck
-      if (!nextPlayer && pendingPlayers.length > 0) {
-        nextPlayer = pendingPlayers[0];
+      // ── Category Queue logic ──────────────────────────────────────────────
+      let categoryFilter = null;
+      let activeCategory = null;
+      const categoryQueue = currentState?.category_queue;
+
+      if (categoryQueue && Array.isArray(categoryQueue) && categoryQueue.length > 0) {
+        let activeSlotIndex = currentState?.category_slot_index ?? 0;
+        let slotServed = currentState?.category_slot_served ?? 0;
+        let slotAdvanced = false;
+
+        while (activeSlotIndex < categoryQueue.length) {
+          const slot = categoryQueue[activeSlotIndex];
+          if (!slot || !slot.category) {
+            activeSlotIndex++;
+            slotServed = 0;
+            slotAdvanced = true;
+            continue;
+          }
+
+          const slotCount = parseInt(slot.count) || 0;
+          if (slotCount > 0 && slotServed >= slotCount) {
+            activeSlotIndex++;
+            slotServed = 0;
+            slotAdvanced = true;
+            continue;
+          }
+
+          // Check if any players remain in this category (AVAILABLE or UNSOLD)
+          const targetCat = slot.category.trim().toLowerCase();
+          const hasRemaining = allPendingPlayers.some(p =>
+            p.category && p.category.trim().toLowerCase() === targetCat
+          );
+
+          if (!hasRemaining) {
+            activeSlotIndex++;
+            slotServed = 0;
+            slotAdvanced = true;
+            continue;
+          }
+
+          // Found active valid category
+          categoryFilter = { category: slot.category };
+          activeCategory = slot.category;
+          break;
+        }
+
+        if (slotAdvanced || activeSlotIndex !== (currentState?.category_slot_index ?? 0)) {
+          await updateCategoryQueueData(auctionId, { slotIndex: activeSlotIndex, slotServed });
+          io.emit('category-slot-changed', {
+            slotIndex: activeSlotIndex,
+            category: activeCategory,
+            slotServed
+          });
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
+      let nextPlayer = pickNextPlayer(allPendingPlayers, sequentialBaseline, categoryFilter);
+      // Guarantee next player fallback so screen never gets stuck (only if no category filter active)
+      if (!nextPlayer && !categoryFilter && allPendingPlayers.length > 0) {
+        nextPlayer = allPendingPlayers[0];
       }
 
       if (nextPlayer) {
@@ -870,6 +1102,15 @@ router.post('/mark-player', async (req, res) => {
           .eq('auction_id', auctionId);
 
         await refreshAuctionState(auctionId);
+
+        // If category mode is active, increment served counter
+        if (categoryFilter) {
+          const currentServed = currentState?.category_slot_served ?? 0;
+          await updateCategoryQueueData(auctionId, {
+            slotIndex: currentState?.category_slot_index ?? 0,
+            slotServed: currentServed + 1
+          });
+        }
 
         await supabase
           .from('bids')
@@ -1167,7 +1408,7 @@ router.post('/upload-image', upload.single('image'), async (req, res) => {
 
 // Add new player
 router.post('/players', async (req, res) => {
-  const { name, image, role, country, age, base_price, serial_number } = req.body;
+  const { name, image, role, country, age, base_price, serial_number, category } = req.body;
   const io = getAuctionIo(req);
   const auctionId = getAuctionId(req);
 
@@ -1226,6 +1467,7 @@ router.post('/players', async (req, res) => {
         base_price: base_price,
         age: age ? parseInt(age) : null,
         status: 'AVAILABLE',
+        category: category ? String(category).trim() : null,
         serial_number: finalSerialNum,
         auction_id: auctionId
       }])
@@ -1279,6 +1521,7 @@ router.post('/players-bulk', async (req, res) => {
         age: p.age ? parseInt(p.age) || null : null,
         serial_number: p.serial_number ? parseInt(p.serial_number) || null : null,
         status: 'AVAILABLE',
+        category: p.category ? String(p.category).trim() : null,
         image: p.image || null,
         thumb_url: p.thumb_url || null,
         auction_id: auctionId
@@ -1402,6 +1645,7 @@ router.post('/players-bulk-with-photos',
           age: p.age ? parseInt(p.age) || null : null,
           serial_number: p.serial_number ? parseInt(p.serial_number) || null : null,
           status: 'AVAILABLE',
+          category: p.category ? String(p.category).trim() : null,
           image: null,
           thumb_url: null,
           auction_id: auctionId
@@ -1584,7 +1828,7 @@ router.post('/players-bulk-with-photos',
 // Update player
 router.put('/players/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, image, thumb_url, role, country, age, base_price, status, sold_price, sold_to_team, serial_number } = req.body;
+  const { name, image, thumb_url, role, country, age, base_price, status, sold_price, sold_to_team, serial_number, category } = req.body;
   const io = getAuctionIo(req);
   const auctionId = getAuctionId(req);
 
@@ -1660,6 +1904,9 @@ router.put('/players/:id', async (req, res) => {
     if (sold_to_team !== undefined) updates.sold_to_team = sold_to_team;
     if (serial_number !== undefined) {
       updates.serial_number = serial_number !== null && serial_number !== '' ? parseInt(serial_number) : null;
+    }
+    if (category !== undefined) {
+      updates.category = category ? String(category).trim() : null;
     }
 
     if (Object.keys(updates).length === 0) {

@@ -18,6 +18,9 @@ function defaultAuctionState(auctionId) {
         enforce_max_bid: 0,
         sequential_mode: 0,
         sequential_last_serial: null,
+        category_queue: null,
+        category_slot_index: 0,
+        category_slot_served: 0,
         updated_at: new Date()
     };
 }
@@ -40,7 +43,29 @@ export async function refreshAuctionState(auctionId) {
         }
 
         if (data) {
-            auctionStateCaches.set(auctionId, { ...data });
+            // Also merge persistent category queue state from auctions.broadcast_config if present
+            let categoryQueue = data.category_queue ?? null;
+            let slotIndex = data.category_slot_index ?? 0;
+            let slotServed = data.category_slot_served ?? 0;
+
+            try {
+                const { data: aData } = await supabase
+                    .from('auctions')
+                    .select('broadcast_config')
+                    .eq('id', auctionId)
+                    .maybeSingle();
+                const bCfg = aData?.broadcast_config || {};
+                if (bCfg.category_queue !== undefined) categoryQueue = bCfg.category_queue;
+                if (bCfg.category_slot_index !== undefined) slotIndex = bCfg.category_slot_index;
+                if (bCfg.category_slot_served !== undefined) slotServed = bCfg.category_slot_served;
+            } catch (_) {}
+
+            auctionStateCaches.set(auctionId, {
+                ...data,
+                category_queue: categoryQueue,
+                category_slot_index: slotIndex,
+                category_slot_served: slotServed
+            });
         } else {
             // Create it if missing
             console.warn(`[Cache:${auctionId}] Auction state not found. Initializing...`);

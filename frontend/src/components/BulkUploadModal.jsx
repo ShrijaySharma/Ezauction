@@ -21,13 +21,14 @@ const parseSpreadsheetData = (text) => {
             });
 
             const name = normalized.name || normalized.player_name || normalized.player || '';
-            const role = normalized.role || normalized.player_role || normalized.category || '';
+            const role = normalized.role || normalized.player_role || '';
             const rawPrice = normalized.base_price !== undefined ? normalized.base_price : (normalized.price || normalized.baseprice || '');
             const cleanPrice = String(rawPrice).replace(/[^0-9.]/g, '');
             const base_price = cleanPrice ? parseFloat(cleanPrice) : '';
             const country = normalized.country || normalized.nationality || '';
             const age = normalized.age ? parseInt(normalized.age) || '' : '';
             const serial_number = normalized.serial_number !== undefined ? normalized.serial_number : (normalized.serial || normalized.sn || '');
+            const category = normalized.category || normalized.player_category || normalized.tier || normalized.group || '';
             const image = normalized.image || normalized.photo || normalized.photo_url || '';
             const thumb_url = normalized.thumb_url || normalized.thumbnail || '';
 
@@ -38,6 +39,7 @@ const parseSpreadsheetData = (text) => {
                 country: String(country).trim(),
                 age,
                 serial_number: serial_number !== '' ? parseInt(serial_number) || '' : '',
+                category: String(category).trim(),
                 image: String(image).trim(),
                 thumb_url: String(thumb_url).trim()
             };
@@ -48,11 +50,11 @@ const parseSpreadsheetData = (text) => {
     }
 };
 
-const SAMPLE_CSV = `name,role,base_price,country,age,serial_number,image
-Virat Kohli,Batsman,20000000,India,35,18,
-Rohit Sharma,Batsman,16000000,India,36,45,
-Jasprit Bumrah,Bowler,12000000,India,30,93,
-Ben Stokes,All Rounder,15000000,England,32,55,`;
+const SAMPLE_CSV = `name,role,base_price,country,age,serial_number,category,image
+Virat Kohli,Batsman,20000000,India,35,18,Diamond,
+Rohit Sharma,Batsman,16000000,India,36,45,Diamond,
+Jasprit Bumrah,Bowler,12000000,India,30,93,Gold,
+Ben Stokes,All Rounder,15000000,England,32,55,,`;
 
 const BulkUploadModal = ({ onClose, onSuccess, auctionId: propAuctionId }) => {
     const { auctionId: routeAuctionId } = useParams();
@@ -207,8 +209,12 @@ const BulkUploadModal = ({ onClose, onSuccess, auctionId: propAuctionId }) => {
                                 <div className="bg-[#2a2a2a] p-6 rounded-lg border border-gray-700">
                                     <h3 className="text-lg font-semibold text-white mb-4">Option 1: Upload CSV or Excel File</h3>
                                     <p className="mb-2 text-sm text-gray-400">
-                                        Upload a file with headers: <code className="bg-black px-1 rounded">name, role, base_price, country, age, serial_number, image, thumb_url</code>
+                                        Upload a file with headers: <code className="bg-black px-1 rounded">name, role, base_price, country, age, serial_number, category, image</code>
                                     </p>
+                                    <div className="mb-3 p-2.5 bg-purple-950/40 border border-purple-500/30 rounded text-xs text-purple-200 flex items-center gap-2">
+                                        <span>🏷️</span>
+                                        <span><strong>Category column is optional</strong> (e.g. Diamond, Gold, Silver). Leave empty if you don't use category rounds.</span>
+                                    </div>
                                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer hover:bg-[#333] transition-colors">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                             <svg className="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
@@ -227,7 +233,7 @@ const BulkUploadModal = ({ onClose, onSuccess, auctionId: propAuctionId }) => {
                                     <h3 className="text-lg font-semibold text-white mb-4">Option 2: Paste CSV Data</h3>
                                     <textarea
                                         className="w-full h-32 bg-black border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
-                                        placeholder={`name,role,base_price,country,age,serial_number,image,thumb_url\nDhoni,WK-Batsman,20000000,India,42,7,https://example.com/dhoni.jpg,https://example.com/dhoni_thumb.jpg`}
+                                        placeholder={`name,role,base_price,country,age,serial_number,category,image\nDhoni,WK-Batsman,20000000,India,42,7,Diamond,https://example.com/dhoni.jpg`}
                                         value={csvText}
                                         onChange={(e) => setCsvText(e.target.value)}
                                     ></textarea>
@@ -296,6 +302,7 @@ const BulkUploadModal = ({ onClose, onSuccess, auctionId: propAuctionId }) => {
                                             <th className="px-6 py-3">#</th>
                                             <th className="px-6 py-3">Name</th>
                                             <th className="px-6 py-3">Role</th>
+                                            <th className="px-6 py-3">Category</th>
                                             <th className="px-6 py-3">Country</th>
                                             <th className="px-6 py-3">Age</th>
                                             <th className="px-6 py-3">Base Price</th>
@@ -309,6 +316,15 @@ const BulkUploadModal = ({ onClose, onSuccess, auctionId: propAuctionId }) => {
                                                 <td className="px-6 py-4">{index + 1}</td>
                                                 <td className="px-6 py-4 font-medium text-white">{row.name}</td>
                                                 <td className="px-6 py-4">{row.role}</td>
+                                                <td className="px-6 py-4">
+                                                    {row.category ? (
+                                                        <span className="bg-purple-900/60 text-purple-300 px-2 py-0.5 rounded text-xs border border-purple-500/40 font-semibold">
+                                                            {row.category}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-600 text-xs">—</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-6 py-4">{row.country || '-'}</td>
                                                 <td className="px-6 py-4">{row.age || '-'}</td>
                                                 <td className="px-6 py-4">{row.base_price}</td>

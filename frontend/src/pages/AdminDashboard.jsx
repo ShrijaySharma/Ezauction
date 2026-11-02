@@ -6,6 +6,7 @@ import * as adminService from '../services/admin';
 import { getImageUrl } from '../utils/imageUtils';
 import BidNotification from '../components/BidNotification';
 import BulkUploadModal from '../components/BulkUploadModal';
+import CategoryQueueModal from '../components/CategoryQueueModal';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
 import { getSocketUrl, getAuctionApiUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
@@ -46,11 +47,19 @@ function AdminDashboard({ user }) {
     name: '',
     image: '',
     role: 'Batsman',
+    category: '',
     country: '',
     age: '',
     base_price: '',
     serial_number: ''
   });
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [categoryQueue, setCategoryQueue] = useState([]);
+  const [categorySlotIndex, setCategorySlotIndex] = useState(0);
+  const [categorySlotServed, setCategorySlotServed] = useState(0);
+  const [availableCategories, setAvailableCategories] = useState([]);
+  const [categoryCounts, setCategoryCounts] = useState({});
+  const [categoryModeActive, setCategoryModeActive] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -372,6 +381,14 @@ function AdminDashboard({ user }) {
       }
     });
 
+    newSocket.on('category-slot-changed', () => {
+      loadCategoryQueue();
+    });
+
+    newSocket.on('category-queue-updated', () => {
+      loadCategoryQueue();
+    });
+
     newSocket.on('trading-window-update', (data) => {
       if (data) {
         setTradingWindowOpen(data.isOpen);
@@ -404,8 +421,23 @@ function AdminDashboard({ user }) {
       loadAuctionState(),
       loadCurrentBid(),
       loadAllBids(),
-      loadPlayers()
+      loadPlayers(),
+      loadCategoryQueue()
     ]);
+  };
+
+  const loadCategoryQueue = async () => {
+    try {
+      const data = await adminService.getCategoryQueue();
+      setCategoryQueue(data.queue || []);
+      setCategorySlotIndex(data.slotIndex ?? 0);
+      setCategorySlotServed(data.slotServed ?? 0);
+      setAvailableCategories(data.categories || []);
+      setCategoryCounts(data.categoryCounts || {});
+      setCategoryModeActive((data.queue || []).length > 0);
+    } catch (e) {
+      console.error('Error loading category queue:', e);
+    }
   };
 
   const loadAuctionState = async () => {
@@ -885,6 +917,7 @@ function AdminDashboard({ user }) {
       image: '',
       thumb_url: '',
       role: 'Batsman',
+      category: '',
       country: '',
       age: '',
       base_price: '',
@@ -900,6 +933,7 @@ function AdminDashboard({ user }) {
       image: player.image || '',
       thumb_url: player.thumb_url || '',
       role: player.role || 'Batsman',
+      category: player.category || '',
       country: player.country || '',
       age: player.age || '',
       base_price: player.base_price || '',
@@ -999,6 +1033,7 @@ function AdminDashboard({ user }) {
           image: imageUrl || null,
           thumb_url: thumbUrl || null,
           role: playerForm.role,
+          category: playerForm.category ? playerForm.category.trim() : null,
           country: playerForm.country || null,
           age: playerForm.age ? parseInt(playerForm.age) : null,
           base_price: parseFloat(playerForm.base_price),
@@ -1016,6 +1051,7 @@ function AdminDashboard({ user }) {
           image: imageUrl || null,
           thumb_url: thumbUrl || null,
           role: playerForm.role,
+          category: playerForm.category ? playerForm.category.trim() : null,
           country: playerForm.country || null,
           age: playerForm.age ? parseInt(playerForm.age) : null,
           base_price: parseFloat(playerForm.base_price),
@@ -1753,6 +1789,127 @@ function AdminDashboard({ user }) {
               </div>
             </div>
 
+            {/* ── Category-Wise Auction Rounds ── */}
+            <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-4 border border-purple-500/30 shadow-lg shadow-purple-950/20">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-white font-semibold flex items-center gap-2">
+                  <span className="text-xl">🏷️</span>
+                  Category Rounds
+                  {categoryModeActive && (
+                    <span className="text-[10px] font-black bg-purple-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse">
+                      ACTIVE
+                    </span>
+                  )}
+                </h3>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => { loadCategoryQueue(); setShowCategoryModal(true); }}
+                    className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-semibold transition-all shadow-sm"
+                  >
+                    {categoryModeActive ? 'Edit Queue' : 'Set Up Queue'}
+                  </button>
+                  {categoryModeActive && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Clear the category queue? The auction will return to normal random mode.')) return;
+                        await adminService.clearCategoryQueue();
+                        loadCategoryQueue();
+                      }}
+                      className="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded-lg text-xs transition-colors"
+                      title="Clear queue and return to normal mode"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {!categoryModeActive ? (
+                <div className="text-xs text-gray-400 bg-gray-900/60 p-3 rounded-lg border border-gray-800">
+                  <p>No category queue active. Players load in normal mode.</p>
+                  <p className="mt-1 text-purple-300/80">Click <strong>Set Up Queue</strong> to auction Diamond, Gold, Silver players in order.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Status overview */}
+                  <div className="flex items-center justify-between text-xs bg-purple-950/30 border border-purple-500/20 px-3 py-2 rounded-lg">
+                    <div>
+                      <span className="text-gray-400">Current Round: </span>
+                      <strong className="text-purple-300 text-sm">
+                        {categoryQueue[categorySlotIndex]?.category || 'Completed'}
+                      </strong>
+                    </div>
+                    {categoryQueue[categorySlotIndex] && (
+                      <span className="text-gray-400 font-mono text-[11px]">
+                        {categoryQueue[categorySlotIndex].count > 0
+                          ? `Served ${categorySlotServed} of ${categoryQueue[categorySlotIndex].count}`
+                          : `All (${categoryCounts[categoryQueue[categorySlotIndex].category] ?? 0} left)`}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Slot progress bar */}
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                    {categoryQueue.map((slot, idx) => {
+                      const isActive = idx === categorySlotIndex;
+                      const isDone = idx < categorySlotIndex;
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-all ${
+                            isActive
+                              ? 'border-purple-500/70 bg-purple-900/40 text-white font-medium shadow-sm shadow-purple-900/30'
+                              : isDone
+                              ? 'border-gray-800 bg-gray-900/40 text-gray-500 line-through'
+                              : 'border-gray-800 bg-gray-900/60 text-gray-300'
+                          }`}
+                        >
+                          <span className="w-4 text-center font-bold text-gray-500">{idx + 1}</span>
+                          <span className={`font-semibold flex-1 truncate ${isActive ? 'text-purple-200' : ''}`}>
+                            {slot.category}
+                          </span>
+                          <span className="text-[11px] text-gray-400 font-mono">
+                            {slot.count > 0 ? `${slot.count} players` : 'All'}
+                          </span>
+                          {isActive && (
+                            <span className="text-[10px] font-bold text-purple-400 bg-purple-950 px-1.5 py-0.5 rounded border border-purple-500/40 shrink-0">
+                              LIVE
+                            </span>
+                          )}
+                          {isDone && <span className="text-[10px] text-gray-600 shrink-0">✓</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Advance button */}
+                  {categorySlotIndex < categoryQueue.length && (
+                    <button
+                      onClick={async () => {
+                        const currentCat = categoryQueue[categorySlotIndex]?.category;
+                        const nextCat = categoryQueue[categorySlotIndex + 1]?.category;
+                        const msg = nextCat
+                          ? `Advance category from "${currentCat}" to "${nextCat}"?`
+                          : `Advance and finish category queue?`;
+                        if (!confirm(msg)) return;
+                        await adminService.advanceCategory();
+                        loadCategoryQueue();
+                      }}
+                      className="w-full mt-1 px-3 py-2 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white rounded-lg text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
+                    >
+                      <span>→</span>
+                      <span>Advance to Next Category</span>
+                      {categoryQueue[categorySlotIndex + 1] && (
+                        <span className="font-normal opacity-80">
+                          ({categoryQueue[categorySlotIndex + 1].category})
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Sequential Auction Mode compact toggle — always visible */}
             <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-4 border border-gray-700 shadow-lg hover:shadow-xl transition-shadow">
               <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
@@ -2042,6 +2199,24 @@ function AdminDashboard({ user }) {
           />
         )}
 
+        {showCategoryModal && (
+          <CategoryQueueModal
+            queue={categoryQueue}
+            availableCategories={availableCategories}
+            categoryCounts={categoryCounts}
+            onSave={async (newQueue) => {
+              try {
+                await adminService.saveCategoryQueue(newQueue);
+                await loadCategoryQueue();
+                setShowCategoryModal(false);
+              } catch (err) {
+                alert('Error saving queue: ' + (err.response?.data?.error || err.message));
+              }
+            }}
+            onClose={() => setShowCategoryModal(false)}
+          />
+        )}
+
         {/* History Modal */}
         {
           showHistory && (
@@ -2180,6 +2355,19 @@ function AdminDashboard({ user }) {
                         <option value="All-Rounder">All-Rounder</option>
                         <option value="WK">WK (Wicket-Keeper)</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-gray-300 text-sm font-medium mb-2">
+                        Category <span className="text-gray-400 text-xs font-normal">(optional — e.g. Diamond, Gold, Silver)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={playerForm.category || ''}
+                        onChange={(e) => setPlayerForm({ ...playerForm, category: e.target.value })}
+                        className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                        placeholder="e.g. Diamond, Gold, Silver (leave blank to skip)"
+                      />
+                      <p className="text-gray-400 text-xs mt-1">Used for category-wise rounds. Leave blank if not using categories.</p>
                     </div>
                     <div>
                       <label className="block text-gray-300 text-sm font-medium mb-2">Age</label>

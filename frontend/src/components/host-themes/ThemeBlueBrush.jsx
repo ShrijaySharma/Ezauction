@@ -55,7 +55,20 @@ export default function ThemeBlueBrush({
               </span>
             </div>
 
-            <div className="flex flex-col items-center gap-3 mt-4 w-full">
+            {/* Category badge — only if player has category */}
+            {currentPlayer?.category && (
+              <div className="mt-2 flex justify-center">
+                <span className="inline-flex items-center gap-1.5 bg-[#0047CC]/10 text-[#0047CC] border border-[#0047CC]/30 text-xs md:text-sm font-black uppercase tracking-[0.2em] px-4 py-1 rounded-full shadow-[0_2px_12px_rgba(0,71,204,0.15)]">
+                  <span className="text-[10px] opacity-75">🏷️</span>
+                  <span>{currentPlayer.category}</span>
+                </span>
+              </div>
+            )}
+
+            {/* Elegant divider */}
+            <div className="w-32 h-[1px] my-1 opacity-25" style={{ background: 'linear-gradient(90deg, transparent, #0047CC, transparent)' }} />
+
+            <div className="flex flex-col items-center gap-3 mt-2 w-full">
               <div className="flex flex-col items-center">
                 <span className="text-slate-600 text-xs font-black uppercase tracking-[0.25em]">AGE</span>
                 <div className="text-[#061E4E] font-black text-2xl md:text-3xl leading-none mt-0.5">
@@ -72,24 +85,28 @@ export default function ThemeBlueBrush({
           </div>
         </div>
 
-        {/* CENTER: Player Image (shifted left a bit) */}
+        {/* CENTER: Player Image with Stage-Lit Radial Spotlight */}
         <div className="flex-1 relative flex items-center justify-center -translate-x-6 md:-translate-x-10 lg:-translate-x-12 p-3 md:p-5 overflow-hidden">
+          {/* Ambient subtle royal blue stage aura behind player */}
+          <div className="absolute w-[500px] h-[500px] rounded-full blur-[100px] pointer-events-none opacity-20"
+            style={{ background: 'radial-gradient(circle, #0047CC 0%, #60A5FA 50%, transparent 70%)' }}
+          />
           {currentPlayer?.image ? (
             <img
               src={getImageUrl(currentPlayer.image)}
               alt={currentPlayer.name}
               onClick={() => setPreviewImage?.(getImageUrl(currentPlayer.image))}
-              className="cursor-pointer max-h-[92vh] w-auto max-w-full object-contain rounded-2xl md:rounded-3xl shadow-[0_15px_50px_rgba(0,0,0,0.25)] border border-[#0047CC]/25 transition-transform duration-200 hover:scale-[1.01]"
+              className="relative z-10 cursor-pointer max-h-[92vh] w-auto max-w-full object-contain rounded-2xl md:rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.28)] border border-[#0047CC]/30 transition-transform duration-200 hover:scale-[1.01]"
               onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }}
             />
           ) : (
-            <div className="text-9xl opacity-20">🏏</div>
+            <div className="relative z-10 text-9xl opacity-20">🏏</div>
           )}
         </div>
 
         {/* RIGHT: High-Contrast Bid Section in Crisp Card */}
         <div className="flex flex-col justify-center items-center px-6 lg:px-8 py-8 relative z-20" style={{ width: '28%' }}>
-          <div className="w-full bg-white/95 border-2 border-[#0047CC]/25 rounded-3xl p-6 md:p-8 backdrop-blur-md shadow-[0_12px_40px_rgba(0,71,204,0.12)] flex flex-col items-center gap-2 text-center">
+          <div className="w-full bg-white/95 border-2 border-[#0047CC]/30 rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,71,204,0.18)] flex flex-col items-center gap-2 text-center">
             <span className="text-[#0047CC] text-xs md:text-sm font-black uppercase tracking-[0.3em]">
               CURRENT BID
             </span>
