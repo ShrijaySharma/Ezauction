@@ -18,3 +18,4 @@ ALTER TABLE public.auction_state
 
 ALTER TABLE public.auction_state
   ADD COLUMN IF NOT EXISTS category_slot_served integer DEFAULT 0;
+
