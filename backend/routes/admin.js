@@ -1026,11 +1026,13 @@ router.post('/mark-player', async (req, res) => {
       // ── Category Queue logic ──────────────────────────────────────────────
       let categoryFilter = null;
       let activeCategory = null;
+      let activeSlotIndex = 0;
+      let slotServed = 0;
       const categoryQueue = currentState?.category_queue;
 
       if (categoryQueue && Array.isArray(categoryQueue) && categoryQueue.length > 0) {
-        let activeSlotIndex = currentState?.category_slot_index ?? 0;
-        let slotServed = currentState?.category_slot_served ?? 0;
+        activeSlotIndex = currentState?.category_slot_index ?? 0;
+        slotServed = currentState?.category_slot_served ?? 0;
         let slotAdvanced = false;
 
         while (activeSlotIndex < categoryQueue.length) {
@@ -1105,10 +1107,15 @@ router.post('/mark-player', async (req, res) => {
 
         // If category mode is active, increment served counter
         if (categoryFilter) {
-          const currentServed = currentState?.category_slot_served ?? 0;
+          const newServed = slotServed + 1;
           await updateCategoryQueueData(auctionId, {
-            slotIndex: currentState?.category_slot_index ?? 0,
-            slotServed: currentServed + 1
+            slotIndex: activeSlotIndex,
+            slotServed: newServed
+          });
+          io.emit('category-slot-changed', {
+            slotIndex: activeSlotIndex,
+            category: activeCategory,
+            slotServed: newServed
           });
         }
 
