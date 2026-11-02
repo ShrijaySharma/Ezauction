@@ -13,7 +13,7 @@ import AdmZip from 'adm-zip';
 import multer from 'multer';
 import SQLite3 from 'sqlite3';
 import * as XLSX from 'xlsx';
-import { refreshAuctionState, getAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState, getAdminAnonymousBid, setAdminAnonymousBid, clearAdminAnonymousBid } from '../auctionState.js';
+import { refreshAuctionState, getAuctionState, hasAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState, getAdminAnonymousBid, setAdminAnonymousBid, clearAdminAnonymousBid } from '../auctionState.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -90,12 +90,10 @@ function pickNextPlayer(pendingPlayers, state, categoryFilter = null) {
 router.get('/auction-state', async (req, res) => {
   try {
     const auctionId = getAuctionId(req);
-    let state = getAuctionState(auctionId);
-
-    if (!state) {
+    if (!hasAuctionState(auctionId)) {
       await refreshAuctionState(auctionId);
-      state = getAuctionState(auctionId);
     }
+    const state = getAuctionState(auctionId);
 
     if (!state) {
       res.json({
@@ -555,6 +553,9 @@ router.post('/load-player', async (req, res) => {
 router.get('/current-bid', async (req, res) => {
   try {
     const auctionId = getAuctionId(req);
+    if (!hasAuctionState(auctionId)) {
+      await refreshAuctionState(auctionId);
+    }
     const state = getAuctionState(auctionId);
 
     if (!state || !state.current_player_id) {

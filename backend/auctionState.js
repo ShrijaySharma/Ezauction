@@ -47,6 +47,7 @@ export async function refreshAuctionState(auctionId) {
             let categoryQueue = data.category_queue ?? null;
             let slotIndex = data.category_slot_index ?? 0;
             let slotServed = data.category_slot_served ?? 0;
+            let bCfg = {};
 
             try {
                 const { data: aData } = await supabase
@@ -54,7 +55,7 @@ export async function refreshAuctionState(auctionId) {
                     .select('broadcast_config')
                     .eq('id', auctionId)
                     .maybeSingle();
-                const bCfg = aData?.broadcast_config || {};
+                bCfg = aData?.broadcast_config || {};
                 if (bCfg.category_queue !== undefined) categoryQueue = bCfg.category_queue;
                 if (bCfg.category_slot_index !== undefined) slotIndex = bCfg.category_slot_index;
                 if (bCfg.category_slot_served !== undefined) slotServed = bCfg.category_slot_served;
@@ -112,6 +113,13 @@ export async function refreshAllAuctionStates() {
     } catch (err) {
         console.error('[Cache] Error in refreshAllAuctionStates:', err);
     }
+}
+
+/**
+ * Returns whether cached auction state exists for a specific auction.
+ */
+export function hasAuctionState(auctionId) {
+    return auctionStateCaches.has(auctionId);
 }
 
 /**

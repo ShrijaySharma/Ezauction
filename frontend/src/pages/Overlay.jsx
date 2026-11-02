@@ -14,7 +14,7 @@ function getOverlayTokens(themeKey) {
     switch (themeKey) {
         case 'navy_gold': return { bg: 'rgba(7,22,48,0.9)', accent: '#C9A84C', text: '#FFFFFF', dim: 'rgba(255,255,255,0.55)', barBg: 'rgba(13,27,62,0.95)' };
         case 'blue_brush': return { bg: 'rgba(0,30,100,0.9)', accent: '#4D9FFF', text: '#FFFFFF', dim: 'rgba(255,255,255,0.6)', barBg: 'rgba(0,47,150,0.95)' };
-        case 'dark_teal':  return { bg: 'rgba(4,14,16,0.92)', accent: '#0CCFBE', text: '#FFFFFF', dim: 'rgba(255,255,255,0.5)', barBg: 'rgba(6,26,30,0.95)' };
+        case 'dark_teal': return { bg: 'rgba(4,14,16,0.92)', accent: '#0CCFBE', text: '#FFFFFF', dim: 'rgba(255,255,255,0.5)', barBg: 'rgba(6,26,30,0.95)' };
         default: /* black_gold */ return { bg: 'rgba(10,10,10,0.92)', accent: '#D4AF37', text: '#FFFFFF', dim: 'rgba(255,255,255,0.5)', barBg: 'rgba(20,18,10,0.95)' };
     }
 }
@@ -407,7 +407,7 @@ function Overlay() {
                 if (Array.isArray(players)) {
                     players.forEach(p => {
                         if (p.thumb_url) { const img = new Image(); img.src = getImageUrl(p.thumb_url); }
-                        if (p.image)     { const img = new Image(); img.src = getImageUrl(p.image); }
+                        if (p.image) { const img = new Image(); img.src = getImageUrl(p.image); }
                     });
                 }
             } catch (e) {
@@ -422,7 +422,7 @@ function Overlay() {
         getPublicBroadcastConfig().then(cfg => {
             if (cfg && cfg.theme) setThemeKey(cfg.theme);
             if (cfg && cfg.hostDisplayMode) setDisplayMode(cfg.hostDisplayMode);
-        }).catch(() => {});
+        }).catch(() => { });
     }, [auctionId]);
 
     // ── Fetch team purses ─────────────────────────────────────────────────────
