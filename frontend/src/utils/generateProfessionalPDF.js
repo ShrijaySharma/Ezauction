@@ -309,17 +309,17 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
       border-radius:10px; overflow:hidden;
       background:#161628;
       border:1px solid rgba(212,175,55,0.25);
-      display:flex; flex-direction:column;
+      display:block;
       box-shadow:0 6px 18px rgba(0,0,0,0.6);
-      width:100%;
+      width:100%; box-sizing:border-box;
     `;
 
     // Photo container with CSS background-image (preserves true aspect ratio in html2canvas without squashing)
     const photoDiv = document.createElement('div');
     if (player._imgBase64) {
       photoDiv.style.cssText = `
-        width:100%; height:160px; overflow:hidden;
-        background-color:#0F0F1D; position:relative; flex-shrink:0;
+        width:100%; height:155px; overflow:hidden;
+        background-color:#0F0F1D; position:relative; display:block;
         background-image:url("${player._imgBase64}");
         background-size:cover;
         background-position:top center;
@@ -328,8 +328,8 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     } else {
       const bg = initialsColor(player.name);
       photoDiv.style.cssText = `
-        width:100%; height:160px; overflow:hidden;
-        background:${bg}; position:relative; flex-shrink:0;
+        width:100%; height:155px; overflow:hidden;
+        background:${bg}; position:relative;
         display:flex; align-items:center; justify-content:center;
       `;
       const initText = document.createElement('div');
@@ -339,64 +339,66 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     }
     card.appendChild(photoDiv);
 
-    // Dedicated Name Box (Accommodates 1, 2, and 3-word names with zero bottom cutting)
-    const nameBox = document.createElement('div');
-    nameBox.style.cssText = `
-      width:100%; min-height:36px; height:36px;
-      display:flex; align-items:center; justify-content:center;
-      padding:2px 6px; box-sizing:border-box; background:#141426;
-      overflow:hidden;
+    // Info Container (Single block flow container, guaranteed zero overlap)
+    const infoContainer = document.createElement('div');
+    infoContainer.style.cssText = `
+      width:100%; background:#141426;
+      padding:8px 6px 12px 6px; box-sizing:border-box;
+      text-align:center; display:block;
     `;
+
     const pName = (player.name || 'Player').trim();
-    const isLongName = pName.length > 14 || pName.split(/\s+/).length >= 3;
-    const nameText = document.createElement('div');
+    const isLongName = pName.length > 13 || pName.split(/\s+/).length >= 3;
+
+    // Table-based vertical centering for Name (CSS 2.1, 100% stable in html2canvas, never cuts letters)
+    const nameTable = document.createElement('div');
+    nameTable.style.cssText = `
+      display:table; width:100%; height:34px; min-height:34px;
+      margin:0 0 8px 0; box-sizing:border-box;
+    `;
+
+    const nameCell = document.createElement('div');
+    nameCell.style.cssText = `
+      display:table-cell; vertical-align:middle; text-align:center;
+      padding:0 2px; box-sizing:border-box;
+    `;
+
+    const nameText = document.createElement('span');
     nameText.textContent = pName;
     nameText.style.cssText = `
       color:#FFFFFF;
-      font-size:${isLongName ? '10.5px' : '12px'};
+      font-size:${isLongName ? '11px' : '12px'};
       font-weight:800;
-      letter-spacing:0.2px;
-      line-height:1.2;
+      letter-spacing:0.25px;
+      line-height:15px;
       display:block;
       text-align:center;
       word-break:break-word;
-      max-width:100%;
       font-family:${FONT_STACK};
-      box-sizing:border-box;
+      overflow:visible;
     `;
-    nameBox.appendChild(nameText);
-    card.appendChild(nameBox);
+    nameCell.appendChild(nameText);
+    nameTable.appendChild(nameCell);
+    infoContainer.appendChild(nameTable);
 
-    // Dedicated Role Box (Separated cleanly below name with ample spacing)
-    const roleBox = document.createElement('div');
-    roleBox.style.cssText = `
-      width:100%; height:32px;
-      display:flex; align-items:center; justify-content:center;
-      padding:0 6px 8px 6px; box-sizing:border-box; background:#141426;
-    `;
-
+    // Dedicated Role Pill (inline-block with exact matching line-height, text never slides down)
     const role = (player.role || 'PLAYER').toUpperCase();
     const rc = roleColor(role);
 
     const rolePill = document.createElement('div');
+    rolePill.textContent = role;
     rolePill.style.cssText = `
-      display:inline-flex; align-items:center; justify-content:center;
-      height:22px; padding:0 12px; border-radius:11px;
+      display:inline-block; height:22px; line-height:20px;
+      padding:0 12px; border-radius:11px;
       background:${rc.bg}; border:1px solid ${rc.border};
-      box-sizing:border-box; overflow:hidden; flex-shrink:0;
-    `;
-
-    const roleText = document.createElement('span');
-    roleText.textContent = role;
-    roleText.style.cssText = `
       color:${rc.text}; font-size:9.5px; font-weight:800;
-      letter-spacing:0.6px; line-height:1; display:block;
-      text-transform:uppercase; font-family:${FONT_STACK};
-      white-space:nowrap; text-align:center;
+      letter-spacing:0.6px; text-transform:uppercase;
+      font-family:${FONT_STACK}; text-align:center;
+      vertical-align:middle; box-sizing:border-box;
+      white-space:nowrap;
     `;
-    rolePill.appendChild(roleText);
-    roleBox.appendChild(rolePill);
-    card.appendChild(roleBox);
+    infoContainer.appendChild(rolePill);
+    card.appendChild(infoContainer);
 
     grid.appendChild(card);
   });
@@ -406,7 +408,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
   if (remainder !== 0) {
     for (let i = 0; i < 4 - remainder; i++) {
       const ph = document.createElement('div');
-      ph.style.cssText = `border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); min-height:228px;`;
+      ph.style.cssText = `border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); min-height:235px;`;
       grid.appendChild(ph);
     }
   }

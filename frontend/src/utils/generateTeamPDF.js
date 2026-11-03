@@ -419,24 +419,22 @@ function buildCoverPage(tk, tournamentName, teams, logoBase64) {
     `, tName));
 
     const right = createEl('div', `
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
+      display: inline-block;
+      text-align: center;
+      vertical-align: middle;
       background: ${tk.accentDim};
       height: 24px;
+      line-height: 22px;
       padding: 0 12px;
       border-radius: 12px;
       border: 1px solid ${tk.cardBorder};
       box-sizing: border-box;
-      line-height: 1;
-    `);
-    right.appendChild(createEl('span', `
       font-size: 11px;
       font-weight: 800;
       color: ${tk.accent};
-      line-height: 14px;
-    `, `${count} Player${count !== 1 ? 's' : ''}`));
+      font-family: ${FONT_STACK};
+      white-space: nowrap;
+    `, `${count} Player${count !== 1 ? 's' : ''}`);
 
     row.appendChild(left);
     row.appendChild(right);
@@ -555,20 +553,22 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
   `, teamName));
 
   const subRow = createEl('div', `display: flex; align-items: center; gap: 10px; margin-top: 4px;`);
-  subRow.appendChild(createEl('span', `
+  subRow.appendChild(createEl('div', `
+    display: inline-block;
     background: ${tk.accentDim};
     color: ${tk.accent};
     border: 1px solid ${tk.cardBorder};
     height: 22px;
+    line-height: 20px;
     padding: 0 12px;
     border-radius: 11px;
     font-size: 11px;
     font-weight: 800;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    text-align: center;
+    vertical-align: middle;
     box-sizing: border-box;
-    line-height: 1;
+    white-space: nowrap;
+    font-family: ${FONT_STACK};
   `, `${players.length} PLAYER${players.length !== 1 ? 'S' : ''}`));
 
   subRow.appendChild(createEl('span', `
@@ -736,34 +736,27 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
     // Role Badge (Guaranteed to stay strictly centered inside colored box)
     const roleCell = createEl('div', `
       width: 160px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      text-align: center;
       box-sizing: border-box;
     `);
     const roleBadge = createEl('div', `
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 24px;
-      padding: 0 14px;
-      border-radius: 12px;
+      display: inline-block;
+      height: 22px;
+      line-height: 20px;
+      padding: 0 12px;
+      border-radius: 11px;
       background: ${roleMeta.bg};
       border: 1px solid ${roleMeta.border};
-      box-sizing: border-box;
-      overflow: hidden;
-    `);
-    const roleSpan = createEl('span', `
       color: ${roleMeta.text};
       font-size: 10px;
       font-weight: 800;
       letter-spacing: 0.6px;
-      line-height: 1;
-      display: block;
-      white-space: nowrap;
       text-align: center;
+      vertical-align: middle;
+      box-sizing: border-box;
+      white-space: nowrap;
+      font-family: ${FONT_STACK};
     `, roleMeta.label);
-    roleBadge.appendChild(roleSpan);
     roleCell.appendChild(roleBadge);
     row.appendChild(roleCell);
 
