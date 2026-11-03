@@ -339,53 +339,49 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     }
     card.appendChild(photoDiv);
 
-    // Player Name
-    const nameDiv = document.createElement('div');
-    nameDiv.style.cssText = `
-      padding:8px 6px 3px 6px; text-align:center; box-sizing:border-box;
+    // Dedicated Name Box
+    const nameBox = document.createElement('div');
+    nameBox.style.cssText = `
+      width:100%; height:30px;
       display:flex; align-items:center; justify-content:center;
-      background:#161628;
+      padding:4px 8px 0 8px; box-sizing:border-box; background:#141426;
     `;
-    const nameText = document.createElement('span');
+    const nameText = document.createElement('div');
     nameText.textContent = player.name || 'Player';
     nameText.style.cssText = `
-      color:#FFFFFF; font-size:11.5px; font-weight:800;
-      letter-spacing:0.3px; line-height:1.2; display:block;
-      overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
-      max-width:100%; font-family:${FONT_STACK};
+      color:#FFFFFF; font-size:12.5px; font-weight:800;
+      letter-spacing:0.3px; line-height:18px; height:18px;
+      display:block; text-align:center; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; width:100%;
+      font-family:${FONT_STACK}; box-sizing:border-box;
     `;
-    nameDiv.appendChild(nameText);
-    card.appendChild(nameDiv);
+    nameBox.appendChild(nameText);
+    card.appendChild(nameBox);
 
-    // Role badge (Guaranteed never to leave its colored pill box)
+    // Dedicated Role Box (Separated cleanly below name with ample spacing)
+    const roleBox = document.createElement('div');
+    roleBox.style.cssText = `
+      width:100%; height:34px;
+      display:flex; align-items:center; justify-content:center;
+      padding:2px 8px 8px 8px; box-sizing:border-box; background:#141426;
+    `;
+
     const role = (player.role || 'PLAYER').toUpperCase();
     const rc = roleColor(role);
 
-    const roleDiv = document.createElement('div');
-    roleDiv.style.cssText = `
-      padding:2px 6px 9px 6px; display:flex; justify-content:center; align-items:center;
-      box-sizing:border-box; background:#161628;
-    `;
-
     const rolePill = document.createElement('div');
     rolePill.style.cssText = `
-      display:flex; align-items:center; justify-content:center;
-      height:20px; padding:0 10px; border-radius:10px;
+      display:block; height:20px; line-height:18px;
+      padding:0 12px; border-radius:10px;
       background:${rc.bg}; border:1px solid ${rc.border};
+      color:${rc.text}; font-size:9.5px; font-weight:800;
+      letter-spacing:0.6px; text-transform:uppercase;
+      font-family:${FONT_STACK}; white-space:nowrap; text-align:center;
       box-sizing:border-box; overflow:hidden;
     `;
-
-    const roleText = document.createElement('span');
-    roleText.textContent = role;
-    roleText.style.cssText = `
-      color:${rc.text}; font-size:9px; font-weight:800;
-      letter-spacing:0.6px; line-height:1; display:block;
-      text-transform:uppercase; font-family:${FONT_STACK};
-      white-space:nowrap;
-    `;
-    rolePill.appendChild(roleText);
-    roleDiv.appendChild(rolePill);
-    card.appendChild(roleDiv);
+    rolePill.textContent = role;
+    roleBox.appendChild(rolePill);
+    card.appendChild(roleBox);
 
     grid.appendChild(card);
   });
