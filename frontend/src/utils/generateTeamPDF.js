@@ -148,7 +148,7 @@ async function toBase64(url) {
 // Fixed A4 dimensions at standard 96 DPI
 const A4_W = 794;
 const A4_H = 1123;
-const FONT_STACK = '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+const FONT_STACK = 'Arial, Helvetica, sans-serif';
 
 // ─── Node Builder Helpers ────────────────────────────────────────────────────
 function createEl(tag, styles, content) {
@@ -242,12 +242,15 @@ function buildCoverPage(tk, tournamentName, teams, logoBase64) {
   const liveBadge = createEl('div', `
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     background: ${tk.accentDim};
     border: 1px solid ${tk.headerBorder};
-    border-radius: 20px;
-    padding: 4px 14px;
+    border-radius: 14px;
+    height: 26px;
+    padding: 0 14px;
     margin-top: 8px;
+    box-sizing: border-box;
   `);
   liveBadge.appendChild(createEl('span', `
     width: 7px;
@@ -418,11 +421,15 @@ function buildCoverPage(tk, tournamentName, teams, logoBase64) {
     const right = createEl('div', `
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
       background: ${tk.accentDim};
-      padding: 3px 10px;
+      height: 24px;
+      padding: 0 12px;
       border-radius: 12px;
       border: 1px solid ${tk.cardBorder};
+      box-sizing: border-box;
+      line-height: 1;
     `);
     right.appendChild(createEl('span', `
       font-size: 11px;
@@ -552,11 +559,16 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
     background: ${tk.accentDim};
     color: ${tk.accent};
     border: 1px solid ${tk.cardBorder};
-    padding: 2px 10px;
-    border-radius: 10px;
+    height: 22px;
+    padding: 0 12px;
+    border-radius: 11px;
     font-size: 11px;
     font-weight: 800;
-    line-height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    line-height: 1;
   `, `${players.length} PLAYER${players.length !== 1 ? 'S' : ''}`));
 
   subRow.appendChild(createEl('span', `
@@ -721,7 +733,7 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
     `, player.name || 'Unnamed Player'));
     row.appendChild(nameCell);
 
-    // Role Badge (Crisp, perfectly centered, no clipping)
+    // Role Badge (Guaranteed to stay strictly centered inside colored box)
     const roleCell = createEl('div', `
       width: 160px;
       display: flex;
@@ -729,22 +741,30 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
       align-items: center;
       box-sizing: border-box;
     `);
-    roleCell.appendChild(createEl('div', `
+    const roleBadge = createEl('div', `
       display: flex;
       align-items: center;
       justify-content: center;
       height: 24px;
-      padding: 0 12px;
+      padding: 0 14px;
       border-radius: 12px;
       background: ${roleMeta.bg};
       border: 1px solid ${roleMeta.border};
+      box-sizing: border-box;
+      overflow: hidden;
+    `);
+    const roleSpan = createEl('span', `
       color: ${roleMeta.text};
       font-size: 10px;
       font-weight: 800;
-      line-height: 22px;
-      box-sizing: border-box;
+      letter-spacing: 0.6px;
+      line-height: 1;
+      display: block;
+      white-space: nowrap;
       text-align: center;
-    `, roleMeta.label));
+    `, roleMeta.label);
+    roleBadge.appendChild(roleSpan);
+    roleCell.appendChild(roleBadge);
     row.appendChild(roleCell);
 
     // Age Cell
