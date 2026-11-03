@@ -290,79 +290,66 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
 
   wrap.appendChild(header);
 
-  // ── 2. PLAYER GRID (Smaller cards, elegant breathing space, 4 columns) ──
+  // ── 2. PLAYER GRID (Smaller cards, elegant breathing space, un-distorted photos) ──
   const gridWrap = document.createElement('div');
   gridWrap.style.cssText = `
     flex:1; display:flex; flex-direction:column; justify-content:center;
-    padding:20px 48px; box-sizing:border-box; position:relative; z-index:1;
+    padding:32px 48px; box-sizing:border-box; position:relative; z-index:1;
   `;
 
   const grid = document.createElement('div');
   grid.style.cssText = `
-    display:grid; grid-template-columns:repeat(4, 1fr); gap:16px;
-    width:100%; max-width:744px; margin:0 auto;
+    display:grid; grid-template-columns:repeat(4, 1fr); gap:24px 18px;
+    width:100%; max-width:670px; margin:0 auto;
   `;
 
   players.forEach(player => {
     const card = document.createElement('div');
     card.style.cssText = `
-      border-radius:12px; overflow:hidden;
+      border-radius:10px; overflow:hidden;
       background:#161628;
       border:1px solid rgba(212,175,55,0.25);
       display:flex; flex-direction:column;
-      box-shadow:0 6px 20px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
+      box-shadow:0 6px 18px rgba(0,0,0,0.6);
+      width:100%;
     `;
 
-    // Photo container
+    // Photo container with CSS background-image (preserves true aspect ratio in html2canvas without squashing)
     const photoDiv = document.createElement('div');
-    photoDiv.style.cssText = `
-      width:100%; height:145px; overflow:hidden;
-      background:#0F0F1D; position:relative; flex-shrink:0;
-    `;
-
     if (player._imgBase64) {
-      const img = document.createElement('img');
-      img.src = player._imgBase64;
-      img.style.cssText = `
-        width:100%; height:100%; object-fit:cover; object-position:top center;
-        display:block;
+      photoDiv.style.cssText = `
+        width:100%; height:160px; overflow:hidden;
+        background-color:#0F0F1D; position:relative; flex-shrink:0;
+        background-image:url("${player._imgBase64}");
+        background-size:cover;
+        background-position:top center;
+        background-repeat:no-repeat;
       `;
-      photoDiv.appendChild(img);
     } else {
-      // Initials fallback
-      const initDiv = document.createElement('div');
       const bg = initialsColor(player.name);
-      initDiv.style.cssText = `
-        width:100%; height:100%; display:flex; align-items:center; justify-content:center;
-        background:${bg};
+      photoDiv.style.cssText = `
+        width:100%; height:160px; overflow:hidden;
+        background:${bg}; position:relative; flex-shrink:0;
+        display:flex; align-items:center; justify-content:center;
       `;
       const initText = document.createElement('div');
       initText.textContent = getInitials(player.name);
-      initText.style.cssText = `font-size:44px; font-weight:900; color:rgba(255,255,255,0.7); font-family:${FONT_STACK};`;
-      initDiv.appendChild(initText);
-      photoDiv.appendChild(initDiv);
+      initText.style.cssText = `font-size:42px; font-weight:900; color:rgba(255,255,255,0.7); font-family:${FONT_STACK};`;
+      photoDiv.appendChild(initText);
     }
-
-    // Gradient fade at bottom of photo
-    const photoFade = document.createElement('div');
-    photoFade.style.cssText = `
-      position:absolute; bottom:0; left:0; right:0; height:36px;
-      background:linear-gradient(transparent, #161628);
-      pointer-events:none;
-    `;
-    photoDiv.appendChild(photoFade);
     card.appendChild(photoDiv);
 
     // Player Name
     const nameDiv = document.createElement('div');
     nameDiv.style.cssText = `
-      padding:7px 8px 3px 8px; text-align:center; box-sizing:border-box;
+      padding:8px 6px 3px 6px; text-align:center; box-sizing:border-box;
       display:flex; align-items:center; justify-content:center;
+      background:#161628;
     `;
     const nameText = document.createElement('span');
     nameText.textContent = player.name || 'Player';
     nameText.style.cssText = `
-      color:#FFFFFF; font-size:12px; font-weight:800;
+      color:#FFFFFF; font-size:11.5px; font-weight:800;
       letter-spacing:0.3px; line-height:1.2; display:block;
       overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
       max-width:100%; font-family:${FONT_STACK};
@@ -376,13 +363,14 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
 
     const roleDiv = document.createElement('div');
     roleDiv.style.cssText = `
-      padding:2px 8px 10px 8px; display:flex; justify-content:center; align-items:center; box-sizing:border-box;
+      padding:2px 6px 9px 6px; display:flex; justify-content:center; align-items:center;
+      box-sizing:border-box; background:#161628;
     `;
 
     const rolePill = document.createElement('div');
     rolePill.style.cssText = `
       display:flex; align-items:center; justify-content:center;
-      height:22px; padding:0 12px; border-radius:11px;
+      height:20px; padding:0 10px; border-radius:10px;
       background:${rc.bg}; border:1px solid ${rc.border};
       box-sizing:border-box; overflow:hidden;
     `;
@@ -390,8 +378,8 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     const roleText = document.createElement('span');
     roleText.textContent = role;
     roleText.style.cssText = `
-      color:${rc.text}; font-size:9.5px; font-weight:800;
-      letter-spacing:0.8px; line-height:1; display:block;
+      color:${rc.text}; font-size:9px; font-weight:800;
+      letter-spacing:0.6px; line-height:1; display:block;
       text-transform:uppercase; font-family:${FONT_STACK};
       white-space:nowrap;
     `;
@@ -407,7 +395,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
   if (remainder !== 0) {
     for (let i = 0; i < 4 - remainder; i++) {
       const ph = document.createElement('div');
-      ph.style.cssText = `border-radius:12px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); min-height:180px;`;
+      ph.style.cssText = `border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); min-height:215px;`;
       grid.appendChild(ph);
     }
   }
