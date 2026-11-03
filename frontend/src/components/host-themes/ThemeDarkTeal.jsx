@@ -19,11 +19,12 @@ export default function ThemeDarkTeal({
 
       {/* ── BG ── */}
       <div className="absolute inset-0 pointer-events-none">
-        <img src="/stadium_img.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover opacity-[0.22]" />
-        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(6,26,30,0.4) 0%, #040E10 80%)' }} />
-        <div className="absolute -top-16 -left-16 w-[45vw] h-[45vw] rounded-full blur-[100px] opacity-25" style={{ background: 'radial-gradient(circle, #0CCFBE 0%, transparent 60%)' }} />
-        <div className="absolute -top-16 right-0 w-[40vw] h-[40vw] rounded-full blur-[100px] opacity-18" style={{ background: 'radial-gradient(circle, #0CCFBE 0%, transparent 60%)' }} />
-        <div className="absolute bottom-0 inset-x-0 h-32 blur-[40px] opacity-15" style={{ background: 'linear-gradient(to top, #057A5B 0%, transparent 100%)' }} />
+        <img src="/stadium_img.webp" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover opacity-[0.52]" />
+        {/* Reduced overlay opacity so stadium shows through strongly */}
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(4,14,16,0.25) 0%, rgba(4,14,16,0.55) 80%)' }} />
+        <div className="absolute -top-16 -left-16 w-[45vw] h-[45vw] rounded-full blur-[100px] opacity-15" style={{ background: 'radial-gradient(circle, #0CCFBE 0%, transparent 60%)' }} />
+        <div className="absolute -top-16 right-0 w-[40vw] h-[40vw] rounded-full blur-[100px] opacity-12" style={{ background: 'radial-gradient(circle, #0CCFBE 0%, transparent 60%)' }} />
+        <div className="absolute bottom-0 inset-x-0 h-32 blur-[40px] opacity-10" style={{ background: 'linear-gradient(to top, #057A5B 0%, transparent 100%)' }} />
       </div>
 
       {/* ── MAIN CONTENT ── */}

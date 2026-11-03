@@ -88,6 +88,26 @@ const THEMES = {
     isLight: false,
     name: 'Dark Teal',
   },
+  midnight_yellow: {
+    bg: '#001b2b',
+    pageGradient: 'radial-gradient(circle at 50% 0%, #003657 0%, #002439 50%, #00121d 100%)',
+    headerBg: 'linear-gradient(135deg, rgba(0,36,57,0.9) 0%, rgba(0,27,43,0.95) 100%)',
+    headerBorder: 'rgba(250,227,0,0.35)',
+    cardBg: 'rgba(0,29,46,0.85)',
+    cardBorder: 'rgba(250,227,0,0.22)',
+    accent: '#FAE300',
+    accentLight: '#FFFF80',
+    accentDim: 'rgba(250,227,0,0.14)',
+    accentGlow: 'rgba(250,227,0,0.25)',
+    textPrimary: '#FFFFFF',
+    textSecondary: 'rgba(240,245,255,0.7)',
+    textMuted: 'rgba(240,245,255,0.35)',
+    rowEven: 'rgba(250,227,0,0.04)',
+    rowBorder: 'rgba(250,227,0,0.12)',
+    tableHeaderBg: 'rgba(0,30,48,0.9)',
+    isLight: false,
+    name: 'Midnight Yellow',
+  },
 };
 
 const ROLE_BADGES = {
@@ -128,7 +148,7 @@ async function toBase64(url) {
 // Fixed A4 dimensions at standard 96 DPI
 const A4_W = 794;
 const A4_H = 1123;
-const FONT_STACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+const FONT_STACK = '"Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
 // ─── Node Builder Helpers ────────────────────────────────────────────────────
 function createEl(tag, styles, content) {
@@ -686,61 +706,73 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
       flex: 1;
       padding-left: 14px;
       display: flex;
-      flex-direction: column;
-      justify-content: center;
+      align-items: center;
+      box-sizing: border-box;
+      min-width: 0;
     `);
     nameCell.appendChild(createEl('div', `
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 800;
       color: ${tk.textPrimary};
-      line-height: 20px;
-      letter-spacing: -0.1px;
+      line-height: 18px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     `, player.name || 'Unnamed Player'));
     row.appendChild(nameCell);
 
-    // Role Badge (Crisp & no clipping)
+    // Role Badge (Crisp, perfectly centered, no clipping)
     const roleCell = createEl('div', `
       width: 160px;
       display: flex;
       justify-content: center;
       align-items: center;
+      box-sizing: border-box;
     `);
     roleCell.appendChild(createEl('div', `
-      display: inline-flex;
+      display: flex;
       align-items: center;
       justify-content: center;
-      padding: 4px 12px;
-      border-radius: 999px;
+      height: 24px;
+      padding: 0 12px;
+      border-radius: 12px;
       background: ${roleMeta.bg};
       border: 1px solid ${roleMeta.border};
       color: ${roleMeta.text};
       font-size: 10px;
       font-weight: 800;
-      line-height: 16px;
-      letter-spacing: 0.6px;
+      line-height: 22px;
+      box-sizing: border-box;
+      text-align: center;
     `, roleMeta.label));
     row.appendChild(roleCell);
 
     // Age Cell
     row.appendChild(createEl('div', `
       width: 54px;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-size: 13px;
       font-weight: 700;
       color: ${tk.textSecondary};
       line-height: 18px;
+      box-sizing: border-box;
     `, player.age ? String(player.age) : '—'));
 
     // Price Cell (optional)
     if (includeBidPrice) {
       row.appendChild(createEl('div', `
         width: 120px;
-        text-align: right;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
         padding-right: 18px;
         font-size: 14px;
         font-weight: 900;
         color: ${tk.accent};
-        line-height: 20px;
+        line-height: 18px;
+        box-sizing: border-box;
       `, player.sold_price ? fmtINR(player.sold_price) : '—'));
     }
 

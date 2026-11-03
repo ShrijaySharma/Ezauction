@@ -3053,7 +3053,7 @@ router.patch('/broadcast-config', async (req, res) => {
     const auctionId = getAuctionId(req);
     const { theme, hostDisplayMode, topPlayersCount } = req.body;
 
-    const VALID_THEMES = ['black_gold', 'navy_gold', 'blue_brush', 'dark_teal'];
+    const VALID_THEMES = ['black_gold', 'navy_gold', 'blue_brush', 'dark_teal', 'midnight_yellow'];
     const VALID_MODES  = ['main', 'purse', 'teams', 'topplayers'];
 
     if (theme && !VALID_THEMES.includes(theme)) {

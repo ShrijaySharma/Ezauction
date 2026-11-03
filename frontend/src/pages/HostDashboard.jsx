@@ -13,6 +13,7 @@ import ThemeBlackGold from '../components/host-themes/ThemeBlackGold';
 import ThemeNavyGold from '../components/host-themes/ThemeNavyGold';
 import ThemeBlueBrush from '../components/host-themes/ThemeBlueBrush';
 import ThemeDarkTeal from '../components/host-themes/ThemeDarkTeal';
+import ThemeMidnightYellow from '../components/host-themes/ThemeMidnightYellow';
 import HostPurseView from '../components/host-themes/HostPurseView';
 import HostTeamsView from '../components/host-themes/HostTeamsView';
 import HostTopPlayersView from '../components/host-themes/HostTopPlayersView';
@@ -648,6 +649,19 @@ function HostDashboard({ user }) {
                     />
                   ) : themeKey === 'dark_teal' ? (
                     <ThemeDarkTeal
+                      currentPlayer={currentPlayer}
+                      currentBid={currentBid}
+                      highestBid={highestBid}
+                      bidFlash={bidFlash}
+                      teams={teams}
+                      sponsorName={sponsorName}
+                      sponsorLogo={sponsorLogo}
+                      getImageUrl={getImageUrl}
+                      formatIndianNumber={formatIndianNumber}
+                      setPreviewImage={setPreviewImage}
+                    />
+                  ) : themeKey === 'midnight_yellow' ? (
+                    <ThemeMidnightYellow
                       currentPlayer={currentPlayer}
                       currentBid={currentBid}
                       highestBid={highestBid}

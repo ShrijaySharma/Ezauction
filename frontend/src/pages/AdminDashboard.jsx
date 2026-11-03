@@ -12,6 +12,7 @@ import ImageModal from '../components/ImageModal';
 import { getSocketUrl, getAuctionApiUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
 import { THEMES, getTheme, DEFAULT_THEME } from '../utils/themeEngine';
 import { generateTeamPDF } from '../utils/generateTeamPDF';
+import { generateProfessionalTeamPDF } from '../utils/generateProfessionalPDF';
 
 // Auto-detect API URL based on current host
 const getApiUrl = () => {
@@ -131,6 +132,7 @@ function AdminDashboard({ user }) {
   const [pdfTournamentName, setPdfTournamentName] = useState('');
   const [pdfIncludePrice, setPdfIncludePrice] = useState(true);
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [pdfMode, setPdfMode] = useState('normal'); // 'normal' | 'professional'
   // ───────────────────────────────────────────────────────────
 
   const enableAudio = () => {
@@ -3847,47 +3849,95 @@ function AdminDashboard({ user }) {
                 />
               </div>
 
-              {/* Include Bid Price */}
+              {/* PDF Style */}
               <div>
                 <label className="block text-white/60 text-xs font-black uppercase tracking-widest mb-3">
-                  Bid Price
+                  PDF Style
                 </label>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => setPdfIncludePrice(true)}
-                    className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all text-left ${pdfIncludePrice
+                    onClick={() => setPdfMode('normal')}
+                    className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all text-left ${pdfMode === 'normal'
                         ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
                         : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
                       }`}
                   >
-                    <span className="text-lg">💰</span>
+                    <span className="text-lg">📋</span>
                     <div>
-                      <div className="font-bold text-sm">Include</div>
-                      <div className="text-[10px] opacity-60">Show sold price</div>
+                      <div className="font-bold text-sm">Normal</div>
+                      <div className="text-[10px] opacity-60">Table-style dossier</div>
                     </div>
-                    {pdfIncludePrice && <span className="ml-auto text-emerald-300 font-bold">✓</span>}
+                    {pdfMode === 'normal' && <span className="ml-auto text-emerald-300 font-bold">✓</span>}
                   </button>
                   <button
-                    onClick={() => setPdfIncludePrice(false)}
-                    className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all text-left ${!pdfIncludePrice
-                        ? 'border-rose-400 bg-rose-500/20 text-rose-300'
+                    onClick={() => setPdfMode('professional')}
+                    className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all text-left ${pdfMode === 'professional'
+                        ? 'border-yellow-400 bg-yellow-500/20 text-yellow-300'
                         : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
                       }`}
                   >
-                    <span className="text-lg">🚫</span>
+                    <span className="text-lg">🏆</span>
                     <div>
-                      <div className="font-bold text-sm">Exclude</div>
-                      <div className="text-[10px] opacity-60">Hide sold price</div>
+                      <div className="font-bold text-sm">Professional</div>
+                      <div className="text-[10px] opacity-60">IPL-style photo cards</div>
                     </div>
-                    {!pdfIncludePrice && <span className="ml-auto text-rose-300 font-bold">✓</span>}
+                    {pdfMode === 'professional' && <span className="ml-auto text-yellow-300 font-bold">✓</span>}
                   </button>
                 </div>
               </div>
 
-              {/* Theme note */}
-              <p className="text-white/30 text-xs text-center">
-                PDF theme will match the currently selected broadcast theme ({THEMES[broadcastTheme]?.name || broadcastTheme})
-              </p>
+              {/* Include Bid Price — only shown for Normal mode */}
+              {pdfMode === 'normal' && (
+                <div>
+                  <label className="block text-white/60 text-xs font-black uppercase tracking-widest mb-3">
+                    Bid Price
+                  </label>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setPdfIncludePrice(true)}
+                      className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all text-left ${pdfIncludePrice
+                          ? 'border-emerald-400 bg-emerald-500/20 text-emerald-300'
+                          : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                        }`}
+                    >
+                      <span className="text-lg">💰</span>
+                      <div>
+                        <div className="font-bold text-sm">Include</div>
+                        <div className="text-[10px] opacity-60">Show sold price</div>
+                      </div>
+                      {pdfIncludePrice && <span className="ml-auto text-emerald-300 font-bold">✓</span>}
+                    </button>
+                    <button
+                      onClick={() => setPdfIncludePrice(false)}
+                      className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all text-left ${!pdfIncludePrice
+                          ? 'border-rose-400 bg-rose-500/20 text-rose-300'
+                          : 'border-white/10 bg-white/5 text-white/50 hover:border-white/30'
+                        }`}
+                    >
+                      <span className="text-lg">🚫</span>
+                      <div>
+                        <div className="font-bold text-sm">Exclude</div>
+                        <div className="text-[10px] opacity-60">Hide sold price</div>
+                      </div>
+                      {!pdfIncludePrice && <span className="ml-auto text-rose-300 font-bold">✓</span>}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Professional note */}
+              {pdfMode === 'professional' && (
+                <p className="text-yellow-400/60 text-xs text-center bg-yellow-400/5 border border-yellow-400/20 rounded-xl px-4 py-2.5">
+                  🏆 IPL-style portrait cards · Cover page · Photo grid · EzAuction branding
+                </p>
+              )}
+
+              {/* Normal mode theme note */}
+              {pdfMode === 'normal' && (
+                <p className="text-white/30 text-xs text-center">
+                  PDF theme will match the currently selected broadcast theme ({THEMES[broadcastTheme]?.name || broadcastTheme})
+                </p>
+              )}
 
               {/* Action buttons */}
               <div className="flex gap-3 pt-2 border-t border-white/10">
@@ -3896,16 +3946,23 @@ function AdminDashboard({ user }) {
                   onClick={async () => {
                     setPdfExporting(true);
                     try {
-                      // Use the existing team-squads endpoint — returns [{team, players}]
                       const teamSquads = await adminService.getTeamSquads();
 
-                      await generateTeamPDF({
-                        tournamentName: pdfTournamentName.trim(),
-                        includeBidPrice: pdfIncludePrice,
-                        themeKey: broadcastTheme,
-                        teamSquads: teamSquads || [],
-                        getImageUrl,
-                      });
+                      if (pdfMode === 'professional') {
+                        await generateProfessionalTeamPDF({
+                          tournamentName: pdfTournamentName.trim(),
+                          teamSquads: teamSquads || [],
+                          getImageUrl,
+                        });
+                      } else {
+                        await generateTeamPDF({
+                          tournamentName: pdfTournamentName.trim(),
+                          includeBidPrice: pdfIncludePrice,
+                          themeKey: broadcastTheme,
+                          teamSquads: teamSquads || [],
+                          getImageUrl,
+                        });
+                      }
 
                       setShowPdfModal(false);
                       setPdfTournamentName('');
@@ -3916,12 +3973,16 @@ function AdminDashboard({ user }) {
                       setPdfExporting(false);
                     }
                   }}
-                  className="flex-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+                  className={`flex-1 disabled:opacity-50 text-white font-black uppercase tracking-widest py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 ${
+                    pdfMode === 'professional'
+                      ? 'bg-gradient-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500'
+                      : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500'
+                  }`}
                 >
                   {pdfExporting ? (
                     <><span className="animate-spin">⏳</span> Generating…</>
                   ) : (
-                    <><span>📥</span> Export PDF</>
+                    <><span>{pdfMode === 'professional' ? '🏆' : '📥'}</span> Export {pdfMode === 'professional' ? 'IPL PDF' : 'PDF'}</>
                   )}
                 </button>
                 <button
