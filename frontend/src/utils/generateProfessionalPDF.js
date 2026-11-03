@@ -339,21 +339,30 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     }
     card.appendChild(photoDiv);
 
-    // Dedicated Name Box
+    // Dedicated Name Box (Accommodates 1, 2, and 3-word names with zero bottom cutting)
     const nameBox = document.createElement('div');
     nameBox.style.cssText = `
-      width:100%; height:30px;
+      width:100%; min-height:36px; height:36px;
       display:flex; align-items:center; justify-content:center;
-      padding:4px 8px 0 8px; box-sizing:border-box; background:#141426;
+      padding:2px 6px; box-sizing:border-box; background:#141426;
+      overflow:hidden;
     `;
+    const pName = (player.name || 'Player').trim();
+    const isLongName = pName.length > 14 || pName.split(/\s+/).length >= 3;
     const nameText = document.createElement('div');
-    nameText.textContent = player.name || 'Player';
+    nameText.textContent = pName;
     nameText.style.cssText = `
-      color:#FFFFFF; font-size:12.5px; font-weight:800;
-      letter-spacing:0.3px; line-height:18px; height:18px;
-      display:block; text-align:center; white-space:nowrap;
-      overflow:hidden; text-overflow:ellipsis; width:100%;
-      font-family:${FONT_STACK}; box-sizing:border-box;
+      color:#FFFFFF;
+      font-size:${isLongName ? '10.5px' : '12px'};
+      font-weight:800;
+      letter-spacing:0.2px;
+      line-height:1.2;
+      display:block;
+      text-align:center;
+      word-break:break-word;
+      max-width:100%;
+      font-family:${FONT_STACK};
+      box-sizing:border-box;
     `;
     nameBox.appendChild(nameText);
     card.appendChild(nameBox);
@@ -361,9 +370,9 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     // Dedicated Role Box (Separated cleanly below name with ample spacing)
     const roleBox = document.createElement('div');
     roleBox.style.cssText = `
-      width:100%; height:34px;
+      width:100%; height:32px;
       display:flex; align-items:center; justify-content:center;
-      padding:2px 8px 8px 8px; box-sizing:border-box; background:#141426;
+      padding:0 6px 8px 6px; box-sizing:border-box; background:#141426;
     `;
 
     const role = (player.role || 'PLAYER').toUpperCase();
@@ -371,15 +380,21 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
 
     const rolePill = document.createElement('div');
     rolePill.style.cssText = `
-      display:block; height:20px; line-height:18px;
-      padding:0 12px; border-radius:10px;
+      display:inline-flex; align-items:center; justify-content:center;
+      height:22px; padding:0 12px; border-radius:11px;
       background:${rc.bg}; border:1px solid ${rc.border};
-      color:${rc.text}; font-size:9.5px; font-weight:800;
-      letter-spacing:0.6px; text-transform:uppercase;
-      font-family:${FONT_STACK}; white-space:nowrap; text-align:center;
-      box-sizing:border-box; overflow:hidden;
+      box-sizing:border-box; overflow:hidden; flex-shrink:0;
     `;
-    rolePill.textContent = role;
+
+    const roleText = document.createElement('span');
+    roleText.textContent = role;
+    roleText.style.cssText = `
+      color:${rc.text}; font-size:9.5px; font-weight:800;
+      letter-spacing:0.6px; line-height:1; display:block;
+      text-transform:uppercase; font-family:${FONT_STACK};
+      white-space:nowrap; text-align:center;
+    `;
+    rolePill.appendChild(roleText);
     roleBox.appendChild(rolePill);
     card.appendChild(roleBox);
 
@@ -391,7 +406,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
   if (remainder !== 0) {
     for (let i = 0; i < 4 - remainder; i++) {
       const ph = document.createElement('div');
-      ph.style.cssText = `border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); min-height:215px;`;
+      ph.style.cssText = `border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); min-height:228px;`;
       grid.appendChild(ph);
     }
   }
