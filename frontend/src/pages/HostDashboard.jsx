@@ -51,6 +51,14 @@ function HostDashboard({ user }) {
   const [previewImage, setPreviewImage] = useState(null);
   const [soldAnimation, setSoldAnimation] = useState(null); // { playerName, teamName, price }
 
+  // ── UI-only display toggles (device-local, persisted via localStorage) ──
+  const [showAge, setShowAge] = useState(() => localStorage.getItem('ez_show_age') !== 'false');
+  const [showCategory, setShowCategory] = useState(() => localStorage.getItem('ez_show_category') !== 'false');
+  const [showSerialNo, setShowSerialNo] = useState(() => localStorage.getItem('ez_show_serial') !== 'false');
+  const toggleAge = () => setShowAge(v => { localStorage.setItem('ez_show_age', String(!v)); return !v; });
+  const toggleCategory = () => setShowCategory(v => { localStorage.setItem('ez_show_category', String(!v)); return !v; });
+  const toggleSerialNo = () => setShowSerialNo(v => { localStorage.setItem('ez_show_serial', String(!v)); return !v; });
+
   // Sponsor Branding State
   const [showSponsorModal, setShowSponsorModal] = useState(false);
   const [sponsorName, setSponsorName] = useState('');
@@ -633,6 +641,9 @@ function HostDashboard({ user }) {
                       getImageUrl={getImageUrl}
                       formatIndianNumber={formatIndianNumber}
                       setPreviewImage={setPreviewImage}
+                      showAge={showAge}
+                      showCategory={showCategory}
+                      showSerialNo={showSerialNo}
                     />
                   ) : themeKey === 'blue_brush' ? (
                     <ThemeBlueBrush
@@ -646,6 +657,9 @@ function HostDashboard({ user }) {
                       getImageUrl={getImageUrl}
                       formatIndianNumber={formatIndianNumber}
                       setPreviewImage={setPreviewImage}
+                      showAge={showAge}
+                      showCategory={showCategory}
+                      showSerialNo={showSerialNo}
                     />
                   ) : themeKey === 'dark_teal' ? (
                     <ThemeDarkTeal
@@ -659,6 +673,9 @@ function HostDashboard({ user }) {
                       getImageUrl={getImageUrl}
                       formatIndianNumber={formatIndianNumber}
                       setPreviewImage={setPreviewImage}
+                      showAge={showAge}
+                      showCategory={showCategory}
+                      showSerialNo={showSerialNo}
                     />
                   ) : themeKey === 'midnight_yellow' ? (
                     <ThemeMidnightYellow
@@ -672,6 +689,9 @@ function HostDashboard({ user }) {
                       getImageUrl={getImageUrl}
                       formatIndianNumber={formatIndianNumber}
                       setPreviewImage={setPreviewImage}
+                      showAge={showAge}
+                      showCategory={showCategory}
+                      showSerialNo={showSerialNo}
                     />
                   ) : (
                     <ThemeBlackGold
@@ -685,6 +705,9 @@ function HostDashboard({ user }) {
                       getImageUrl={getImageUrl}
                       formatIndianNumber={formatIndianNumber}
                       setPreviewImage={setPreviewImage}
+                      showAge={showAge}
+                      showCategory={showCategory}
+                      showSerialNo={showSerialNo}
                     />
                   )}
                 </>
@@ -735,11 +758,31 @@ function HostDashboard({ user }) {
               </button>
               <button
                 onClick={() => { setShowTeamPurses(true); setShowMenu(false); loadTeamPurses(); }}
-                className="w-full flex items-center gap-3 px-5 py-4 text-white hover:bg-white/10 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-5 py-4 text-white hover:bg-white/10 transition-colors text-left border-b border-white/10"
               >
                 <span className="text-xl">💰</span>
                 <span className="font-semibold text-sm tracking-wide">Team Purses</span>
               </button>
+
+              {/* A / C / S display toggles — device-local UI only */}
+              <div className="flex items-center justify-around px-4 py-3">
+                {[
+                  { letter: 'A', value: showAge, toggle: toggleAge },
+                  { letter: 'C', value: showCategory, toggle: toggleCategory },
+                  { letter: 'S', value: showSerialNo, toggle: toggleSerialNo },
+                ].map(({ letter, value, toggle }) => (
+                  <button
+                    key={letter}
+                    onClick={toggle}
+                    className="flex flex-col items-center gap-1.5"
+                  >
+                    <span className={`text-xs font-black tracking-widest transition-colors ${value ? 'text-white' : 'text-white/30'}`}>{letter}</span>
+                    <div className={`w-9 h-5 rounded-full relative transition-colors duration-200 ${value ? 'bg-yellow-400' : 'bg-white/15'}`}>
+                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${value ? 'left-[18px]' : 'left-0.5'}`} />
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </>
         )}

@@ -4,7 +4,8 @@ const FMT = (n) => Number(n || 0).toLocaleString('en-IN');
 
 export default function ThemeNavyGold({
   currentPlayer, currentBid, highestBid, bidFlash,
-  teams, sponsorName, sponsorLogo, getImageUrl, setPreviewImage
+  teams, sponsorName, sponsorLogo, getImageUrl, setPreviewImage,
+  showAge = true, showCategory = true, showSerialNo = true,
 }) {
   const winningTeam = highestBid
     ? teams.find(t => t.name === highestBid.team_name || t.id === highestBid.team_id)
@@ -41,33 +42,43 @@ export default function ThemeNavyGold({
               {lastName && <span className="block text-[#ECC867]">{lastName}</span>}
             </h1>
 
-            {/* Role pill */}
-            <div className="mt-1 flex justify-center">
+            {/* Role & Category (side by side on same level) */}
+            <div className="mt-1 flex items-center justify-center gap-2 flex-wrap">
               <span className="inline-block bg-[#ECC867] text-[#051126] text-xs md:text-sm font-black uppercase tracking-[0.15em] px-4 py-1.5 rounded-lg shadow-[0_4px_16px_rgba(236,200,103,0.35)]">
                 {currentPlayer?.role || 'PLAYER'}
               </span>
-            </div>
-
-            {/* Category badge — only if player has category */}
-            {currentPlayer?.category && (
-              <div className="mt-2 flex justify-center">
+              {showCategory && currentPlayer?.category && (
                 <span className="inline-flex items-center bg-[#ECC867]/15 text-[#ECC867] border border-[#ECC867]/40 text-xs md:text-sm font-black uppercase tracking-[0.2em] px-4 py-1 rounded-full shadow-[0_0_16px_rgba(236,200,103,0.25)]">
                   <span>{currentPlayer.category}</span>
                 </span>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Elegant divider */}
             <div className="w-32 h-[1px] my-1 opacity-30" style={{ background: 'linear-gradient(90deg, transparent, #ECC867, transparent)' }} />
 
-            {/* Age + Base Price (centered) */}
+            {/* Age + Serial No + Base Price (centered) */}
             <div className="flex flex-col items-center gap-3 mt-2 w-full">
-              <div className="flex flex-col items-center">
-                <span className="text-[#ECC867] text-xs font-black uppercase tracking-[0.25em]">AGE</span>
-                <div className="text-white font-black text-2xl md:text-3xl leading-none mt-0.5">
-                  {currentPlayer?.age || '—'} <span className="text-white/60 text-sm font-bold">YRS</span>
+              {(showAge || (showSerialNo && currentPlayer?.serial_number != null)) && (
+                <div className="flex items-center justify-center gap-4">
+                  {showSerialNo && currentPlayer?.serial_number != null && (
+                    <div className="text-white font-black text-2xl md:text-3xl leading-none">
+                      <span className="text-[#ECC867]">#</span>{currentPlayer.serial_number}
+                    </div>
+                  )}
+                  {showSerialNo && currentPlayer?.serial_number != null && showAge && (
+                    <div className="w-[1px] h-7 bg-[#ECC867]/40" />
+                  )}
+                  {showAge && (
+                    <div className="flex flex-col items-center">
+                      <span className="text-[#ECC867] text-xs font-black uppercase tracking-[0.25em]">AGE</span>
+                      <div className="text-white font-black text-2xl md:text-3xl leading-none mt-0.5">
+                        {currentPlayer?.age || '—'} <span className="text-white/60 text-sm font-bold">YRS</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
               <div className="flex flex-col items-center mt-1">
                 <span className="text-[#ECC867] text-xs font-black uppercase tracking-[0.25em]">BASE PRICE</span>
                 <div className="text-[#FFDF78] font-black font-mono text-3xl md:text-4xl lg:text-5xl leading-none mt-0.5 drop-shadow-[0_2px_14px_rgba(255,223,120,0.35)]">
