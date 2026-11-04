@@ -402,9 +402,20 @@ function Overlay() {
     const theme = getTheme(themeKey);
 
     // UI display toggles synced from Host (Age, Category, Serial No)
-    const [showAge, setShowAge] = useState(true);
-    const [showCategory, setShowCategory] = useState(true);
-    const [showSerialNo, setShowSerialNo] = useState(true);
+    const [showAge, setShowAge] = useState(() => localStorage.getItem('ez_show_age') !== 'false');
+    const [showCategory, setShowCategory] = useState(() => localStorage.getItem('ez_show_category') !== 'false');
+    const [showSerialNo, setShowSerialNo] = useState(() => localStorage.getItem('ez_show_serial') !== 'false');
+
+    // Cross-tab instant sync if Host and Overlay are open on the same browser
+    useEffect(() => {
+        const handleStorage = (e) => {
+            if (e.key === 'ez_show_age') setShowAge(e.newValue !== 'false');
+            if (e.key === 'ez_show_category') setShowCategory(e.newValue !== 'false');
+            if (e.key === 'ez_show_serial') setShowSerialNo(e.newValue !== 'false');
+        };
+        window.addEventListener('storage', handleStorage);
+        return () => window.removeEventListener('storage', handleStorage);
+    }, []);
 
     const currentPlayerRef = useRef(null);
 
@@ -548,9 +559,18 @@ function Overlay() {
         newSocket.on('ui-toggles-updated', (data) => {
             if (!data) return;
             console.log('[Socket:Overlay] ui-toggles-updated →', data);
-            if (data.showAge !== undefined) setShowAge(data.showAge);
-            if (data.showCategory !== undefined) setShowCategory(data.showCategory);
-            if (data.showSerialNo !== undefined) setShowSerialNo(data.showSerialNo);
+            if (data.showAge !== undefined) {
+                setShowAge(data.showAge);
+                localStorage.setItem('ez_show_age', String(data.showAge));
+            }
+            if (data.showCategory !== undefined) {
+                setShowCategory(data.showCategory);
+                localStorage.setItem('ez_show_category', String(data.showCategory));
+            }
+            if (data.showSerialNo !== undefined) {
+                setShowSerialNo(data.showSerialNo);
+                localStorage.setItem('ez_show_serial', String(data.showSerialNo));
+            }
         });
 
         // ── Real-time Player Sold & Team Purse Updates ────────────────────────

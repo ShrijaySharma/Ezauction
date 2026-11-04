@@ -294,7 +294,7 @@ auctionNamespace.on('connection', (socket) => {
       if (state) {
         state.ui_toggles = { ...(state.ui_toggles || {}), ...data };
       }
-      socket.broadcast.emit('ui-toggles-updated', data);
+      socket.nsp.emit('ui-toggles-updated', state ? state.ui_toggles : data);
 
       // Persist in auctions.broadcast_config so it survives reloads & restarts
       const { data: aData } = await supabase

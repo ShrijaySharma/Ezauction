@@ -61,7 +61,7 @@ function HostDashboard({ user }) {
     const next = !v;
     localStorage.setItem('ez_show_age', String(next));
     if (socketRef.current) {
-      socketRef.current.emit('ui-toggles-changed', { showAge: next, showCategory, showSerialNo });
+      socketRef.current.emit('ui-toggles-changed', { showAge: next });
     }
     return next;
   });
@@ -69,7 +69,7 @@ function HostDashboard({ user }) {
     const next = !v;
     localStorage.setItem('ez_show_category', String(next));
     if (socketRef.current) {
-      socketRef.current.emit('ui-toggles-changed', { showAge, showCategory: next, showSerialNo });
+      socketRef.current.emit('ui-toggles-changed', { showCategory: next });
     }
     return next;
   });
@@ -77,7 +77,7 @@ function HostDashboard({ user }) {
     const next = !v;
     localStorage.setItem('ez_show_serial', String(next));
     if (socketRef.current) {
-      socketRef.current.emit('ui-toggles-changed', { showAge, showCategory, showSerialNo: next });
+      socketRef.current.emit('ui-toggles-changed', { showSerialNo: next });
     }
     return next;
   });
