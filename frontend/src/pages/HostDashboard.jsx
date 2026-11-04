@@ -595,7 +595,7 @@ function HostDashboard({ user }) {
   const isLight = themeKey === 'blue_brush';
 
   return (
-    <div className={`h-screen w-screen relative overflow-hidden font-sans selection:bg-yellow-400 selection:text-blue-900 ${isLight ? 'bg-[#F4F7FC]' : 'bg-black'}`}>
+    <div className={`h-screen h-[100dvh] w-screen relative overflow-hidden font-sans selection:bg-yellow-400 selection:text-blue-900 ${isLight ? 'bg-[#F4F7FC]' : 'bg-black'}`}>
       <TradingWindowBanner socket={socket} />
       {/* Connection Error Banner */}
       {connectionError && (
@@ -641,7 +641,7 @@ function HostDashboard({ user }) {
       )}
 
       {/* Main Full-Screen Content Area — perfectly seamless */}
-      <div className="relative z-10 h-full w-full flex flex-col overflow-hidden">
+      <div className="relative z-10 h-full w-full flex flex-col overflow-y-auto lg:overflow-hidden">
 
           {/* ── MODE: PURSE ─────────────────────────────────────────────────── */}
           {displayMode === 'purse' && (

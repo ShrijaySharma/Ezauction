@@ -16,7 +16,7 @@ export default function ThemeBlueBrush({
   const lastName = nameParts.slice(1).join(' ') || '';
 
   return (
-    <div className="relative w-full h-full flex flex-col overflow-hidden select-none" style={{ background: '#EFF3FB', fontFamily: "'Inter', sans-serif" }}>
+    <div className="relative w-full min-h-full flex flex-col justify-between overflow-x-hidden select-none" style={{ background: '#EFF3FB', fontFamily: "'Inter', sans-serif" }}>
 
       {/* ── BG ── */}
       <div className="absolute inset-0 pointer-events-none">
@@ -38,57 +38,57 @@ export default function ThemeBlueBrush({
       </div>
 
       {/* ── MAIN CONTENT ── */}
-      <div className="relative z-10 flex-1 flex items-stretch min-h-0">
+      <div className="relative z-10 flex-1 flex flex-col lg:flex-row items-center lg:items-stretch min-h-0 w-full max-w-7xl lg:max-w-none mx-auto p-4 sm:p-6 lg:p-0 gap-6 lg:gap-0">
 
         {/* LEFT: Logo + Player Info (centered within left column) */}
-        <div className="flex flex-col justify-between items-center text-center py-6 px-6 lg:px-8" style={{ width: '35%' }}>
-          <img src="/ezauction.png" alt="ezAuction" className="h-10 md:h-12 lg:h-14 object-contain self-center mb-3 drop-shadow-md" />
+        <div className="w-full lg:w-[35%] flex flex-col justify-between items-center text-center py-2 lg:py-6 px-4 lg:px-8 shrink-0">
+          <img src="/ezauction.png" alt="ezAuction" className="h-9 sm:h-11 md:h-12 lg:h-14 object-contain self-center mb-2 lg:mb-3 drop-shadow-md" />
 
           <div className="flex-1 flex flex-col justify-center items-center gap-2 w-full">
-            <h1 className="font-black uppercase leading-[1.0] drop-shadow-sm text-center" style={{ fontSize: 'clamp(2rem, 3.8vw, 3.8rem)', letterSpacing: '-0.02em', color: '#061E4E' }}>
+            <h1 className="font-black uppercase leading-[1.0] drop-shadow-sm text-center" style={{ fontSize: 'clamp(1.85rem, 5vw, 3.8rem)', letterSpacing: '-0.02em', color: '#061E4E' }}>
               <span className="block">{firstName}</span>
               {lastName && <span className="block" style={{ color: '#0047CC' }}>{lastName}</span>}
             </h1>
 
             {/* Role & Category (side by side on same level) */}
             <div className="mt-1 flex items-center justify-center gap-2 flex-wrap">
-              <span className="inline-block bg-[#0047CC] text-white text-xs md:text-sm font-black uppercase tracking-[0.15em] px-4 py-1.5 rounded-lg shadow-[0_4px_16px_rgba(0,71,204,0.3)]">
+              <span className="inline-block bg-[#0047CC] text-white text-xs md:text-sm font-black uppercase tracking-[0.15em] px-3.5 py-1 md:px-4 md:py-1.5 rounded-lg shadow-[0_4px_16px_rgba(0,71,204,0.3)]">
                 {currentPlayer?.role || 'PLAYER'}
               </span>
               {showCategory && currentPlayer?.category && (
-                <span className="inline-flex items-center bg-[#0047CC]/10 text-[#0047CC] border border-[#0047CC]/30 text-xs md:text-sm font-black uppercase tracking-[0.2em] px-4 py-1 rounded-full shadow-[0_2px_12px_rgba(0,71,204,0.15)]">
+                <span className="inline-flex items-center bg-[#0047CC]/10 text-[#0047CC] border border-[#0047CC]/30 text-xs md:text-sm font-black uppercase tracking-[0.2em] px-3.5 py-1 md:px-4 md:py-1.5 rounded-full shadow-[0_2px_12px_rgba(0,71,204,0.15)]">
                   <span>{currentPlayer.category}</span>
                 </span>
               )}
             </div>
 
             {/* Elegant divider */}
-            <div className="w-32 h-[1px] my-1 opacity-25" style={{ background: 'linear-gradient(90deg, transparent, #0047CC, transparent)' }} />
+            <div className="w-28 sm:w-32 h-[1px] my-1 opacity-25" style={{ background: 'linear-gradient(90deg, transparent, #0047CC, transparent)' }} />
 
-            <div className="flex flex-col items-center gap-3 mt-2 w-full">
+            <div className="flex flex-col items-center gap-2 sm:gap-3 mt-1 sm:mt-2 w-full">
               {(showAge || (showSerialNo && currentPlayer?.serial_number != null)) && (
                 <div className="flex items-center justify-center gap-4">
                   {showSerialNo && currentPlayer?.serial_number != null && (
-                    <div className="text-[#061E4E] font-black text-2xl md:text-3xl leading-none">
+                    <div className="text-[#061E4E] font-black text-xl sm:text-2xl md:text-3xl leading-none">
                       <span className="text-[#0047CC]">#</span>{currentPlayer.serial_number}
                     </div>
                   )}
                   {showSerialNo && currentPlayer?.serial_number != null && showAge && (
-                    <div className="w-[1px] h-7 bg-[#0047CC]/25" />
+                    <div className="w-[1px] h-6 sm:h-7 bg-[#0047CC]/25" />
                   )}
                   {showAge && (
                     <div className="flex flex-col items-center">
-                      <span className="text-slate-600 text-xs font-black uppercase tracking-[0.25em]">AGE</span>
-                      <div className="text-[#061E4E] font-black text-2xl md:text-3xl leading-none mt-0.5">
-                        {currentPlayer?.age || '—'} <span className="text-slate-500 text-sm font-bold">YRS</span>
+                      <span className="text-slate-600 text-[10px] sm:text-xs font-black uppercase tracking-[0.25em]">AGE</span>
+                      <div className="text-[#061E4E] font-black text-xl sm:text-2xl md:text-3xl leading-none mt-0.5">
+                        {currentPlayer?.age || '—'} <span className="text-slate-500 text-xs sm:text-sm font-bold">YRS</span>
                       </div>
                     </div>
                   )}
                 </div>
               )}
               <div className="flex flex-col items-center mt-1">
-                <span className="text-[#0047CC] text-xs font-black uppercase tracking-[0.25em]">BASE PRICE</span>
-                <div className="text-[#0047CC] font-black font-mono text-3xl md:text-4xl lg:text-5xl leading-none mt-0.5">
+                <span className="text-[#0047CC] text-[10px] sm:text-xs font-black uppercase tracking-[0.25em]">BASE PRICE</span>
+                <div className="text-[#0047CC] font-black font-mono text-2xl sm:text-3xl md:text-4xl lg:text-5xl leading-none mt-0.5">
                   ₹{FMT(currentPlayer?.base_price)}
                 </div>
               </div>
@@ -97,9 +97,9 @@ export default function ThemeBlueBrush({
         </div>
 
         {/* CENTER: Player Image with Stage-Lit Radial Spotlight */}
-        <div className="flex-1 relative flex items-center justify-center -translate-x-6 md:-translate-x-10 lg:-translate-x-12 p-3 md:p-5 overflow-hidden">
+        <div className="w-full lg:flex-1 relative flex items-center justify-center translate-x-0 lg:-translate-x-6 xl:-translate-x-12 p-2 sm:p-4 lg:p-5 overflow-visible lg:overflow-hidden shrink-0">
           {/* Ambient subtle royal blue stage aura behind player */}
-          <div className="absolute w-[500px] h-[500px] rounded-full blur-[100px] pointer-events-none opacity-20"
+          <div className="absolute w-[280px] h-[280px] sm:w-[380px] sm:h-[380px] lg:w-[500px] lg:h-[500px] rounded-full blur-[70px] sm:blur-[90px] lg:blur-[100px] pointer-events-none opacity-20"
             style={{ background: 'radial-gradient(circle, #0047CC 0%, #60A5FA 50%, transparent 70%)' }}
           />
           {currentPlayer?.image ? (
@@ -107,37 +107,37 @@ export default function ThemeBlueBrush({
               src={getImageUrl(currentPlayer.image)}
               alt={currentPlayer.name}
               onClick={() => setPreviewImage?.(getImageUrl(currentPlayer.image))}
-              className="relative z-10 cursor-pointer max-h-[92vh] w-auto max-w-full object-contain rounded-2xl md:rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.28)] border border-[#0047CC]/30 transition-transform duration-200 hover:scale-[1.01]"
+              className="relative z-10 cursor-pointer max-h-[36vh] sm:max-h-[44vh] lg:max-h-[92vh] w-auto max-w-full object-contain rounded-2xl md:rounded-3xl shadow-[0_12px_36px_rgba(0,0,0,0.22)] lg:shadow-[0_20px_50px_rgba(0,0,0,0.28)] border border-[#0047CC]/30 transition-transform duration-200 hover:scale-[1.01]"
               onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }}
             />
           ) : (
-            <div className="relative z-10 text-9xl opacity-20">🏏</div>
+            <div className="relative z-10 text-7xl sm:text-8xl lg:text-9xl opacity-20">🏏</div>
           )}
         </div>
 
         {/* RIGHT: High-Contrast Bid Section in Crisp Card */}
-        <div className="flex flex-col justify-center items-center px-6 lg:px-8 py-8 relative z-20" style={{ width: '28%' }}>
-          <div className="w-full bg-white/95 border-2 border-[#0047CC]/30 rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-[0_16px_50px_rgba(0,71,204,0.18)] flex flex-col items-center gap-2 text-center">
-            <span className="text-[#0047CC] text-xs md:text-sm font-black uppercase tracking-[0.3em]">
+        <div className="w-full lg:w-[28%] max-w-md lg:max-w-none flex flex-col justify-center items-center px-4 sm:px-6 lg:px-8 py-3 lg:py-8 relative z-20 shrink-0">
+          <div className="w-full bg-white/95 border-2 border-[#0047CC]/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 backdrop-blur-xl shadow-[0_10px_35px_rgba(0,71,204,0.14)] lg:shadow-[0_16px_50px_rgba(0,71,204,0.18)] flex flex-col items-center gap-2 text-center">
+            <span className="text-[#0047CC] text-xs md:text-sm font-black uppercase tracking-[0.25em] sm:tracking-[0.3em]">
               CURRENT BID
             </span>
 
             <div
               className={`font-black font-mono text-[#003B9E] leading-none transition-transform duration-200 ${bidFlash ? 'scale-110' : ''}`}
-              style={{ fontSize: 'clamp(2.6rem, 4.8vw, 4.8rem)' }}
+              style={{ fontSize: 'clamp(2.2rem, 5.5vw, 4.8rem)' }}
             >
               ₹{FMT(currentBid)}
             </div>
 
-            <div className="mt-3 min-h-[70px] flex flex-col items-center justify-center w-full">
+            <div className="mt-2 sm:mt-3 min-h-[60px] sm:min-h-[70px] flex flex-col items-center justify-center w-full">
               {highestBid ? (
-                <div className="animate-team-bounce flex items-center gap-3.5 bg-gradient-to-r from-blue-500/15 via-blue-500/10 to-blue-500/5 border-2 border-[#0047CC] px-4 py-2.5 rounded-2xl w-full shadow-[0_4px_25px_rgba(0,71,204,0.18)]">
+                <div className="animate-team-bounce flex items-center gap-3 sm:gap-3.5 bg-gradient-to-r from-blue-500/15 via-blue-500/10 to-blue-500/5 border-2 border-[#0047CC] px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl lg:rounded-2xl w-full shadow-[0_4px_25px_rgba(0,71,204,0.18)]">
                   {winningTeam?.logo ? (
                     <img src={getImageUrl(winningTeam.logo)} alt={highestBid.team_name}
-                      className="w-14 h-14 md:w-16 md:h-16 rounded-xl object-cover border-2 border-[#0047CC] shadow-md shrink-0 bg-white"
+                      className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl object-cover border-2 border-[#0047CC] shadow-md shrink-0 bg-white"
                       onError={e => { e.target.style.display = 'none'; }} />
                   ) : (
-                    <div className="w-14 h-14 md:w-16 md:h-16 rounded-xl flex items-center justify-center font-black text-2xl text-white bg-[#0047CC] shrink-0 shadow-md">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-xl flex items-center justify-center font-black text-xl sm:text-2xl text-white bg-[#0047CC] shrink-0 shadow-md">
                       {(highestBid.team_name || 'T').charAt(0)}
                     </div>
                   )}
@@ -170,11 +170,11 @@ export default function ThemeBlueBrush({
 
       {/* ── SPONSOR BAR (only if user has set sponsor) ── */}
       {(sponsorName || sponsorLogo) && (
-        <div className="relative z-20 shrink-0 h-20 md:h-24 w-full bg-[#0047CC] flex items-center justify-center gap-6 px-8 shadow-lg">
-          <span className="text-white/80 text-sm md:text-base font-black uppercase tracking-[0.3em]">SPONSOR</span>
-          <div className="w-px h-8 bg-white/40" />
-          {sponsorLogo && <img src={sponsorLogo} alt={sponsorName || 'Sponsor'} className="max-h-12 md:max-h-14 object-contain brightness-0 invert" />}
-          {sponsorName && <span className="text-white font-black text-xl md:text-2xl tracking-[0.15em] uppercase">{sponsorName}</span>}
+        <div className="relative z-20 shrink-0 h-14 sm:h-16 md:h-20 lg:h-24 w-full bg-[#0047CC] flex items-center justify-center gap-3 sm:gap-4 md:gap-6 px-4 sm:px-6 lg:px-8 shadow-lg">
+          <span className="text-white/80 text-xs sm:text-sm md:text-base font-black uppercase tracking-[0.25em] sm:tracking-[0.3em]">SPONSOR</span>
+          <div className="w-px h-5 sm:h-6 md:h-8 bg-white/40" />
+          {sponsorLogo && <img src={sponsorLogo} alt={sponsorName || 'Sponsor'} className="max-h-8 sm:max-h-10 md:max-h-12 lg:max-h-14 object-contain brightness-0 invert" />}
+          {sponsorName && <span className="text-white font-black text-sm sm:text-base md:text-xl lg:text-2xl tracking-wider sm:tracking-[0.15em] uppercase">{sponsorName}</span>}
         </div>
       )}
     </div>
