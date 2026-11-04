@@ -51,13 +51,36 @@ function HostDashboard({ user }) {
   const [previewImage, setPreviewImage] = useState(null);
   const [soldAnimation, setSoldAnimation] = useState(null); // { playerName, teamName, price }
 
-  // ── UI-only display toggles (device-local, persisted via localStorage) ──
+  // ── UI-only display toggles (device-local, persisted via localStorage & synced with Overlay) ──
   const [showAge, setShowAge] = useState(() => localStorage.getItem('ez_show_age') !== 'false');
   const [showCategory, setShowCategory] = useState(() => localStorage.getItem('ez_show_category') !== 'false');
   const [showSerialNo, setShowSerialNo] = useState(() => localStorage.getItem('ez_show_serial') !== 'false');
-  const toggleAge = () => setShowAge(v => { localStorage.setItem('ez_show_age', String(!v)); return !v; });
-  const toggleCategory = () => setShowCategory(v => { localStorage.setItem('ez_show_category', String(!v)); return !v; });
-  const toggleSerialNo = () => setShowSerialNo(v => { localStorage.setItem('ez_show_serial', String(!v)); return !v; });
+  const socketRef = useRef(null);
+
+  const toggleAge = () => setShowAge(v => {
+    const next = !v;
+    localStorage.setItem('ez_show_age', String(next));
+    if (socketRef.current) {
+      socketRef.current.emit('ui-toggles-changed', { showAge: next, showCategory, showSerialNo });
+    }
+    return next;
+  });
+  const toggleCategory = () => setShowCategory(v => {
+    const next = !v;
+    localStorage.setItem('ez_show_category', String(next));
+    if (socketRef.current) {
+      socketRef.current.emit('ui-toggles-changed', { showAge, showCategory: next, showSerialNo });
+    }
+    return next;
+  });
+  const toggleSerialNo = () => setShowSerialNo(v => {
+    const next = !v;
+    localStorage.setItem('ez_show_serial', String(next));
+    if (socketRef.current) {
+      socketRef.current.emit('ui-toggles-changed', { showAge, showCategory, showSerialNo: next });
+    }
+    return next;
+  });
 
   // Sponsor Branding State
   const [showSponsorModal, setShowSponsorModal] = useState(false);
@@ -82,6 +105,7 @@ function HostDashboard({ user }) {
   // Sync state to refs
   useEffect(() => { currentPlayerRef.current = currentPlayer; }, [currentPlayer]);
   useEffect(() => { teamsRef.current = teams; }, [teams]);
+  useEffect(() => { socketRef.current = socket; }, [socket]);
 
   // Whenever displayMode switches to topplayers, (re-)load the leaderboard
   useEffect(() => {
@@ -153,6 +177,11 @@ function HostDashboard({ user }) {
       loadTeams();
       loadUnsoldPlayers();
       loadTeamPurses();
+      newSocket.emit('ui-toggles-changed', {
+        showAge: localStorage.getItem('ez_show_age') !== 'false',
+        showCategory: localStorage.getItem('ez_show_category') !== 'false',
+        showSerialNo: localStorage.getItem('ez_show_serial') !== 'false',
+      });
     });
 
     newSocket.on('reconnect', () => {
@@ -162,6 +191,27 @@ function HostDashboard({ user }) {
       loadTeams();
       loadUnsoldPlayers();
       loadTeamPurses();
+      newSocket.emit('ui-toggles-changed', {
+        showAge: localStorage.getItem('ez_show_age') !== 'false',
+        showCategory: localStorage.getItem('ez_show_category') !== 'false',
+        showSerialNo: localStorage.getItem('ez_show_serial') !== 'false',
+      });
+    });
+
+    newSocket.on('ui-toggles-updated', (data) => {
+      if (!data) return;
+      if (data.showAge !== undefined) {
+        setShowAge(data.showAge);
+        localStorage.setItem('ez_show_age', String(data.showAge));
+      }
+      if (data.showCategory !== undefined) {
+        setShowCategory(data.showCategory);
+        localStorage.setItem('ez_show_category', String(data.showCategory));
+      }
+      if (data.showSerialNo !== undefined) {
+        setShowSerialNo(data.showSerialNo);
+        localStorage.setItem('ez_show_serial', String(data.showSerialNo));
+      }
     });
 
     newSocket.on('reconnect_failed', () => {

@@ -135,10 +135,12 @@ router.get('/broadcast-config', async (req, res) => {
 
     if (error) throw error;
     const cfg = (data && data.broadcast_config) || {};
+    const state = getAuctionState(auctionId);
     res.json({
       theme: cfg.theme || 'black_gold',
       hostDisplayMode: cfg.hostDisplayMode || 'main',
       topPlayersCount: cfg.topPlayersCount || 10,
+      uiToggles: state?.ui_toggles || cfg.ui_toggles || null,
     });
   } catch (err) {
     console.error('Error getting broadcast-config (public):', err);

@@ -273,8 +273,46 @@ auctionNamespace.on('connection', (socket) => {
           }
         }
       }
+
+      // Send active UI display toggles (Age, Category, Serial No)
+      if (state) {
+        const toggles = state.ui_toggles || state.broadcast_config?.ui_toggles;
+        if (toggles) {
+          socket.emit('ui-toggles-updated', toggles);
+        }
+      }
     } catch (err) {
       console.error(`[Socket:${auctionId}] Error in request-info:`, err);
+    }
+  });
+
+  // Relay Host UI display toggles to Overlay in real-time & persist
+  socket.on('ui-toggles-changed', async (data) => {
+    if (!data || typeof data !== 'object') return;
+    try {
+      const state = getAuctionState(auctionId);
+      if (state) {
+        state.ui_toggles = { ...(state.ui_toggles || {}), ...data };
+      }
+      socket.broadcast.emit('ui-toggles-updated', data);
+
+      // Persist in auctions.broadcast_config so it survives reloads & restarts
+      const { data: aData } = await supabase
+        .from('auctions')
+        .select('broadcast_config')
+        .eq('id', auctionId)
+        .maybeSingle();
+      const currentCfg = aData?.broadcast_config || {};
+      const updatedCfg = {
+        ...currentCfg,
+        ui_toggles: { ...(currentCfg.ui_toggles || {}), ...data }
+      };
+      await supabase
+        .from('auctions')
+        .update({ broadcast_config: updatedCfg })
+        .eq('id', auctionId);
+    } catch (err) {
+      console.error(`[Socket:${auctionId}] Failed to persist ui_toggles:`, err);
     }
   });
 });

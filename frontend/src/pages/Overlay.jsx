@@ -219,7 +219,10 @@ function OverlayTeams({ teamPurses, theme, themeKey }) {
 }
 
 // ── Main bid lower-third with Centered Player Image & Serial on left ─────────
-function OverlayLowerThird({ theme, currentPlayer, currentBid, leadingTeam, bidFlash, formatIndianNumber }) {
+function OverlayLowerThird({
+    theme, currentPlayer, currentBid, leadingTeam, bidFlash, formatIndianNumber,
+    showAge = true, showCategory = true, showSerialNo = true
+}) {
     const imageUrl = currentPlayer?.image ? getImageUrl(currentPlayer.image) : null;
 
     return (
@@ -250,13 +253,13 @@ function OverlayLowerThird({ theme, currentPlayer, currentBid, leadingTeam, bidF
                         >
                             {currentPlayer.role}
                             {currentPlayer.country ? ` · ${currentPlayer.country}` : ''}
-                            {currentPlayer.age ? ` · Age ${currentPlayer.age}` : ''}
-                            {currentPlayer.category ? ` · ${currentPlayer.category}` : ''}
+                            {showAge && currentPlayer.age ? ` · Age ${currentPlayer.age}` : ''}
+                            {showCategory && currentPlayer.category ? ` · ${currentPlayer.category}` : ''}
                         </span>
 
                         {/* Serial number badge on the LEFT of player name */}
                         <div className="flex items-center gap-2 min-w-0">
-                            {currentPlayer.serial_number && (
+                            {showSerialNo && currentPlayer.serial_number && (
                                 <span
                                     className="px-2 py-0.5 rounded text-[11px] md:text-xs font-black uppercase tracking-wider shrink-0 shadow-md"
                                     style={{
@@ -398,6 +401,11 @@ function Overlay() {
     const [teamPurses, setTeamPurses] = useState([]);
     const theme = getTheme(themeKey);
 
+    // UI display toggles synced from Host (Age, Category, Serial No)
+    const [showAge, setShowAge] = useState(true);
+    const [showCategory, setShowCategory] = useState(true);
+    const [showSerialNo, setShowSerialNo] = useState(true);
+
     const currentPlayerRef = useRef(null);
 
     // ── Preload all player images ─────────────────────────────────────────────
@@ -423,6 +431,11 @@ function Overlay() {
         getPublicBroadcastConfig().then(cfg => {
             if (cfg && cfg.theme) setThemeKey(cfg.theme);
             if (cfg && cfg.hostDisplayMode) setDisplayMode(cfg.hostDisplayMode);
+            if (cfg && cfg.uiToggles) {
+                if (cfg.uiToggles.showAge !== undefined) setShowAge(cfg.uiToggles.showAge);
+                if (cfg.uiToggles.showCategory !== undefined) setShowCategory(cfg.uiToggles.showCategory);
+                if (cfg.uiToggles.showSerialNo !== undefined) setShowSerialNo(cfg.uiToggles.showSerialNo);
+            }
         }).catch(() => { });
     }, [auctionId]);
 
@@ -529,6 +542,15 @@ function Overlay() {
                     refreshTeamPurses();
                 }
             }
+        });
+
+        // ── UI display toggles from Host (Age, Category, Serial No) ───────────
+        newSocket.on('ui-toggles-updated', (data) => {
+            if (!data) return;
+            console.log('[Socket:Overlay] ui-toggles-updated →', data);
+            if (data.showAge !== undefined) setShowAge(data.showAge);
+            if (data.showCategory !== undefined) setShowCategory(data.showCategory);
+            if (data.showSerialNo !== undefined) setShowSerialNo(data.showSerialNo);
         });
 
         // ── Real-time Player Sold & Team Purse Updates ────────────────────────
@@ -647,6 +669,9 @@ function Overlay() {
                     leadingTeam={leadingTeam}
                     bidFlash={bidFlash}
                     formatIndianNumber={formatIndianNumber}
+                    showAge={showAge}
+                    showCategory={showCategory}
+                    showSerialNo={showSerialNo}
                 />
             )}
 
