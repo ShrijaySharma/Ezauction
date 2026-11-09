@@ -279,38 +279,38 @@ function buildProCoverPage(tournamentName, teamsWithPlayers, logoBase64) {
 // ---------------------------------------------------------------------------
 
 function getProGridLayout(count) {
-  // Available height for grid in A4 Portrait (PAGE_H = 1414px):
-  // Header (~115px) + Footer (~45px) + Padding (~40px) leaves ~1214px vertical space.
-  // Usable width: 1000 - 60 = 940px.
+  // Available height in A4 Portrait (PAGE_H = 1414px):
+  // Header (112px) + Footer (46px) leaves 1256px vertical canvas.
+  // Generous gaps (22-28px) and paddings provide high-end card breathing room.
 
   if (count <= 4) {
     return {
       cols: 2,
-      photoH: 320,
-      gapX: 28, gapY: 28,
-      nameSize: 17, nameLineH: 22, nameBoxH: 46,
+      photoH: 300,
+      gapX: 36, gapY: 32,
+      nameSize: 17, nameLineH: 22, nameBoxH: 42,
       roleSize: 12, roleH: 26,
-      padX: 50, padY: 24,
+      padX: 60, padY: 30,
     };
   }
   if (count <= 8) {
     return {
       cols: 4,
-      photoH: 240,
-      gapX: 20, gapY: 20,
-      nameSize: 14.5, nameLineH: 19, nameBoxH: 40,
+      photoH: 220,
+      gapX: 26, gapY: 26,
+      nameSize: 14.5, nameLineH: 19, nameBoxH: 36,
       roleSize: 11, roleH: 24,
-      padX: 36, padY: 20,
+      padX: 46, padY: 26,
     };
   }
   if (count <= 12) {
     return {
       cols: 4,
-      photoH: 195,
-      gapX: 18, gapY: 18,
-      nameSize: 13.5, nameLineH: 18, nameBoxH: 38,
+      photoH: 185,
+      gapX: 24, gapY: 24,
+      nameSize: 13.5, nameLineH: 18, nameBoxH: 34,
       roleSize: 10, roleH: 23,
-      padX: 32, padY: 18,
+      padX: 44, padY: 24,
     };
   }
   if (count <= 16) {
@@ -318,53 +318,53 @@ function getProGridLayout(count) {
     return {
       cols: 4,
       photoH: 165,
-      gapX: 16, gapY: 15,
-      nameSize: 13, nameLineH: 17, nameBoxH: 36,
+      gapX: 24, gapY: 22,
+      nameSize: 13, nameLineH: 17, nameBoxH: 32,
       roleSize: 9.5, roleH: 22,
-      padX: 30, padY: 16,
+      padX: 42, padY: 22,
     };
   }
   if (count <= 20) {
     // 5 columns x 4 rows = 20 cards
     return {
       cols: 5,
-      photoH: 155,
-      gapX: 14, gapY: 14,
-      nameSize: 12, nameLineH: 16, nameBoxH: 34,
+      photoH: 150,
+      gapX: 18, gapY: 18,
+      nameSize: 12, nameLineH: 16, nameBoxH: 30,
       roleSize: 9, roleH: 21,
-      padX: 26, padY: 14,
+      padX: 36, padY: 20,
     };
   }
   if (count <= 25) {
     // 5 columns x 5 rows = 25 cards
     return {
       cols: 5,
-      photoH: 130,
-      gapX: 12, gapY: 12,
-      nameSize: 11, nameLineH: 15, nameBoxH: 30,
+      photoH: 125,
+      gapX: 16, gapY: 16,
+      nameSize: 11, nameLineH: 15, nameBoxH: 28,
       roleSize: 8.5, roleH: 20,
-      padX: 24, padY: 12,
+      padX: 34, padY: 16,
     };
   }
   if (count <= 30) {
     // 6 columns x 5 rows = 30 cards
     return {
       cols: 6,
-      photoH: 115,
-      gapX: 10, gapY: 10,
-      nameSize: 10.5, nameLineH: 14, nameBoxH: 28,
+      photoH: 110,
+      gapX: 14, gapY: 14,
+      nameSize: 10.5, nameLineH: 14, nameBoxH: 26,
       roleSize: 8, roleH: 18,
-      padX: 20, padY: 10,
+      padX: 30, padY: 14,
     };
   }
   // 31+ players
   return {
     cols: 7,
     photoH: 95,
-    gapX: 8, gapY: 8,
-    nameSize: 9.5, nameLineH: 13, nameBoxH: 26,
+    gapX: 12, gapY: 12,
+    nameSize: 9.5, nameLineH: 13, nameBoxH: 24,
     roleSize: 7.5, roleH: 17,
-    padX: 16, padY: 8,
+    padX: 24, padY: 12,
   };
 }
 
@@ -439,7 +439,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
 
   wrap.appendChild(header);
 
-  // ── 2. PLAYER GRID (Generous breathing room, proper portrait photo framing) ──
+  // ── 2. PLAYER GRID (Generous card breathing room, proportional un-stretched photos) ──
   const gridWrap = document.createElement('div');
   gridWrap.style.cssText = `
     flex:1; display:flex; flex-direction:column; justify-content:center;
@@ -459,42 +459,41 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
       background:linear-gradient(180deg, #18192E 0%, #111222 100%);
       border:1.5px solid rgba(212,175,55,0.30);
       border-top:3px solid #D4AF37;
-      display:flex; flex-direction:column;
-      box-shadow:0 8px 24px rgba(0,0,0,0.5);
+      display:block;
+      box-shadow:0 8px 24px rgba(0,0,0,0.55);
       width:100%; box-sizing:border-box;
     `;
 
-    // Photo container with HTML image + subtle bottom vignette overlay
+    // Photo container with CSS background-image
+    // (html2canvas preserves exact aspect ratio without stretching, unlike <img> tags)
     const photoBox = document.createElement('div');
-    photoBox.style.cssText = `
-      width:100%; height:${layout.photoH}px; overflow:hidden;
-      background:radial-gradient(circle at 50% 30%, #222544 0%, #0d0e1c 100%);
-      position:relative; display:flex; align-items:center; justify-content:center;
-      flex-shrink:0;
-    `;
-
     if (player._imgBase64) {
-      const img = document.createElement('img');
-      img.src = player._imgBase64;
-      img.style.cssText = `
-        width:100%; height:100%;
-        object-fit:cover;
-        object-position:top center;
-        display:block;
+      photoBox.style.cssText = `
+        width:100%; height:${layout.photoH}px;
+        background-color:#0D0E1C;
+        background-image:url("${player._imgBase64}");
+        background-size:cover;
+        background-position:center top;
+        background-repeat:no-repeat;
+        position:relative; display:block; overflow:hidden;
       `;
-      photoBox.appendChild(img);
 
       // Subtle bottom gradient fade for seamless broadcast look
       const vignette = document.createElement('div');
       vignette.style.cssText = `
-        position:absolute; bottom:0; left:0; right:0; height:35%;
-        background:linear-gradient(180deg, transparent 0%, rgba(17,18,34,0.92) 100%);
+        position:absolute; bottom:0; left:0; right:0; height:32%;
+        background:linear-gradient(180deg, transparent 0%, rgba(19,20,38,0.96) 100%);
         pointer-events:none;
       `;
       photoBox.appendChild(vignette);
     } else {
       const bg = initialsColor(player.name);
-      photoBox.style.background = bg;
+      photoBox.style.cssText = `
+        width:100%; height:${layout.photoH}px;
+        background:${bg};
+        position:relative; display:flex; align-items:center; justify-content:center;
+        overflow:hidden;
+      `;
       const initText = document.createElement('div');
       initText.textContent = getInitials(player.name);
       initText.style.cssText = `
@@ -504,17 +503,23 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
       photoBox.appendChild(initText);
     }
 
-    // Optional sold price tag in top right corner of photo
+    // Sold price tag: rigidly sized & vertically centered (text NEVER slips out at bottom)
     if (player.sold_price) {
       const priceTag = document.createElement('div');
       priceTag.textContent = fmtINR(player.sold_price);
       priceTag.style.cssText = `
-        position:absolute; top:6px; right:6px;
-        background:rgba(0,0,0,0.78); border:1px solid rgba(212,175,55,0.6);
-        border-radius:6px; padding:2px 7px;
-        font-size:${layout.cols >= 6 ? '8px' : '9.5px'}; font-weight:800; color:#FFDF73;
+        position:absolute; top:8px; right:8px;
+        height:22px; line-height:20px;
+        padding:0 10px;
+        background:rgba(8,9,18,0.92);
+        border:1.5px solid #D4AF37;
+        border-radius:11px;
+        font-size:10px; font-weight:800; color:#FFE885;
         letter-spacing:0.5px; font-family:${FONT_STACK};
-        box-shadow:0 2px 6px rgba(0,0,0,0.6);
+        box-sizing:border-box; text-align:center;
+        display:block; z-index:3;
+        box-shadow:0 3px 8px rgba(0,0,0,0.7);
+        white-space:nowrap;
       `;
       photoBox.appendChild(priceTag);
     }
@@ -522,22 +527,22 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     card.appendChild(photoBox);
 
     // Info Container (Player Name & Role Pill)
+    // Uses standard block flow layout (no nested flex flex:1) so text never slips out of cards
     const infoContainer = document.createElement('div');
     infoContainer.style.cssText = `
       width:100%; background:#131426;
-      padding:8px 6px 10px; box-sizing:border-box;
-      text-align:center; display:flex; flex-direction:column;
-      align-items:center; justify-content:center; flex:1;
+      padding:8px 8px 12px; box-sizing:border-box;
+      text-align:center; display:block;
     `;
 
     const pName = (player.name || 'Player').trim();
     const isLongName = pName.length > 13 || pName.split(/\s+/).length >= 3;
 
-    // Name Box
+    // Name Box (Table layout for robust vertical centering)
     const nameTable = document.createElement('div');
     nameTable.style.cssText = `
       display:table; width:100%; height:${layout.nameBoxH}px; min-height:${layout.nameBoxH}px;
-      margin:0 0 4px 0; box-sizing:border-box;
+      margin:0 0 6px 0; box-sizing:border-box;
     `;
 
     const nameCell = document.createElement('div');
@@ -564,7 +569,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     nameTable.appendChild(nameCell);
     infoContainer.appendChild(nameTable);
 
-    // Dedicated Role Pill
+    // Dedicated Role Pill (Sufficient bottom margin guarantees zero overlap/slipping)
     const role = (player.role || 'PLAYER').toUpperCase();
     const rc = roleColor(role);
 
@@ -590,6 +595,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
   wrap.appendChild(gridWrap);
 
   // ── 3. FOOTER BAR: Clean ezAuction Branding Center, Page Number Right ──
+  // (Removed redundant team dossier text per user request)
   const footer = document.createElement('div');
   footer.style.cssText = `
     width:100%; height:46px; flex-shrink:0;
@@ -599,10 +605,9 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     padding:0 36px; box-sizing:border-box; position:relative; z-index:2;
   `;
 
-  // Left
+  // Left (Clean spacer for balance)
   const ftLeft = document.createElement('div');
-  ftLeft.textContent = `${teamName.toUpperCase()} • OFFICIAL DOSSIER`;
-  ftLeft.style.cssText = `font-size:10.5px; font-weight:700; color:#777; letter-spacing:1px; width:220px; font-family:${FONT_STACK};`;
+  ftLeft.style.cssText = `width:120px;`;
   footer.appendChild(ftLeft);
 
   // Center: EzAuction Logo / Text
@@ -626,7 +631,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
   ftRight.textContent = `PAGE ${pageNum} / ${totalPages}`;
   ftRight.style.cssText = `
     font-size:11px; font-weight:800; color:#D4AF37; letter-spacing:1px;
-    width:220px; text-align:right; font-family:${FONT_STACK};
+    width:120px; text-align:right; font-family:${FONT_STACK};
   `;
   footer.appendChild(ftRight);
 

@@ -855,13 +855,8 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
     align-items: center;
   `);
 
-  footer.appendChild(createEl('div', `
-    font-size: 10px;
-    font-weight: 700;
-    color: ${tk.textMuted};
-    letter-spacing: 1px;
-    line-height: 14px;
-  `, `${teamName.toUpperCase()} • ${tournamentName || 'AUCTION'} • OFFICIAL DOSSIER`));
+  // Left space for balance (removed team dossier line per request)
+  footer.appendChild(createEl('div', `width: 80px;`));
 
   footer.appendChild(createEl('div', `
     font-size: 10px;
