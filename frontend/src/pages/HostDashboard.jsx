@@ -587,6 +587,14 @@ function HostDashboard({ user }) {
     reader.readAsDataURL(file);
   };
 
+  // Ensure host broadcast view is strictly locked to full screen with zero scrollbar
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   // Derive theme object — pure computation, no side-effects
   const theme = getTheme(themeKey);
   const isLight = themeKey === 'blue_brush';
@@ -637,8 +645,8 @@ function HostDashboard({ user }) {
         </div>
       )}
 
-      {/* Main Full-Screen Content Area — perfectly seamless */}
-      <div className="relative z-10 h-full w-full flex flex-col overflow-y-auto lg:overflow-hidden">
+      {/* Main Full-Screen Content Area — perfectly seamless, strictly no scrollbar */}
+      <div className="relative z-10 h-full w-full flex flex-col overflow-hidden">
 
           {/* ── MODE: PURSE ─────────────────────────────────────────────────── */}
           {displayMode === 'purse' && (

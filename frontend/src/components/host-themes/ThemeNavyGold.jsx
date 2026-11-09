@@ -16,7 +16,7 @@ export default function ThemeNavyGold({
   const lastName = nameParts.slice(1).join(' ') || '';
 
   return (
-    <div className="relative w-full min-h-full flex flex-col justify-between overflow-x-hidden select-none" style={{ background: '#051126', fontFamily: "'Inter', sans-serif" }}>
+    <div className="relative w-full h-full flex flex-col justify-between overflow-hidden select-none" style={{ background: '#051126', fontFamily: "'Inter', sans-serif" }}>
 
       {/* ── BG ── */}
       <div className="absolute inset-0 pointer-events-none">
