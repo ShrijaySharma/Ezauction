@@ -945,26 +945,35 @@ router.post('/mark-player', async (req, res) => {
       let finalSoldToTeam = soldToTeam || null;
 
       if (!finalSoldPrice || !finalSoldToTeam) {
-        // Fallback: look up highest bid from DB (page-refresh recovery path)
-        const { data: highestBid, error: bidError } = await supabase
-          .from('bids')
-          .select('*')
-          .eq('player_id', playerId)
-          .eq('auction_id', auctionId)
-          .order('amount', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (bidError) throw bidError;
-
-        if (!highestBid && !finalSoldPrice) {
-          return res.status(400).json({
-            error: 'No bids found for this player. Cannot mark as SOLD without a bid.'
-          });
+        // Optimistic Bidding Recovery: Check in-memory virtual highest bid first
+        const vBid = getVirtualHighestBid(auctionId);
+        if (vBid && Number(vBid.player_id) === Number(playerId)) {
+          finalSoldPrice = finalSoldPrice || vBid.amount;
+          finalSoldToTeam = finalSoldToTeam || vBid.team_id;
         }
 
-        finalSoldPrice = finalSoldPrice || (highestBid ? highestBid.amount : 0);
-        finalSoldToTeam = finalSoldToTeam || (highestBid ? highestBid.team_id : null);
+        // Fallback: look up highest bid from DB (legacy or reconnect recovery path)
+        if (!finalSoldPrice || !finalSoldToTeam) {
+          const { data: highestBid, error: bidError } = await supabase
+            .from('bids')
+            .select('*')
+            .eq('player_id', playerId)
+            .eq('auction_id', auctionId)
+            .order('amount', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (bidError) throw bidError;
+
+          if (!highestBid && !finalSoldPrice) {
+            return res.status(400).json({
+              error: 'No bids found for this player. Cannot mark as SOLD without a bid.'
+            });
+          }
+
+          finalSoldPrice = finalSoldPrice || (highestBid ? highestBid.amount : 0);
+          finalSoldToTeam = finalSoldToTeam || (highestBid ? highestBid.team_id : null);
+        }
       }
 
       if (!finalSoldToTeam) {
@@ -987,7 +996,7 @@ router.post('/mark-player', async (req, res) => {
 
       // 4 + 5. Update team budget, player status, and persist winning bid in parallel (independent writes)
       const newBudget = team.budget - finalSoldPrice;
-      const [{ error: updateBudgetError }, { error: updatePlayerError }] = await Promise.all([
+      const [{ error: updateBudgetError }, { error: updatePlayerError }, { error: insertBidError }] = await Promise.all([
         supabase.from('teams').update({ budget: newBudget }).eq('id', finalSoldToTeam).eq('auction_id', auctionId),
         supabase.from('players').update({
           status: 'SOLD',
@@ -1006,6 +1015,7 @@ router.post('/mark-player', async (req, res) => {
 
       if (updateBudgetError) throw updateBudgetError;
       if (updatePlayerError) throw updatePlayerError;
+      if (insertBidError) console.warn('[Admin] Non-fatal: winning bid insertion warning:', insertBidError);
 
       clearVirtualBids(auctionId);
 
