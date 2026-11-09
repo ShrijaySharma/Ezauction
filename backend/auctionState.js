@@ -160,3 +160,31 @@ export function setAdminAnonymousBid(auctionId, amount, playerId) {
 export function clearAdminAnonymousBid(auctionId) {
     adminAnonymousBids.set(auctionId, { amount: 0, playerId: null });
 }
+
+// ─── In-Memory Virtual Bid Stack (per auction, for optimistic admin bidding) ──
+const auctionBidStacks = new Map(); // auctionId → Array of virtual bids
+
+export function pushVirtualBid(auctionId, bid) {
+    const stack = auctionBidStacks.get(auctionId) || [];
+    stack.push(bid);
+    auctionBidStacks.set(auctionId, stack);
+}
+
+export function popVirtualBid(auctionId) {
+    const stack = auctionBidStacks.get(auctionId) || [];
+    if (stack.length === 0) return null;
+    stack.pop();
+    const top = stack.length > 0 ? stack[stack.length - 1] : null;
+    const previous = stack.length > 1 ? stack[stack.length - 2] : null;
+    return { top, previous };
+}
+
+export function getVirtualHighestBid(auctionId) {
+    const stack = auctionBidStacks.get(auctionId) || [];
+    return stack.length > 0 ? stack[stack.length - 1] : null;
+}
+
+export function clearVirtualBids(auctionId) {
+    auctionBidStacks.delete(auctionId);
+}
+

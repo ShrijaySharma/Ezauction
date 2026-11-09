@@ -17,7 +17,7 @@ import { requireAuctionScope } from './middleware/auth.js';
 import bcrypt from 'bcrypt';
 import { supabase } from './supabaseClient.js';
 import { SupabaseSessionStore } from './supabaseSessionStore.js';
-import { refreshAuctionState, refreshAllAuctionStates, getAuctionState, getAdminAnonymousBid } from './auctionState.js';
+import { refreshAuctionState, refreshAllAuctionStates, getAuctionState, getAdminAnonymousBid, pushVirtualBid, getVirtualHighestBid } from './auctionState.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -220,55 +220,61 @@ auctionNamespace.on('connection', (socket) => {
         if (player) {
           socket.emit('player-loaded', { player });
 
-          const { data: bid } = await supabase
-            .from('bids')
-            .select('*')
-            .eq('player_id', state.current_player_id)
-            .eq('auction_id', auctionId)
-            .order('amount', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          let processedBid = null;
-          if (bid) {
-            let teamName = '';
-            if (bid.team_id) {
-              const { data: team } = await supabase
-                .from('teams')
-                .select('name')
-                .eq('id', bid.team_id)
-                .eq('auction_id', auctionId)
-                .maybeSingle();
-              if (team) teamName = team.name;
-            }
-
-            processedBid = { ...bid, team_name: teamName };
-
-            // Check if there's a higher in-memory anonymous bid
-            const anonBid = getAdminAnonymousBid(auctionId);
-            if (anonBid.playerId === state.current_player_id && anonBid.amount > processedBid.amount) {
-              processedBid = {
-                ...processedBid,
-                amount: anonBid.amount,
-                team_id: null,
-                team_name: ''
-              };
-            }
-
-            socket.emit('bid-updated', { highestBid: processedBid });
+          // ── Check in-memory virtual highest bid first (optimistic bidding) ──
+          const vBid = getVirtualHighestBid(auctionId);
+          if (vBid && vBid.player_id === state.current_player_id) {
+            socket.emit('bid-updated', { highestBid: vBid });
           } else {
-            const anonBid = getAdminAnonymousBid(auctionId);
-            if (anonBid.playerId === state.current_player_id && anonBid.amount > 0) {
-              socket.emit('bid-updated', {
-                highestBid: {
-                  id: Date.now(),
-                  player_id: state.current_player_id,
-                  team_id: null,
+            const { data: bid } = await supabase
+              .from('bids')
+              .select('*')
+              .eq('player_id', state.current_player_id)
+              .eq('auction_id', auctionId)
+              .order('amount', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            let processedBid = null;
+            if (bid) {
+              let teamName = '';
+              if (bid.team_id) {
+                const { data: team } = await supabase
+                  .from('teams')
+                  .select('name')
+                  .eq('id', bid.team_id)
+                  .eq('auction_id', auctionId)
+                  .maybeSingle();
+                if (team) teamName = team.name;
+              }
+
+              processedBid = { ...bid, team_name: teamName };
+
+              // Check if there's a higher in-memory anonymous bid
+              const anonBid = getAdminAnonymousBid(auctionId);
+              if (anonBid.playerId === state.current_player_id && anonBid.amount > processedBid.amount) {
+                processedBid = {
+                  ...processedBid,
                   amount: anonBid.amount,
-                  team_name: '',
-                  timestamp: new Date()
-                }
-              });
+                  team_id: null,
+                  team_name: ''
+                };
+              }
+
+              socket.emit('bid-updated', { highestBid: processedBid });
+            } else {
+              const anonBid = getAdminAnonymousBid(auctionId);
+              if (anonBid.playerId === state.current_player_id && anonBid.amount > 0) {
+                socket.emit('bid-updated', {
+                  highestBid: {
+                    id: Date.now(),
+                    player_id: state.current_player_id,
+                    team_id: null,
+                    amount: anonBid.amount,
+                    team_name: '',
+                    timestamp: new Date()
+                  }
+                });
+              }
             }
           }
         }
@@ -285,6 +291,48 @@ auctionNamespace.on('connection', (socket) => {
       console.error(`[Socket:${auctionId}] Error in request-info:`, err);
     }
   });
+
+  // ─── Optimistic Admin Bid ───────────────────────────────────────────────────
+  // The admin places a bid via socket — no DB write happens here.
+  // The server validates the bid against in-memory auction state and
+  // rebroadcasts 'bid-placed' to ALL clients instantly (~1-5ms vs 300-800ms).
+  // The actual DB write (amount + team) only happens when SOLD is clicked.
+  socket.on('place-admin-bid', (data) => {
+    try {
+      const { teamId, amount, teamName, playerId, previousBid, increment } = data || {};
+      const state = getAuctionState(auctionId);
+
+      // Basic guard rails — prevent clearly invalid bids from being broadcast
+      if (!state || state.status !== 'LIVE' || !state.current_player_id) return;
+      if (!teamId || !amount || amount <= 0) return;
+      if (Number(playerId) !== Number(state.current_player_id)) return;
+
+      // Build the virtual bid object (mirrors what the HTTP endpoint used to return)
+      const virtualBid = {
+        id: Date.now(),             // virtual id — not a real DB row
+        player_id: state.current_player_id,
+        team_id: teamId,
+        team_name: teamName || '',
+        amount: amount,
+        timestamp: new Date().toISOString()
+      };
+
+      // Push to in-memory bid stack for this auction
+      pushVirtualBid(auctionId, virtualBid);
+
+      // Broadcast to everyone in this auction namespace (host, owners, overlay, admin)
+      socket.nsp.emit('bid-placed', {
+        bid: virtualBid,
+        highestBid: virtualBid,
+        increment: increment || 0,
+        playerId: state.current_player_id,
+        previousBid: previousBid || 0
+      });
+    } catch (err) {
+      console.error(`[Socket:${auctionId}] Error in place-admin-bid:`, err);
+    }
+  });
+  // ───────────────────────────────────────────────────────────────────────────
 
   // Relay Host UI display toggles to Overlay in real-time & persist
   socket.on('ui-toggles-changed', async (data) => {

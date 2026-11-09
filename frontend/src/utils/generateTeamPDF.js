@@ -498,13 +498,62 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
     border-radius: 16px 0 0 0;
   `));
 
+  // Header banner sizing adapts when squad has many players
+  const count = players.length;
+  let rowH = 54;
+  let avatarSize = 40;
+  let fontSizeName = 13;
+  let fontSizeRole = 10;
+  let fontSizeAge = 13;
+  let fontSizePrice = 14;
+  let roleBadgeH = 22;
+  let roleBadgePad = 12;
+
+  if (count > 10 && count <= 13) {
+    rowH = 45;
+    avatarSize = 34;
+    fontSizeName = 12;
+    fontSizeRole = 9.5;
+    fontSizeAge = 12;
+    fontSizePrice = 13;
+    roleBadgeH = 20;
+    roleBadgePad = 10;
+  } else if (count > 13 && count <= 16) {
+    rowH = 38;
+    avatarSize = 30;
+    fontSizeName = 11.5;
+    fontSizeRole = 9;
+    fontSizeAge = 11.5;
+    fontSizePrice = 12;
+    roleBadgeH = 19;
+    roleBadgePad = 8;
+  } else if (count > 16 && count <= 20) {
+    rowH = 32;
+    avatarSize = 25;
+    fontSizeName = 11;
+    fontSizeRole = 8.5;
+    fontSizeAge = 11;
+    fontSizePrice = 11;
+    roleBadgeH = 17;
+    roleBadgePad = 6;
+  } else if (count > 20) {
+    rowH = Math.max(22, Math.floor(660 / count));
+    avatarSize = Math.max(16, rowH - 6);
+    fontSizeName = 10;
+    fontSizeRole = 8;
+    fontSizeAge = 10;
+    fontSizePrice = 10;
+    roleBadgeH = Math.max(14, rowH - 6);
+    roleBadgePad = 4;
+  }
+
   // ── HEADER BANNER ──────────────────────────────────────────────────────────
   const header = createEl('div', `
     background: ${tk.headerBg};
     border: 1px solid ${tk.headerBorder};
     border-radius: 14px;
-    padding: 18px 24px;
-    margin-bottom: 20px;
+    padding: ${count > 14 ? '12px 20px' : '18px 24px'};
+    margin-bottom: ${count > 14 ? '12px' : '20px'};
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -661,7 +710,7 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
     const row = createEl('div', `
       display: flex;
       align-items: center;
-      height: 56px;
+      height: ${rowH}px;
       background: ${rowBg};
       border-bottom: ${isLast ? 'none' : `1px solid ${tk.rowBorder}`};
       box-sizing: border-box;
@@ -671,13 +720,13 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
     row.appendChild(createEl('div', `
       width: 44px;
       text-align: center;
-      font-size: 12px;
+      font-size: ${fontSizeName}px;
       font-weight: 800;
       color: ${tk.accent};
       line-height: 16px;
     `, `#${String(idx + 1).padStart(2, '0')}`));
 
-    // Photo avatar (40x40)
+    // Photo avatar
     const photoCell = createEl('div', `
       width: 52px;
       display: flex;
@@ -686,9 +735,9 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
     `);
 
     const avatarBox = createEl('div', `
-      width: 40px;
-      height: 40px;
-      border-radius: 10px;
+      width: ${avatarSize}px;
+      height: ${avatarSize}px;
+      border-radius: ${Math.round(avatarSize * 0.25)}px;
       overflow: hidden;
       background: ${tk.cardBg};
       border: 1.5px solid ${tk.cardBorder};
@@ -704,10 +753,10 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
       avatarBox.appendChild(pImg);
     } else {
       avatarBox.appendChild(createEl('span', `
-        font-size: 16px;
+        font-size: ${Math.round(avatarSize * 0.45)}px;
         font-weight: 900;
         color: ${tk.accent};
-        line-height: 20px;
+        line-height: ${Math.round(avatarSize * 0.5)}px;
       `, (player.name || '?').charAt(0).toUpperCase()));
     }
     photoCell.appendChild(avatarBox);
@@ -723,10 +772,10 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
       min-width: 0;
     `);
     nameCell.appendChild(createEl('div', `
-      font-size: 13px;
+      font-size: ${fontSizeName}px;
       font-weight: 800;
       color: ${tk.textPrimary};
-      line-height: 18px;
+      line-height: ${rowH < 35 ? '14px' : '18px'};
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -741,16 +790,17 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
     `);
     const roleBadge = createEl('div', `
       display: inline-block;
-      height: 22px;
-      line-height: 20px;
-      padding: 0 12px;
-      border-radius: 11px;
+      height: ${roleBadgeH}px;
+      line-height: ${roleBadgeH - 2}px;
+      padding: 0 ${roleBadgePad}px;
+      border-radius: ${Math.round(roleBadgeH / 2)}px;
       background: ${roleMeta.bg};
       border: 1px solid ${roleMeta.border};
       color: ${roleMeta.text};
-      font-size: 10px;
+      font-size: ${fontSizeRole}px;
       font-weight: 800;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
       text-align: center;
       vertical-align: middle;
       box-sizing: border-box;
@@ -766,7 +816,7 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 13px;
+      font-size: ${fontSizeAge}px;
       font-weight: 700;
       color: ${tk.textSecondary};
       line-height: 18px;
@@ -781,7 +831,7 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
         align-items: center;
         justify-content: flex-end;
         padding-right: 18px;
-        font-size: 14px;
+        font-size: ${fontSizePrice}px;
         font-weight: 900;
         color: ${tk.accent};
         line-height: 18px;
@@ -794,73 +844,6 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
 
   tableContainer.appendChild(tableBody);
   page.appendChild(tableContainer);
-
-  // ── SQUAD INSIGHTS CARD (Fills empty space beautifully when players <= 6) ─────
-  if (players.length <= 6) {
-    const insightCard = createEl('div', `
-      background: ${tk.cardBg};
-      border: 1px solid ${tk.cardBorder};
-      border-radius: 14px;
-      padding: 20px 24px;
-      margin-bottom: auto;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-    `);
-
-    const inHeader = createEl('div', `
-      font-size: 11px;
-      font-weight: 800;
-      color: ${tk.accent};
-      letter-spacing: 1.5px;
-      line-height: 16px;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    `);
-    inHeader.appendChild(createEl('span', ``, '📊 ROSTER SUMMARY & STATUS'));
-    insightCard.appendChild(inHeader);
-
-    // Count roles
-    const counts = { Batsman: 0, Bowler: 0, 'All-Rounder': 0, 'Wicket-Keeper': 0 };
-    players.forEach(p => {
-      const r = (p.role || '').toUpperCase();
-      if (r.includes('BAT')) counts.Batsman++;
-      else if (r.includes('BOWL')) counts.Bowler++;
-      else if (r.includes('ALL') || r.includes('ROUND')) counts['All-Rounder']++;
-      else if (r.includes('KEEP') || r.includes('WK')) counts['Wicket-Keeper']++;
-      else counts['All-Rounder']++;
-    });
-
-    const grid = createEl('div', `display: flex; gap: 14px;`);
-    Object.entries(counts).forEach(([k, v]) => {
-      const b = createEl('div', `
-        flex: 1;
-        background: ${tk.rowEven};
-        border: 1px solid ${tk.rowBorder};
-        border-radius: 10px;
-        padding: 12px 14px;
-        text-align: center;
-      `);
-      b.appendChild(createEl('div', `
-        font-size: 20px;
-        font-weight: 900;
-        color: ${tk.textPrimary};
-        line-height: 24px;
-      `, String(v)));
-      b.appendChild(createEl('div', `
-        font-size: 9px;
-        font-weight: 800;
-        color: ${tk.textMuted};
-        letter-spacing: 0.5px;
-        line-height: 14px;
-        margin-top: 2px;
-      `, k.toUpperCase()));
-      grid.appendChild(b);
-    });
-
-    insightCard.appendChild(grid);
-    page.appendChild(insightCard);
-  }
 
   // ── FOOTER ────────────────────────────────────────────────────────────────
   const footer = createEl('div', `
@@ -945,16 +928,8 @@ export async function generateTeamPDF({
   const PAGE_W_MM = 210;
   const PAGE_H_MM = 297;
 
-  // Max players per team page (10 allows generous row heights + room for insights card/stats)
-  const PLAYERS_PER_PAGE = 10;
-
-  // Calculate total pages for page numbers
-  let totalReportPages = 1; // cover
-  teamsWithPlayers.forEach(t => {
-    const count = (t.players || []).length;
-    totalReportPages += Math.max(1, Math.ceil(count / PLAYERS_PER_PAGE));
-  });
-
+  // Calculate total pages: 1 cover + 1 per team (every team fits on 1 page)
+  const totalReportPages = 1 + teamsWithPlayers.length;
   let currentPageIndex = 1;
 
   try {
@@ -975,47 +950,38 @@ export async function generateTeamPDF({
     doc.addImage(coverData, 'JPEG', 0, 0, PAGE_W_MM, PAGE_H_MM, undefined, 'FAST');
     container.removeChild(coverNode);
 
-    // ── 2. RENDER TEAM SQUAD PAGES ────────────────────────────────────────────
+    // ── 2. RENDER TEAM SQUAD PAGES (1 page per team) ─────────────────────────
     for (const team of teamsWithPlayers) {
+      currentPageIndex++;
+      doc.addPage();
       const players = team.players || [];
-      const chunks = [];
-      for (let i = 0; i < players.length; i += PLAYERS_PER_PAGE) {
-        chunks.push(players.slice(i, i + PLAYERS_PER_PAGE));
-      }
-      if (chunks.length === 0) chunks.push([]);
 
-      for (let ci = 0; ci < chunks.length; ci++) {
-        currentPageIndex++;
-        doc.addPage();
-        const chunk = chunks[ci];
+      const teamPageNode = buildTeamPage(
+        tk,
+        team,
+        players,
+        tournamentName,
+        includeBidPrice,
+        logoBase64,
+        team._logoBase64 || null,
+        currentPageIndex,
+        totalReportPages
+      );
 
-        const teamPageNode = buildTeamPage(
-          tk,
-          team,
-          chunk,
-          tournamentName,
-          includeBidPrice,
-          logoBase64,
-          team._logoBase64 || null,
-          currentPageIndex,
-          totalReportPages
-        );
+      container.appendChild(teamPageNode);
+      await new Promise(r => setTimeout(r, 120));
 
-        container.appendChild(teamPageNode);
-        await new Promise(r => setTimeout(r, 120));
-
-        const teamCanvas = await html2canvas(teamPageNode, {
-          scale: 2.2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: tk.bg,
-          logging: false,
-          imageTimeout: 8000,
-        });
-        const teamData = teamCanvas.toDataURL('image/jpeg', 0.96);
-        doc.addImage(teamData, 'JPEG', 0, 0, PAGE_W_MM, PAGE_H_MM, undefined, 'FAST');
-        container.removeChild(teamPageNode);
-      }
+      const teamCanvas = await html2canvas(teamPageNode, {
+        scale: 2.2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: tk.bg,
+        logging: false,
+        imageTimeout: 8000,
+      });
+      const teamData = teamCanvas.toDataURL('image/jpeg', 0.96);
+      doc.addImage(teamData, 'JPEG', 0, 0, PAGE_W_MM, PAGE_H_MM, undefined, 'FAST');
+      container.removeChild(teamPageNode);
     }
 
     const safeFilename = `${(tournamentName || 'Auction').replace(/[^a-z0-9]/gi, '_')}_Official_Squad_List.pdf`;

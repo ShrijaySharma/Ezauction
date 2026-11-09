@@ -226,8 +226,147 @@ function buildProCoverPage(tournamentName, teamsWithPlayers, logoBase64) {
 // Team page (1:1 Square, Centralized Header, Balanced Card Grid)
 // ---------------------------------------------------------------------------
 
+function getProGridLayout(count) {
+  if (count <= 4) {
+    return {
+      cols: Math.max(count, 3),
+      maxW: count <= 2 ? 440 : count === 3 ? 560 : 700,
+      photoH: 180,
+      gapX: 18,
+      gapY: 18,
+      nameSize: 13,
+      nameLineH: 16,
+      nameBoxH: 34,
+      roleSize: 10,
+      roleH: 22,
+      padX: 40,
+      padY: 24,
+      cardMinH: 260
+    };
+  }
+  if (count <= 8) {
+    return {
+      cols: 4,
+      maxW: 710,
+      photoH: 145,
+      gapX: 16,
+      gapY: 16,
+      nameSize: 12,
+      nameLineH: 15,
+      nameBoxH: 32,
+      roleSize: 9.5,
+      roleH: 21,
+      padX: 36,
+      padY: 20,
+      cardMinH: 220
+    };
+  }
+  if (count <= 10) {
+    return {
+      cols: 5,
+      maxW: 760,
+      photoH: 135,
+      gapX: 12,
+      gapY: 14,
+      nameSize: 11,
+      nameLineH: 14,
+      nameBoxH: 30,
+      roleSize: 9,
+      roleH: 20,
+      padX: 24,
+      padY: 16,
+      cardMinH: 205
+    };
+  }
+  if (count <= 12) {
+    return {
+      cols: 4,
+      maxW: 720,
+      photoH: 105,
+      gapX: 14,
+      gapY: 10,
+      nameSize: 11,
+      nameLineH: 14,
+      nameBoxH: 28,
+      roleSize: 8.5,
+      roleH: 19,
+      padX: 32,
+      padY: 12,
+      cardMinH: 170
+    };
+  }
+  if (count <= 15) {
+    return {
+      cols: 5,
+      maxW: 760,
+      photoH: 98,
+      gapX: 10,
+      gapY: 9,
+      nameSize: 10.5,
+      nameLineH: 13,
+      nameBoxH: 26,
+      roleSize: 8,
+      roleH: 18,
+      padX: 20,
+      padY: 10,
+      cardMinH: 158
+    };
+  }
+  if (count <= 20) {
+    return {
+      cols: 5,
+      maxW: 770,
+      photoH: 72,
+      gapX: 9,
+      gapY: 7,
+      nameSize: 9.5,
+      nameLineH: 12,
+      nameBoxH: 24,
+      roleSize: 7.5,
+      roleH: 16,
+      padX: 16,
+      padY: 8,
+      cardMinH: 128
+    };
+  }
+  if (count <= 25) {
+    return {
+      cols: 5,
+      maxW: 780,
+      photoH: 56,
+      gapX: 7,
+      gapY: 5,
+      nameSize: 9,
+      nameLineH: 11,
+      nameBoxH: 22,
+      roleSize: 7,
+      roleH: 15,
+      padX: 12,
+      padY: 6,
+      cardMinH: 106
+    };
+  }
+  const cols = count > 30 ? 7 : 6;
+  return {
+    cols: cols,
+    maxW: 790,
+    photoH: 46,
+    gapX: 6,
+    gapY: 4,
+    nameSize: 8,
+    nameLineH: 10,
+    nameBoxH: 20,
+    roleSize: 6.5,
+    roleH: 13,
+    padX: 10,
+    padY: 4,
+    cardMinH: 90
+  };
+}
+
 function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
   const teamName = teamData.team?.name || teamData.name || 'Team';
+  const layout = getProGridLayout(players.length);
 
   const wrap = document.createElement('div');
   wrap.style.cssText = `
@@ -247,13 +386,14 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
   wrap.appendChild(bgGlow);
 
   // ── 1. HEADER SECTION: Centralized Logo & Large Team Name (No page number on top) ──
+  const headerHeight = players.length > 12 ? 88 : 98;
   const header = document.createElement('div');
   header.style.cssText = `
-    width:100%; height:98px; flex-shrink:0;
+    width:100%; height:${headerHeight}px; flex-shrink:0;
     background:linear-gradient(180deg, rgba(212,175,55,0.14) 0%, rgba(13,13,26,0.95) 100%);
     border-bottom:2px solid rgba(212,175,55,0.40);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:12px 24px; box-sizing:border-box; position:relative; z-index:2;
+    padding:10px 24px; box-sizing:border-box; position:relative; z-index:2;
   `;
 
   const centerRow = document.createElement('div');
@@ -263,7 +403,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     const tLogo = document.createElement('img');
     tLogo.src = teamData._logoBase64;
     tLogo.style.cssText = `
-      height:50px; width:50px; object-fit:contain; border-radius:10px;
+      height:46px; width:46px; object-fit:contain; border-radius:10px;
       border:1.5px solid rgba(212,175,55,0.45); filter:drop-shadow(0 3px 10px rgba(0,0,0,0.8));
     `;
     centerRow.appendChild(tLogo);
@@ -272,7 +412,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
   const tNameEl = document.createElement('div');
   tNameEl.textContent = teamName.toUpperCase();
   tNameEl.style.cssText = `
-    font-size:32px; font-weight:900; color:#FFFFFF; letter-spacing:2px; line-height:1;
+    font-size:${players.length > 15 ? '28px' : '32px'}; font-weight:900; color:#FFFFFF; letter-spacing:2px; line-height:1;
     text-shadow: 0 2px 14px rgba(0,0,0,0.9), 0 0 24px rgba(212,175,55,0.35);
     font-family:${FONT_STACK};
   `;
@@ -283,24 +423,24 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
   const tSub = document.createElement('div');
   tSub.textContent = `${players.length} SQUAD PLAYER${players.length !== 1 ? 'S' : ''}`;
   tSub.style.cssText = `
-    font-size:10.5px; font-weight:800; color:#D4AF37; letter-spacing:3px; margin-top:6px;
+    font-size:10px; font-weight:800; color:#D4AF37; letter-spacing:3px; margin-top:5px;
     text-transform:uppercase; line-height:1; font-family:${FONT_STACK};
   `;
   header.appendChild(tSub);
 
   wrap.appendChild(header);
 
-  // ── 2. PLAYER GRID (Smaller cards, elegant breathing space, un-distorted photos) ──
+  // ── 2. PLAYER GRID (Dynamically adapted so ALL players fit onto 1 single page) ──
   const gridWrap = document.createElement('div');
   gridWrap.style.cssText = `
     flex:1; display:flex; flex-direction:column; justify-content:center;
-    padding:32px 48px; box-sizing:border-box; position:relative; z-index:1;
+    padding:${layout.padY}px ${layout.padX}px; box-sizing:border-box; position:relative; z-index:1;
   `;
 
   const grid = document.createElement('div');
   grid.style.cssText = `
-    display:grid; grid-template-columns:repeat(4, 1fr); gap:24px 18px;
-    width:100%; max-width:670px; margin:0 auto;
+    display:grid; grid-template-columns:repeat(${layout.cols}, 1fr); gap:${layout.gapY}px ${layout.gapX}px;
+    width:100%; max-width:${layout.maxW}px; margin:0 auto;
   `;
 
   players.forEach(player => {
@@ -318,7 +458,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     const photoDiv = document.createElement('div');
     if (player._imgBase64) {
       photoDiv.style.cssText = `
-        width:100%; height:155px; overflow:hidden;
+        width:100%; height:${layout.photoH}px; overflow:hidden;
         background-color:#0F0F1D; position:relative; display:block;
         background-image:url("${player._imgBase64}");
         background-size:cover;
@@ -328,13 +468,13 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     } else {
       const bg = initialsColor(player.name);
       photoDiv.style.cssText = `
-        width:100%; height:155px; overflow:hidden;
+        width:100%; height:${layout.photoH}px; overflow:hidden;
         background:${bg}; position:relative;
         display:flex; align-items:center; justify-content:center;
       `;
       const initText = document.createElement('div');
       initText.textContent = getInitials(player.name);
-      initText.style.cssText = `font-size:42px; font-weight:900; color:rgba(255,255,255,0.7); font-family:${FONT_STACK};`;
+      initText.style.cssText = `font-size:${Math.round(layout.photoH * 0.35)}px; font-weight:900; color:rgba(255,255,255,0.7); font-family:${FONT_STACK};`;
       photoDiv.appendChild(initText);
     }
     card.appendChild(photoDiv);
@@ -343,7 +483,7 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     const infoContainer = document.createElement('div');
     infoContainer.style.cssText = `
       width:100%; background:#141426;
-      padding:8px 6px 12px 6px; box-sizing:border-box;
+      padding:${layout.padY > 10 ? 8 : 4}px 4px ${layout.padY > 10 ? 10 : 5}px 4px; box-sizing:border-box;
       text-align:center; display:block;
     `;
 
@@ -353,8 +493,8 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     // Table-based vertical centering for Name (CSS 2.1, 100% stable in html2canvas, never cuts letters)
     const nameTable = document.createElement('div');
     nameTable.style.cssText = `
-      display:table; width:100%; height:34px; min-height:34px;
-      margin:0 0 8px 0; box-sizing:border-box;
+      display:table; width:100%; height:${layout.nameBoxH}px; min-height:${layout.nameBoxH}px;
+      margin:0 0 ${layout.padY > 10 ? 6 : 2}px 0; box-sizing:border-box;
     `;
 
     const nameCell = document.createElement('div');
@@ -367,10 +507,10 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     nameText.textContent = pName;
     nameText.style.cssText = `
       color:#FFFFFF;
-      font-size:${isLongName ? '11px' : '12px'};
+      font-size:${isLongName ? `${layout.nameSize - 1}px` : `${layout.nameSize}px`};
       font-weight:800;
       letter-spacing:0.25px;
-      line-height:15px;
+      line-height:${layout.nameLineH}px;
       display:block;
       text-align:center;
       word-break:break-word;
@@ -388,11 +528,11 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     const rolePill = document.createElement('div');
     rolePill.textContent = role;
     rolePill.style.cssText = `
-      display:inline-block; height:22px; line-height:20px;
-      padding:0 12px; border-radius:11px;
+      display:inline-block; height:${layout.roleH}px; line-height:${layout.roleH - 2}px;
+      padding:0 ${layout.cols >= 6 ? 6 : 10}px; border-radius:${Math.round(layout.roleH / 2)}px;
       background:${rc.bg}; border:1px solid ${rc.border};
-      color:${rc.text}; font-size:9.5px; font-weight:800;
-      letter-spacing:0.6px; text-transform:uppercase;
+      color:${rc.text}; font-size:${layout.roleSize}px; font-weight:800;
+      letter-spacing:0.5px; text-transform:uppercase;
       font-family:${FONT_STACK}; text-align:center;
       vertical-align:middle; box-sizing:border-box;
       white-space:nowrap;
@@ -403,12 +543,12 @@ function buildProTeamPage(teamData, players, logoBase64, pageNum, totalPages) {
     grid.appendChild(card);
   });
 
-  // Placeholder cards to keep 4-column symmetry on partial rows
-  const remainder = players.length % 4;
+  // Placeholder cards to keep symmetry on partial rows
+  const remainder = players.length % layout.cols;
   if (remainder !== 0) {
-    for (let i = 0; i < 4 - remainder; i++) {
+    for (let i = 0; i < layout.cols - remainder; i++) {
       const ph = document.createElement('div');
-      ph.style.cssText = `border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); min-height:235px;`;
+      ph.style.cssText = `border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); min-height:${layout.cardMinH}px;`;
       grid.appendChild(ph);
     }
   }
@@ -522,7 +662,6 @@ export async function generateProfessionalTeamPDF({ tournamentName, teamSquads, 
 
   // 1:1 Square PDF: 210mm x 210mm
   const doc = new jsPDF({ unit: 'mm', format: [PAGE_SIZE_MM, PAGE_SIZE_MM], orientation: 'portrait' });
-  const PLAYERS_PER_PAGE = 8; // 2 rows of 4 cards fits gracefully in square format
 
   try {
     // ── Cover page ──
@@ -543,54 +682,38 @@ export async function generateProfessionalTeamPDF({ tournamentName, teamSquads, 
     );
     container.removeChild(coverNode);
 
-    // ── Team pages ──
-    const totalPages =
-      1 + // cover
-      teamsWithPlayers.reduce(
-        (s, t) => s + Math.max(1, Math.ceil((t.players || []).length / PLAYERS_PER_PAGE)),
-        0
-      );
-
+    // ── Team pages (Every team fits on exactly 1 page) ──
+    const totalPages = 1 + teamsWithPlayers.length;
     let pageNum = 1; // cover is page 1
 
     for (const team of teamsWithPlayers) {
       const players = team.players || [];
+      doc.addPage();
+      pageNum++;
 
-      // Chunk into groups of PLAYERS_PER_PAGE
-      const chunks = [];
-      for (let i = 0; i < players.length; i += PLAYERS_PER_PAGE) {
-        chunks.push(players.slice(i, i + PLAYERS_PER_PAGE));
-      }
-      if (!chunks.length) chunks.push([]);
+      const node = buildProTeamPage(
+        team,
+        players,
+        logoBase64,
+        pageNum,
+        totalPages
+      );
+      container.appendChild(node);
+      await new Promise(r => setTimeout(r, 120));
 
-      for (let ci = 0; ci < chunks.length; ci++) {
-        doc.addPage();
-        pageNum++;
-
-        const node = buildProTeamPage(
-          team,
-          chunks[ci],
-          logoBase64,
-          pageNum,
-          totalPages
-        );
-        container.appendChild(node);
-        await new Promise(r => setTimeout(r, 120));
-
-        const canvas = await html2canvas(node, {
-          scale: 2.2,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: '#0D0D1A',
-          logging: false,
-        });
-        doc.addImage(
-          canvas.toDataURL('image/jpeg', 0.96),
-          'JPEG', 0, 0, PAGE_SIZE_MM, PAGE_SIZE_MM,
-          undefined, 'FAST'
-        );
-        container.removeChild(node);
-      }
+      const canvas = await html2canvas(node, {
+        scale: 2.2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#0D0D1A',
+        logging: false,
+      });
+      doc.addImage(
+        canvas.toDataURL('image/jpeg', 0.96),
+        'JPEG', 0, 0, PAGE_SIZE_MM, PAGE_SIZE_MM,
+        undefined, 'FAST'
+      );
+      container.removeChild(node);
     }
 
     const safeFilename = `${(tournamentName || 'Auction').replace(/[^a-z0-9]/gi, '_')}_IPL_Style_Squad.pdf`;

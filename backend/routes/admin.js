@@ -13,7 +13,7 @@ import AdmZip from 'adm-zip';
 import multer from 'multer';
 import SQLite3 from 'sqlite3';
 import * as XLSX from 'xlsx';
-import { refreshAuctionState, getAuctionState, hasAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState, getAdminAnonymousBid, setAdminAnonymousBid, clearAdminAnonymousBid } from '../auctionState.js';
+import { refreshAuctionState, getAuctionState, hasAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState, getAdminAnonymousBid, setAdminAnonymousBid, clearAdminAnonymousBid, popVirtualBid, getVirtualHighestBid, clearVirtualBids } from '../auctionState.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -438,6 +438,7 @@ router.delete('/players-all', async (req, res) => {
     if (deleteTeamsError) throw deleteTeamsError;
 
     clearAdminAnonymousBid(auctionId);
+    clearVirtualBids(auctionId);
     resetTradingWindowState(auctionId);
     await refreshAuctionState(auctionId); // Sync Cache
     io.emit('all-players-deleted');
@@ -537,8 +538,9 @@ router.post('/load-player', async (req, res) => {
     deleteBidsQuery = deleteBidsQuery.eq('auction_id', auctionId);
     await deleteBidsQuery;
 
-    // Admin Bidding: clear anonymous bid
+    // Admin Bidding: clear anonymous bid and virtual bids
     clearAdminAnonymousBid(auctionId);
+    clearVirtualBids(auctionId);
 
     io.emit('player-loaded', { player });
     res.json({ success: true, player });
@@ -602,6 +604,12 @@ router.get('/current-bid', async (req, res) => {
         team_name: team ? team.name : null,
         team_id: bid.team_id
       };
+    }
+
+    // ─── Optimistic Admin Bid: check in-memory virtual highest bid ───
+    const vBid = getVirtualHighestBid(auctionId);
+    if (vBid && vBid.player_id === state.current_player_id) {
+      processedBid = vBid;
     }
 
     // ─── Admin Bidding 2.0: check in-memory anonymous bid ───
@@ -689,6 +697,19 @@ router.post('/undo-bid', async (req, res) => {
 
     if (!state || !state.current_player_id) {
       return res.status(400).json({ error: 'No active player' });
+    }
+
+    // ─── Optimistic Admin Bid: check in-memory virtual bids first ───
+    const undoVirtual = popVirtualBid(auctionId);
+    if (undoVirtual) {
+      const newHighest = undoVirtual.top || null;
+      const newPrevious = undoVirtual.previous ? undoVirtual.previous.amount : null;
+      io.emit('bid-updated', {
+        highestBid: newHighest,
+        playerId: state.current_player_id,
+        previousBid: newPrevious
+      });
+      return res.json({ success: true, highestBid: newHighest, undoneVirtual: true });
     }
 
     // ─── Admin Bidding 2.0: check if an anonymous in-memory bid is active ───
@@ -916,31 +937,35 @@ router.post('/mark-player', async (req, res) => {
     if (!currentPlayer) return res.status(404).json({ error: 'Player not found' });
 
     if (status === 'SOLD') {
-      // 1. Get highest bid
-      const { data: highestBid, error: bidError } = await supabase
-        .from('bids')
-        .select('*')
-        .eq('player_id', playerId)
-        .eq('auction_id', auctionId)
-        .order('amount', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // ─── Optimistic Bidding: soldPrice + soldToTeam are sent directly by the
+      // admin frontend (since bids are no longer written to DB on every click).
+      // Fall back to the DB highest bid only if the caller didn't supply them
+      // (supports legacy callers and the case where admin refreshed mid-auction).
+      let finalSoldPrice = soldPrice || 0;
+      let finalSoldToTeam = soldToTeam || null;
 
-      if (bidError) throw bidError;
+      if (!finalSoldPrice || !finalSoldToTeam) {
+        // Fallback: look up highest bid from DB (page-refresh recovery path)
+        const { data: highestBid, error: bidError } = await supabase
+          .from('bids')
+          .select('*')
+          .eq('player_id', playerId)
+          .eq('auction_id', auctionId)
+          .order('amount', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      // Validations
-      if (!highestBid && !soldPrice) {
-        // Logic requires at least one bid or explicit soldPrice
-        // Original code: "require at least one bid to mark as SOLD"
-        if (!highestBid) {
+        if (bidError) throw bidError;
+
+        if (!highestBid && !finalSoldPrice) {
           return res.status(400).json({
             error: 'No bids found for this player. Cannot mark as SOLD without a bid.'
           });
         }
-      }
 
-      const finalSoldPrice = soldPrice || (highestBid ? highestBid.amount : 0);
-      const finalSoldToTeam = soldToTeam || (highestBid ? highestBid.team_id : null);
+        finalSoldPrice = finalSoldPrice || (highestBid ? highestBid.amount : 0);
+        finalSoldToTeam = finalSoldToTeam || (highestBid ? highestBid.team_id : null);
+      }
 
       if (!finalSoldToTeam) {
         return res.status(400).json({ error: 'No team selected for sale' });
@@ -960,7 +985,7 @@ router.post('/mark-player', async (req, res) => {
         return res.status(400).json({ error: 'Team does not have enough budget' });
       }
 
-      // 4 + 5. Update team budget AND player status in parallel (independent writes)
+      // 4 + 5. Update team budget, player status, and persist winning bid in parallel (independent writes)
       const newBudget = team.budget - finalSoldPrice;
       const [{ error: updateBudgetError }, { error: updatePlayerError }] = await Promise.all([
         supabase.from('teams').update({ budget: newBudget }).eq('id', finalSoldToTeam).eq('auction_id', auctionId),
@@ -969,11 +994,20 @@ router.post('/mark-player', async (req, res) => {
           sold_price: finalSoldPrice,
           sold_to_team: finalSoldToTeam,
           was_unsold: 0 // Reset flag
-        }).eq('id', playerId).eq('auction_id', auctionId)
+        }).eq('id', playerId).eq('auction_id', auctionId),
+        supabase.from('bids').insert([{
+          auction_id: auctionId,
+          player_id: playerId,
+          team_id: finalSoldToTeam,
+          amount: finalSoldPrice,
+          timestamp: new Date()
+        }])
       ]);
 
       if (updateBudgetError) throw updateBudgetError;
       if (updatePlayerError) throw updatePlayerError;
+
+      clearVirtualBids(auctionId);
 
       io.emit('player-marked', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam, soldToTeamName: team.name, soldToTeamLogo: team.logo });
       io.emit('team-budget-updated', { teamId: finalSoldToTeam, newBudget });
@@ -981,6 +1015,7 @@ router.post('/mark-player', async (req, res) => {
 
     } else {
       // Mark as UNSOLD
+      clearVirtualBids(auctionId);
       const { error: updatePlayerError } = await supabase
         .from('players')
         .update({
@@ -1171,8 +1206,9 @@ router.post('/reset-bidding', async (req, res) => {
 
     if (deleteError) throw deleteError;
 
-    // ─── Admin Bidding 2.0: clear in-memory anonymous bid so next bid starts from base price ───
+    // ─── Admin Bidding: clear anonymous bid and virtual bids so next bid starts from base price ───
     clearAdminAnonymousBid(auctionId);
+    clearVirtualBids(auctionId);
 
     // Fetch player base price so frontend can reset bid display without API call
     const { data: resetPlayer } = await supabase
