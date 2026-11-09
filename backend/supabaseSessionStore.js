@@ -4,6 +4,34 @@ import { supabase } from './supabaseClient.js';
 // Express's default MemoryStore loses every signed-in user on restart and cannot
 // be shared by multiple Render instances. This store keeps only encrypted session
 // identifiers in cookies; the session payload itself lives in Supabase.
+
+// ── In-process session cache ──────────────────────────────────────────────────
+// Avoids a Supabase round-trip on every authenticated API request.
+// Cache TTL is 30 seconds — short enough that a logout invalidates quickly,
+// long enough to absorb the rapid burst of requests during active bidding
+// (each bid = HTTP request = session lookup; at 1 bid/sec this saves ~30 DB reads/min).
+const SESSION_CACHE_TTL_MS = 30_000;
+const sessionCache = new Map(); // sid → { data, expiresAt: Date, cachedAt: number }
+
+function cacheGet(sid) {
+  const entry = sessionCache.get(sid);
+  if (!entry) return null;
+  if (Date.now() - entry.cachedAt > SESSION_CACHE_TTL_MS) {
+    sessionCache.delete(sid);
+    return null;
+  }
+  return entry.data;
+}
+
+function cacheSet(sid, data, expiresAt) {
+  sessionCache.set(sid, { data, expiresAt, cachedAt: Date.now() });
+}
+
+function cacheDelete(sid) {
+  sessionCache.delete(sid);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export class SupabaseSessionStore extends session.Store {
   constructor({ ttlMs = 24 * 60 * 60 * 1000 } = {}) {
     super();
@@ -18,6 +46,10 @@ export class SupabaseSessionStore extends session.Store {
   }
 
   get(sid, callback) {
+    // Serve from cache if fresh
+    const cached = cacheGet(sid);
+    if (cached !== null) return callback(null, cached);
+
     (async () => {
       try {
         const { data, error } = await supabase
@@ -37,8 +69,11 @@ export class SupabaseSessionStore extends session.Store {
 
         if (new Date(data.expires_at).getTime() <= Date.now()) {
           await supabase.from('app_sessions').delete().eq('sid', sid).catch(() => {});
+          cacheDelete(sid);
           return callback(null, null);
         }
+        // Store in cache for subsequent requests
+        cacheSet(sid, data.data, data.expires_at);
         return callback(null, data.data);
       } catch (err) {
         console.error('[SupabaseSessionStore] unexpected get error:', err.message);
@@ -48,6 +83,8 @@ export class SupabaseSessionStore extends session.Store {
   }
 
   set(sid, sess, callback = () => {}) {
+    // Invalidate cache so the next read gets fresh data
+    cacheDelete(sid);
     supabase
       .from('app_sessions')
       .upsert({ sid, data: sess, expires_at: this.expiresAt(sess) }, { onConflict: 'sid' })
@@ -55,6 +92,8 @@ export class SupabaseSessionStore extends session.Store {
         if (error && error.code !== '42P01') {
           console.error('[SupabaseSessionStore] set error:', error.message);
         }
+        // Re-cache with new data
+        cacheSet(sid, sess, this.expiresAt(sess));
         callback(null);
       })
       .catch((err) => {
@@ -64,6 +103,7 @@ export class SupabaseSessionStore extends session.Store {
   }
 
   destroy(sid, callback = () => {}) {
+    cacheDelete(sid);
     supabase
       .from('app_sessions')
       .delete()
@@ -81,6 +121,10 @@ export class SupabaseSessionStore extends session.Store {
   }
 
   touch(sid, sess, callback = () => {}) {
+    // Update cache TTL without invalidating
+    const cached = cacheGet(sid);
+    if (cached !== null) cacheSet(sid, cached, this.expiresAt(sess));
+
     supabase
       .from('app_sessions')
       .update({ expires_at: this.expiresAt(sess) })

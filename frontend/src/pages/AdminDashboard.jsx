@@ -120,6 +120,17 @@ function AdminDashboard({ user }) {
   const [connectionError, setConnectionError] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
 
+  // ── Memoized team player counts (avoids O(players × teams) on every bid render) ──
+  const playersBoughtByTeam = useMemo(() => {
+    const map = {};
+    players.forEach(p => {
+      if (p.status === 'SOLD' && p.sold_to_team) {
+        map[p.sold_to_team] = (map[p.sold_to_team] || 0) + 1;
+      }
+    });
+    return map;
+  }, [players]);
+
   // ── Broadcast Control State ────────────────────────────────────────────
   const [showBroadcastControl, setShowBroadcastControl] = useState(false);
   const [broadcastTheme, setBroadcastTheme] = useState(DEFAULT_THEME);
@@ -180,18 +191,10 @@ function AdminDashboard({ user }) {
     });
     setSocket(newSocket);
 
-    // === TEMPORARY DEBUG LOGGING ===
-    newSocket.onAny((eventName, ...args) => {
-      console.log(`[Socket:Admin] ${eventName}`, JSON.stringify(args).slice(0, 300));
-    });
-    // === END DEBUG LOGGING ===
-
     newSocket.on('connect', () => {
       console.log('[Socket:Admin] Connected');
       setConnectionError(false);
-      loadData();
-      loadCurrentBid();
-      loadPlayers();
+      loadData(); // loads auction state, current bid, all bids, players, category queue
       loadTeams();
     });
 
@@ -199,8 +202,6 @@ function AdminDashboard({ user }) {
       console.log('[Socket:Admin] Reconnected — re-syncing latest state');
       setConnectionError(false);
       loadData();
-      loadCurrentBid();
-      loadPlayers();
       loadTeams();
     });
 
@@ -236,7 +237,7 @@ function AdminDashboard({ user }) {
     newSocket.on('bid-placed', (data) => {
       if (data && data.bid) {
         setHighestBid(data.bid);
-        setAllBids(prev => [data.bid, ...prev]);
+        setAllBids(prev => [data.bid, ...prev.slice(0, 49)]); // cap at 50
         setPreviousBid(prev => data.previousBid || prev);
 
         // Show Notification
@@ -259,13 +260,7 @@ function AdminDashboard({ user }) {
       if (data && data.highestBid) {
         setHighestBid(data.highestBid);
         setPreviousBid(prev => data.previousBid || prev);
-
-        // Play Sound on update too
-        if (audioElementRef.current) {
-          audioElementRef.current.currentTime = 0;
-          audioElementRef.current.play().catch(err => console.error('Audio play failed:', err));
-        }
-
+        // Note: audio is played by bid-placed; no duplicate play here
       } else {
         // Bid undone — reset directly without API call
         setHighestBid(null);
@@ -406,13 +401,6 @@ function AdminDashboard({ user }) {
       alert('All players and bids have been cleared by an admin');
     });
 
-    newSocket.on('reconnect', () => {
-      console.log('[Socket:Admin] Reconnected — performing full state resync');
-      setConnectionError(false);
-      loadData();
-      loadTeams();
-    });
-
     return () => {
       newSocket.close();
     };
@@ -444,7 +432,11 @@ function AdminDashboard({ user }) {
 
   const loadAuctionState = async () => {
     try {
-      const data = await adminService.getAuctionState();
+      // Run auction-state and current-bid fetches in parallel when possible
+      const [data, playerData] = await Promise.all([
+        adminService.getAuctionState(),
+        adminService.getCurrentBid()
+      ]);
 
       if (JSON.stringify(data) !== JSON.stringify(auctionState)) {
         setAuctionState(prev => {
@@ -475,10 +467,13 @@ function AdminDashboard({ user }) {
         return prev;
       });
 
+      // Use the already-fetched player data (no second round-trip)
       if (data.currentPlayerId) {
-        const playerData = await adminService.getCurrentBid();
         if (JSON.stringify(playerData.player) !== JSON.stringify(currentPlayer)) {
           setCurrentPlayer(playerData.player);
+        }
+        if (playerData.highestBid !== undefined) {
+          setHighestBid(playerData.highestBid);
         }
       } else if (currentPlayer !== null) {
         setCurrentPlayer(null);
@@ -694,10 +689,10 @@ function AdminDashboard({ user }) {
     setIsMarkingPlayer(true);
 
     try {
-      // For SOLD, backend will automatically use the highest bidder
-      // For UNSOLD, proceed directly
       const markRes = await adminService.markPlayer(playerToMark.id, status, null, null);
 
+      // Optimistic update from HTTP response — fast UI feedback before socket event arrives.
+      // The socket 'player-loaded' event will also arrive shortly and confirm/correct this.
       if (markRes && markRes.nextPlayer) {
         setCurrentPlayer(markRes.nextPlayer);
         setHighestBid(null);
@@ -713,14 +708,13 @@ function AdminDashboard({ user }) {
       if (status === 'SOLD') {
         const teamName = highestBid ? (highestBid.team_name || 'leading team') : 'team';
         setSaleToast(`✓ ${playerToMark.name} SOLD to ${teamName}`);
-        loadTeams();
+        // No loadTeams() needed — 'team-budget-updated' socket event updates budget inline
       } else {
         setSaleToast(`ℹ ${playerToMark.name} marked as ${status}`);
       }
       setTimeout(() => setSaleToast(null), 3500);
 
-      loadPlayers();
-      loadCurrentBid();
+      // 'player-loaded' socket event triggers loadPlayers() + loadCurrentBid() automatically
     } catch (error) {
       alert('Error marking player: ' + (error.response?.data?.error || error.message));
     } finally {
@@ -1087,12 +1081,10 @@ function AdminDashboard({ user }) {
     }
 
     try {
-      const res = await adminService.adminPlaceBid(teamId, bidAmount);
-      if (res && res.bid) {
-        setHighestBid(res.bid);
-        setAllBids(prev => [res.bid, ...prev]);
-        setPreviousBid(highestBid ? highestBid.amount : (currentPlayer ? currentPlayer.base_price : 0));
-      }
+      // Fire the HTTP request; the socket 'bid-placed' event will update state reactively.
+      // Do NOT optimistically push to allBids here — that causes a double-insert
+      // (once here, once when the socket event arrives from the server).
+      await adminService.adminPlaceBid(teamId, bidAmount);
     } catch (error) {
       alert('Error placing bid: ' + (error.response?.data?.error || error.message));
     }
@@ -3389,7 +3381,7 @@ function AdminDashboard({ user }) {
               {teams.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-4 gap-4">
                   {teams.map(team => {
-                    const playersBought = players.filter(p => p.sold_to_team === team.id && p.status === 'SOLD').length;
+                    const playersBought = playersBoughtByTeam[team.id] || 0;
                     const maxAllowed = auctionState?.maxPlayersPerTeam || 10;
                     const remainingPlayers = maxAllowed - playersBought;
                     const isLogicOn = auctionState?.enforceMaxBid === 1 || auctionState?.enforceMaxBid === true || enforceMaxBid;

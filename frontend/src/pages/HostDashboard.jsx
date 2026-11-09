@@ -226,7 +226,6 @@ function HostDashboard({ user }) {
     loadTeamPurses();
 
     newSocket.on('bid-placed', (data) => {
-      console.log('Bid placed event:', data);
       if (data.bid) {
         setBidFlash(true);
         setTimeout(() => setBidFlash(false), 1000);
@@ -250,7 +249,6 @@ function HostDashboard({ user }) {
     });
 
     newSocket.on('bid-updated', (data) => {
-      console.log('Bid updated event:', data);
       if (data.highestBid) {
         setHighestBid(data.highestBid);
         setCurrentBid(data.highestBid.amount);
@@ -278,7 +276,6 @@ function HostDashboard({ user }) {
     document.addEventListener('click', handleFirstClick);
 
     newSocket.on('player-loaded', (data) => {
-      console.log('Player loaded event:', data);
       setCurrentPlayer(data.player);
       setHighestBid(null);
       setCurrentBid(data.player ? data.player.base_price : 0);

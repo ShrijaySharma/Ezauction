@@ -92,14 +92,7 @@ function OwnerDashboard({ user }) {
     });
     setSocket(newSocket);
 
-    // === TEMPORARY DEBUG LOGGING ===
-    newSocket.onAny((eventName, ...args) => {
-      console.log(`[Socket:Owner] ${eventName}`, JSON.stringify(args).slice(0, 300));
-    });
-    // === END DEBUG LOGGING ===
-
     newSocket.on('connect', () => {
-      console.log('[Socket:Owner] Connected');
       setConnectionError(false);
       loadCurrentInfo();
     });
@@ -348,14 +341,10 @@ function OwnerDashboard({ user }) {
     setBidding({ ...bidding, [increment]: true });
 
     try {
-      console.log('Placing bid:', newBidAmount, 'Current balance:', walletBalance);
       const response = await ownerService.placeBid(newBidAmount, expectedHighestBidAmount);
-      console.log('Bid response:', response);
-
 
       // Update wallet balance immediately from response
       if (response && response.walletBalance !== undefined) {
-        console.log('Updating wallet balance to:', response.walletBalance);
         setWalletBalance(response.walletBalance);
       }
       if (response && response.totalBudget !== undefined) {
@@ -384,14 +373,10 @@ function OwnerDashboard({ user }) {
     setBidding({ ...bidding, base: true });
 
     try {
-      console.log('Placing base price bid:', basePriceAmount, 'Current balance:', walletBalance);
       const response = await ownerService.placeBid(basePriceAmount, expectedHighestBidAmount);
-      console.log('Base price bid response:', response);
-
 
       // Update wallet balance immediately from response
       if (response && response.walletBalance !== undefined) {
-        console.log('Updating wallet balance to:', response.walletBalance);
         setWalletBalance(response.walletBalance);
       }
       if (response && response.totalBudget !== undefined) {

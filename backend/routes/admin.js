@@ -946,7 +946,7 @@ router.post('/mark-player', async (req, res) => {
         return res.status(400).json({ error: 'No team selected for sale' });
       }
 
-      // 3. Check team budget (also fetch name + logo for the socket emit)
+      // 3. Fetch team (budget validation + socket payload)
       const { data: team, error: teamError } = await supabase
         .from('teams')
         .select('budget, name, logo')
@@ -960,30 +960,19 @@ router.post('/mark-player', async (req, res) => {
         return res.status(400).json({ error: 'Team does not have enough budget' });
       }
 
-      // 4. Update team budget
-      // Note: Supabase doesn't have "decrement" easily without stored proc.
-      // We calculate new budget in JS and set it. Race condition possible but unlikely in this low-concurrency app.
+      // 4 + 5. Update team budget AND player status in parallel (independent writes)
       const newBudget = team.budget - finalSoldPrice;
-      const { error: updateBudgetError } = await supabase
-        .from('teams')
-        .update({ budget: newBudget })
-        .eq('id', finalSoldToTeam)
-        .eq('auction_id', auctionId);
-
-      if (updateBudgetError) throw updateBudgetError;
-
-      // 5. Update player status
-      const { error: updatePlayerError } = await supabase
-        .from('players')
-        .update({
+      const [{ error: updateBudgetError }, { error: updatePlayerError }] = await Promise.all([
+        supabase.from('teams').update({ budget: newBudget }).eq('id', finalSoldToTeam).eq('auction_id', auctionId),
+        supabase.from('players').update({
           status: 'SOLD',
           sold_price: finalSoldPrice,
           sold_to_team: finalSoldToTeam,
           was_unsold: 0 // Reset flag
-        })
-        .eq('id', playerId)
-        .eq('auction_id', auctionId);
+        }).eq('id', playerId).eq('auction_id', auctionId)
+      ]);
 
+      if (updateBudgetError) throw updateBudgetError;
       if (updatePlayerError) throw updatePlayerError;
 
       io.emit('player-marked', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam, soldToTeamName: team.name, soldToTeamLogo: team.logo });
@@ -2493,7 +2482,7 @@ router.post('/admin-bid', async (req, res) => {
   }
 
   try {
-    // 1. Check auction state
+    // 1. Check auction state (in-memory — no DB hit)
     const auctionId = getAuctionId(req);
     const state = getAuctionState(auctionId);
     if (!state) throw new Error('Auction state error');
@@ -2501,14 +2490,21 @@ router.post('/admin-bid', async (req, res) => {
     if (state.status !== 'LIVE') return res.status(400).json({ error: 'Auction is not live' });
     if (!state.current_player_id) return res.status(400).json({ error: 'No player is currently being auctioned' });
 
-    // 2. Get current highest bid scoped to auction
-    let bidQ = supabase.from('bids').select('*').eq('player_id', state.current_player_id).order('amount', { ascending: false }).limit(1);
-    bidQ = bidQ.eq('auction_id', auctionId);
-    const { data: currentHighest } = await bidQ.maybeSingle();
+    // 2. Run independent queries in parallel to cut latency
+    const [
+      { data: currentHighest },
+      { data: player },
+      { data: team },
+      { count: playersBought }
+    ] = await Promise.all([
+      supabase.from('bids').select('*').eq('player_id', state.current_player_id).eq('auction_id', auctionId).order('amount', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('players').select('base_price').eq('id', state.current_player_id).eq('auction_id', auctionId).single(),
+      supabase.from('teams').select('budget, name').eq('id', teamId).eq('auction_id', auctionId).single(),
+      supabase.from('players').select('id', { count: 'exact', head: true }).eq('sold_to_team', teamId).eq('status', 'SOLD').eq('auction_id', auctionId)
+    ]);
 
-    // 3. Get player info
-    const { data: player } = await supabase.from('players').select('base_price').eq('id', state.current_player_id).eq('auction_id', auctionId).single();
     if (!player) return res.status(404).json({ error: 'Player not found' });
+    if (!team) return res.status(400).json({ error: 'Team not found' });
 
     // Validations
     if (currentHighest && amount <= currentHighest.amount) {
@@ -2521,21 +2517,9 @@ router.post('/admin-bid', async (req, res) => {
       return res.status(400).json({ error: 'This team is already the highest bidder' });
     }
 
-    // 4. Check wallet balance
-    const { data: team } = await supabase.from('teams').select('budget, name').eq('id', teamId).eq('auction_id', auctionId).single();
-    if (!team) return res.status(400).json({ error: 'Team not found' });
-
     // Smart logic
     const maxPlayersPerTeam = state.max_players_per_team || 10;
     const enforceMaxBid = state.enforce_max_bid === 1;
-
-    // Count players bought
-    const { count: playersBought } = await supabase
-      .from('players')
-      .select('id', { count: 'exact', head: true })
-      .eq('sold_to_team', teamId)
-      .eq('status', 'SOLD')
-      .eq('auction_id', auctionId);
 
     const remainingPlayers = maxPlayersPerTeam - (playersBought || 0);
 
@@ -2585,11 +2569,10 @@ router.post('/admin-bid', async (req, res) => {
     const previousBidAmount = currentHighest ? currentHighest.amount : player.base_price;
     const increment = amount - previousBidAmount;
 
+    // Single combined emit — bid-placed carries all data needed by both admin and other dashboards
     io.emit('bid-placed', {
       bid: bidToSend,
-      increment: increment
-    });
-    io.emit('bid-updated', {
+      increment: increment,
       highestBid: bidToSend,
       playerId: state.current_player_id,
       previousBid: previousBidAmount

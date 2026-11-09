@@ -31,11 +31,14 @@ function defaultAuctionState(auctionId) {
  */
 export async function refreshAuctionState(auctionId) {
     try {
-        const { data, error } = await supabase
-            .from('auction_state')
-            .select('*')
-            .eq('auction_id', auctionId)
-            .maybeSingle();
+        // Fetch auction_state and broadcast_config in parallel (saves one DB round-trip)
+        const [
+            { data, error },
+            { data: aData }
+        ] = await Promise.all([
+            supabase.from('auction_state').select('*').eq('auction_id', auctionId).maybeSingle(),
+            supabase.from('auctions').select('broadcast_config').eq('id', auctionId).maybeSingle()
+        ]);
 
         if (error) {
             console.error(`[Cache:${auctionId}] Error refreshing auction state:`, error);
@@ -47,19 +50,11 @@ export async function refreshAuctionState(auctionId) {
             let categoryQueue = data.category_queue ?? null;
             let slotIndex = data.category_slot_index ?? 0;
             let slotServed = data.category_slot_served ?? 0;
-            let bCfg = {};
 
-            try {
-                const { data: aData } = await supabase
-                    .from('auctions')
-                    .select('broadcast_config')
-                    .eq('id', auctionId)
-                    .maybeSingle();
-                bCfg = aData?.broadcast_config || {};
-                if (bCfg.category_queue !== undefined) categoryQueue = bCfg.category_queue;
-                if (bCfg.category_slot_index !== undefined) slotIndex = bCfg.category_slot_index;
-                if (bCfg.category_slot_served !== undefined) slotServed = bCfg.category_slot_served;
-            } catch (_) {}
+            const bCfg = aData?.broadcast_config || {};
+            if (bCfg.category_queue !== undefined) categoryQueue = bCfg.category_queue;
+            if (bCfg.category_slot_index !== undefined) slotIndex = bCfg.category_slot_index;
+            if (bCfg.category_slot_served !== undefined) slotServed = bCfg.category_slot_served;
 
             auctionStateCaches.set(auctionId, {
                 ...data,
