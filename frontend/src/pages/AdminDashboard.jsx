@@ -119,6 +119,8 @@ function AdminDashboard({ user }) {
   const audioElementRef = useRef(null);
   const [connectionError, setConnectionError] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
+  // Per-team bid-in-flight guard: prevents rapid double-clicks from stacking requests
+  const [biddingInFlight, setBiddingInFlight] = useState({});
 
   // ── Memoized team player counts (avoids O(players × teams) on every bid render) ──
   const playersBoughtByTeam = useMemo(() => {
@@ -180,7 +182,10 @@ function AdminDashboard({ user }) {
 
     console.log('AdminDashboard mounted');
     const newSocket = io(getSocketUrl(auctionId), {
-      transports: ['websocket', 'polling'], // Allow polling fallback so UI never freezes on network hiccups
+      // Start with polling (always works through proxies/firewalls), then upgrade
+      // to WebSocket automatically. This prevents the "stuck" state that happens
+      // when WebSocket is tried first and silently fails on Render.com under load.
+      transports: ['polling', 'websocket'],
       upgrade: true,
       withCredentials: true,
       reconnection: true,
@@ -1068,25 +1073,30 @@ function AdminDashboard({ user }) {
 
   const handleAdminPlaceBid = async (teamId, type, incrementValue) => {
     if (!currentPlayer) return;
+    // Prevent concurrent bids for the same team (rapid double-clicks)
+    if (biddingInFlight[teamId]) return;
 
     let bidAmount = 0;
-
-    // Calculate new bid amount
     if (type === 'BASE') {
       bidAmount = currentPlayer.base_price;
     } else {
-      // Use the explicitly passed increment value
       const startAmount = highestBid ? highestBid.amount : currentPlayer.base_price;
       bidAmount = startAmount + parseInt(incrementValue ?? customBidIncrement);
     }
 
+    setBiddingInFlight(prev => ({ ...prev, [teamId]: true }));
     try {
-      // Fire the HTTP request; the socket 'bid-placed' event will update state reactively.
-      // Do NOT optimistically push to allBids here — that causes a double-insert
-      // (once here, once when the socket event arrives from the server).
       await adminService.adminPlaceBid(teamId, bidAmount);
+      // Socket 'bid-placed' event updates highestBid + allBids reactively.
+      // No local state update here to avoid double-insert into allBids.
     } catch (error) {
-      alert('Error placing bid: ' + (error.response?.data?.error || error.message));
+      const msg = error.code === 'ECONNABORTED'
+        ? 'Request timed out. The server may be busy — please try again.'
+        : (error.response?.data?.error || error.message);
+      alert('Error placing bid: ' + msg);
+    } finally {
+      // Release the per-team lock after a short cooldown (prevents instant re-click)
+      setTimeout(() => setBiddingInFlight(prev => ({ ...prev, [teamId]: false })), 800);
     }
   };
 
@@ -3429,35 +3439,35 @@ function AdminDashboard({ user }) {
                         <div className="mt-auto grid grid-cols-3 gap-1.5">
                           <button
                             onClick={() => handleAdminPlaceBid(team.id, 'BASE')}
-                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.amount >= baseBidPrice || !canAffordBase}
+                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.amount >= baseBidPrice || !canAffordBase || !!biddingInFlight[team.id]}
                             className="px-2 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white rounded text-sm font-semibold transition-colors"
                             title={isSquadFull ? 'Squad is full' : !canAffordBase ? 'Exceeds max allowed bid' : 'Place base bid'}
                           >
-                            Base
+                            {biddingInFlight[team.id] ? '…' : 'Base'}
                           </button>
                           <button
                             onClick={() => handleAdminPlaceBid(team.id, 'INCREMENT', customBidIncrement)}
-                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.team_id === team.id || !canAfford1}
+                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.team_id === team.id || !canAfford1 || !!biddingInFlight[team.id]}
                             className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${highestBid?.team_id === team.id
                                 ? 'bg-green-600 text-white cursor-default'
-                                : canAfford1
+                                : canAfford1 && !biddingInFlight[team.id]
                                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
                                   : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                               }`}
                             title={highestBid?.team_id === team.id ? 'Leading bidder' : isSquadFull ? 'Squad full' : !canAfford1 ? 'Exceeds max allowed bid' : `+₹${parseInt(customBidIncrement).toLocaleString('en-IN')}`}
                           >
-                            {highestBid?.team_id === team.id ? '✓ B1' : `+${(parseInt(customBidIncrement) / 1000).toFixed(parseInt(customBidIncrement) % 1000 === 0 ? 0 : 1)}k`}
+                            {biddingInFlight[team.id] ? '⏳' : (highestBid?.team_id === team.id ? '✓ B1' : `+${(parseInt(customBidIncrement) / 1000).toFixed(parseInt(customBidIncrement) % 1000 === 0 ? 0 : 1)}k`)}
                           </button>
                           <button
                             onClick={() => handleAdminPlaceBid(team.id, 'INCREMENT', customBidIncrement2)}
-                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.team_id === team.id || !canAfford2}
-                            className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${canAfford2 && highestBid?.team_id !== team.id
+                            disabled={!currentPlayer || auctionState.status !== 'LIVE' || auctionState.biddingLocked || highestBid?.team_id === team.id || !canAfford2 || !!biddingInFlight[team.id]}
+                            className={`px-2 py-2 rounded text-sm font-bold shadow-md transition-all transform active:scale-95 ${canAfford2 && highestBid?.team_id !== team.id && !biddingInFlight[team.id]
                                 ? 'bg-blue-600 hover:bg-blue-500 text-white'
                                 : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                               }`}
                             title={isSquadFull ? 'Squad full' : !canAfford2 ? 'Exceeds max allowed bid' : `+₹${parseInt(customBidIncrement2).toLocaleString('en-IN')}`}
                           >
-                            +{(parseInt(customBidIncrement2) / 1000).toFixed(parseInt(customBidIncrement2) % 1000 === 0 ? 0 : 1)}k
+                            {biddingInFlight[team.id] ? '⏳' : `+${(parseInt(customBidIncrement2) / 1000).toFixed(parseInt(customBidIncrement2) % 1000 === 0 ? 0 : 1)}k`}
                           </button>
                         </div>
                       </div>

@@ -4,6 +4,10 @@ import { API_URL, getAuctionApiPath, getCurrentAuctionId, setCurrentAuctionId, c
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
+  // 12-second timeout: Render.com's proxy limit is 30s, but bids should never
+  // take more than a few seconds. Without this, a hanging request freezes the
+  // entire admin bidding console until a manual page refresh.
+  timeout: 12000,
 });
 
 // Request interceptor to automatically attach x-auction-id from URL or storage
