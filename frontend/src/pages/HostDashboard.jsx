@@ -45,42 +45,16 @@ function HostDashboard({ user }) {
   const [notificationKey, setNotificationKey] = useState(0);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
-  const [showTeamPurses, setShowTeamPurses] = useState(false);
   const [teamPurses, setTeamPurses] = useState([]);
   const [connectionError, setConnectionError] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [soldAnimation, setSoldAnimation] = useState(null); // { playerName, teamName, price }
 
-  // ── UI-only display toggles (device-local, persisted via localStorage & synced with Overlay) ──
-  const [showAge, setShowAge] = useState(() => localStorage.getItem('ez_show_age') !== 'false');
-  const [showCategory, setShowCategory] = useState(() => localStorage.getItem('ez_show_category') !== 'false');
-  const [showSerialNo, setShowSerialNo] = useState(() => localStorage.getItem('ez_show_serial') !== 'false');
-  const socketRef = useRef(null);
-
-  const toggleAge = () => setShowAge(v => {
-    const next = !v;
-    localStorage.setItem('ez_show_age', String(next));
-    if (socketRef.current) {
-      socketRef.current.emit('ui-toggles-changed', { showAge: next });
-    }
-    return next;
-  });
-  const toggleCategory = () => setShowCategory(v => {
-    const next = !v;
-    localStorage.setItem('ez_show_category', String(next));
-    if (socketRef.current) {
-      socketRef.current.emit('ui-toggles-changed', { showCategory: next });
-    }
-    return next;
-  });
-  const toggleSerialNo = () => setShowSerialNo(v => {
-    const next = !v;
-    localStorage.setItem('ez_show_serial', String(next));
-    if (socketRef.current) {
-      socketRef.current.emit('ui-toggles-changed', { showSerialNo: next });
-    }
-    return next;
-  });
+  // ── Display toggles — read-only on Host; controlled globally by Admin via socket ──
+  // Default true; server sends correct state via 'ui-toggles-updated' on connect.
+  const [showAge, setShowAge] = useState(true);
+  const [showCategory, setShowCategory] = useState(true);
+  const [showSerialNo, setShowSerialNo] = useState(true);
 
   // Sponsor Branding State
   const [showSponsorModal, setShowSponsorModal] = useState(false);
@@ -95,6 +69,7 @@ function HostDashboard({ user }) {
   // ---------------------------------------------------------------------------
 
   const audioElementRef = useRef(null);
+  const socketRef = useRef(null);
 
   // Refs for socket callbacks to access latest state
   const currentPlayerRef = useRef(null);
@@ -141,6 +116,11 @@ function HostDashboard({ user }) {
       if (cfg && cfg.hostDisplayMode === 'topplayers') {
         loadTopPlayers(cfg.topPlayersCount || 10);
       }
+      if (cfg && cfg.uiToggles) {
+        if (cfg.uiToggles.showAge !== undefined) setShowAge(cfg.uiToggles.showAge);
+        if (cfg.uiToggles.showCategory !== undefined) setShowCategory(cfg.uiToggles.showCategory);
+        if (cfg.uiToggles.showSerialNo !== undefined) setShowSerialNo(cfg.uiToggles.showSerialNo);
+      }
     }).catch(() => {/* silently use defaults */});
 
     // Create audio element for notifications
@@ -177,11 +157,7 @@ function HostDashboard({ user }) {
       loadTeams();
       loadUnsoldPlayers();
       loadTeamPurses();
-      newSocket.emit('ui-toggles-changed', {
-        showAge: localStorage.getItem('ez_show_age') !== 'false',
-        showCategory: localStorage.getItem('ez_show_category') !== 'false',
-        showSerialNo: localStorage.getItem('ez_show_serial') !== 'false',
-      });
+      newSocket.emit('request-info');
     });
 
     newSocket.on('reconnect', () => {
@@ -191,27 +167,15 @@ function HostDashboard({ user }) {
       loadTeams();
       loadUnsoldPlayers();
       loadTeamPurses();
-      newSocket.emit('ui-toggles-changed', {
-        showAge: localStorage.getItem('ez_show_age') !== 'false',
-        showCategory: localStorage.getItem('ez_show_category') !== 'false',
-        showSerialNo: localStorage.getItem('ez_show_serial') !== 'false',
-      });
+      newSocket.emit('request-info');
     });
 
     newSocket.on('ui-toggles-updated', (data) => {
       if (!data) return;
-      if (data.showAge !== undefined) {
-        setShowAge(data.showAge);
-        localStorage.setItem('ez_show_age', String(data.showAge));
-      }
-      if (data.showCategory !== undefined) {
-        setShowCategory(data.showCategory);
-        localStorage.setItem('ez_show_category', String(data.showCategory));
-      }
-      if (data.showSerialNo !== undefined) {
-        setShowSerialNo(data.showSerialNo);
-        localStorage.setItem('ez_show_serial', String(data.showSerialNo));
-      }
+      // Update display state from server — no localStorage (admin controls these globally)
+      if (data.showAge !== undefined) setShowAge(data.showAge);
+      if (data.showCategory !== undefined) setShowCategory(data.showCategory);
+      if (data.showSerialNo !== undefined) setShowSerialNo(data.showSerialNo);
     });
 
     newSocket.on('reconnect_failed', () => {
@@ -811,147 +775,8 @@ function HostDashboard({ user }) {
                 <span className="text-xl">✨</span>
                 <span className="font-semibold text-sm tracking-wide">Brand & Sponsor</span>
               </button>
-              <button
-                onClick={() => { setShowTeamPurses(true); setShowMenu(false); loadTeamPurses(); }}
-                className="w-full flex items-center gap-3 px-5 py-4 text-white hover:bg-white/10 transition-colors text-left border-b border-white/10"
-              >
-                <span className="text-xl">💰</span>
-                <span className="font-semibold text-sm tracking-wide">Team Purses</span>
-              </button>
-
-              {/* A / C / S display toggles — device-local UI only */}
-              <div className="flex items-center justify-around px-4 py-3">
-                {[
-                  { letter: 'A', value: showAge, toggle: toggleAge },
-                  { letter: 'C', value: showCategory, toggle: toggleCategory },
-                  { letter: 'S', value: showSerialNo, toggle: toggleSerialNo },
-                ].map(({ letter, value, toggle }) => (
-                  <button
-                    key={letter}
-                    onClick={toggle}
-                    className="flex flex-col items-center gap-1.5"
-                  >
-                    <span className={`text-xs font-black tracking-widest transition-colors ${value ? 'text-white' : 'text-white/30'}`}>{letter}</span>
-                    <div className={`w-9 h-5 rounded-full relative transition-colors duration-200 ${value ? 'bg-yellow-400' : 'bg-white/15'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${value ? 'left-[18px]' : 'left-0.5'}`} />
-                    </div>
-                  </button>
-                ))}
-              </div>
             </div>
           </>
-        )}
-
-        {/* Team Purses Slide-out Panel */}
-        {showTeamPurses && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-8">
-            {/* Backdrop */}
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setShowTeamPurses(false)}></div>
-
-            {/* Panel */}
-            <div className="relative w-full h-full max-w-7xl bg-gradient-to-b from-gray-900/98 via-gray-900/95 to-black/98 backdrop-blur-3xl border border-white/20 shadow-2xl flex flex-col animate-slide-in-right rounded-3xl overflow-hidden">
-              {/* Panel Header */}
-              <div className="flex items-center justify-between px-6 md:px-10 py-5 md:py-8 border-b border-white/10 bg-gradient-to-r from-yellow-400/10 via-yellow-400/5 to-transparent shrink-0 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-400 to-transparent"></div>
-                <div className="flex items-center gap-4 md:gap-6 relative z-10">
-                  <div className="p-3 md:p-4 bg-yellow-400/20 rounded-xl md:rounded-2xl border border-yellow-400/30 shadow-[0_0_20px_rgba(250,204,21,0.2)]">
-                    <svg className="w-6 h-6 md:w-8 md:h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-white font-black text-2xl md:text-4xl tracking-tighter drop-shadow-lg">TEAM PURSES</h2>
-                    <p className="text-yellow-400/80 text-xs md:text-sm font-bold uppercase tracking-[0.3em] mt-1">Live Budget Tracking</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowTeamPurses(false)}
-                  className="p-3 hover:bg-white/10 rounded-2xl transition-all hover:scale-110 active:scale-95 bg-white/5 border border-white/10 relative z-10"
-                >
-                  <svg className="w-6 h-6 md:w-8 md:h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Team Cards */}
-              <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 space-y-4 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 md:gap-6 lg:gap-8 md:content-start scrollbar-none">
-                {teamPurses.length > 0 ? (
-                  teamPurses.map((team, index) => {
-                    const budgetPercent = team.budget && team.totalSpent !== undefined
-                      ? Math.max(0, (team.budget / (team.budget + team.totalSpent)) * 100)
-                      : 100;
-                    return (
-                      <div
-                        key={team.id}
-                        className="bg-white/5 rounded-2xl md:rounded-3xl border border-white/10 p-4 md:p-6 lg:p-8 hover:bg-white/10 transition-all group hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(255,255,255,0.05)]"
-                        style={{ animationDelay: `${index * 60}ms` }}
-                      >
-                        <div className="flex items-center gap-3 md:gap-5 mb-4 md:mb-6">
-                          {team.logo ? (
-                            <img
-                              src={getImageUrl(team.logo)}
-                              alt={team.name}
-                              className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 rounded-full object-cover border-2 md:border-4 border-white/20 group-hover:border-yellow-400/60 transition-colors shadow-lg"
-                              onError={(e) => { e.target.src = 'https://via.placeholder.com/40?text=' + team.name.charAt(0); }}
-                            />
-                          ) : (
-                            <div className="w-12 h-12 md:w-16 md:h-16 lg:w-20 lg:h-20 rounded-full bg-gradient-to-br from-yellow-400/20 to-orange-400/20 border-2 md:border-4 border-white/20 flex items-center justify-center text-white font-black text-lg md:text-2xl shadow-lg">
-                              {team.name.charAt(0)}
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-white font-black text-base md:text-xl lg:text-2xl truncate drop-shadow-md">{team.name}</h3>
-                            <p className="text-white/60 text-sm md:text-base lg:text-lg font-medium mt-0.5 md:mt-1">{team.playersBought || 0} players bought</p>
-                          </div>
-                        </div>
-
-                        {/* Budget Bar */}
-                        <div className="mb-3 md:mb-4">
-                          <div className="flex items-baseline justify-between mb-1.5 md:mb-2 gap-2">
-                            <span className="text-white/50 text-xs md:text-sm font-bold uppercase tracking-[0.15em] shrink-0">Remaining</span>
-                            <span className="text-yellow-400 font-black text-base md:text-xl lg:text-2xl font-mono tracking-tighter drop-shadow-lg text-right whitespace-nowrap">₹{formatIndianNumber(team.budget || 0)}</span>
-                          </div>
-                          <div className="w-full h-2 md:h-3 bg-white/10 rounded-full overflow-hidden shadow-inner">
-                            <div
-                              className={`h-full rounded-full transition-all duration-700 shadow-[0_0_10px_currentColor] ${
-                                budgetPercent > 60 ? 'bg-gradient-to-r from-green-400 to-emerald-500 text-emerald-500' :
-                                budgetPercent > 30 ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-yellow-500' :
-                                'bg-gradient-to-r from-red-400 to-rose-600 text-rose-500'
-                              }`}
-                              style={{ width: `${budgetPercent}%` }}
-                            ></div>
-                          </div>
-                        </div>
-
-                        {team.totalSpent > 0 && (
-                          <div className="flex items-center justify-between text-xs md:text-sm lg:text-base mt-4 md:mt-6 pt-3 md:pt-4 border-t border-white/10">
-                            <span className="text-white/40 font-bold uppercase tracking-wider">Total Spent</span>
-                            <span className="text-rose-400/90 font-mono font-black tracking-tight text-sm md:text-lg lg:text-xl">₹{formatIndianNumber(team.totalSpent)}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="text-4xl mb-3 opacity-40">💰</div>
-                    <p className="text-white/40 text-sm">No teams available</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Panel Footer */}
-              <div className="px-6 py-4 border-t border-white/10 bg-black/30">
-                <button
-                  onClick={loadTeamPurses}
-                  className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all border border-white/10"
-                >
-                  ↻ Refresh
-                </button>
-              </div>
-            </div>
-          </div>
         )}
 
         {/* Sponsor Settings Modal */}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { getSocketUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
-import { getPublicPlayers, getPublicTeams } from '../services/public';
+import { getPublicPlayers, getPublicTeams, getPublicBroadcastConfig } from '../services/public';
 import { getImageUrl } from '../utils/imageUtils';
 import TradingWindowBanner from '../components/TradingWindowBanner';
 import ImageModal from '../components/ImageModal';
@@ -30,6 +30,11 @@ function PublicLive() {
     const [searchQuery, setSearchQuery] = useState('');
     const [loadingCatalog, setLoadingCatalog] = useState(true);
     const [previewImage, setPreviewImage] = useState(null);
+
+    // Global display toggles synced from Admin
+    const [showAge, setShowAge] = useState(true);
+    const [showCategory, setShowCategory] = useState(true);
+    const [showSerialNo, setShowSerialNo] = useState(true);
 
     useEffect(() => {
         if (auctionId) {
@@ -121,6 +126,13 @@ function PublicLive() {
             setAuctionStatus(data.status);
         });
 
+        newSocket.on('ui-toggles-updated', (data) => {
+            if (!data) return;
+            if (data.showAge !== undefined) setShowAge(data.showAge);
+            if (data.showCategory !== undefined) setShowCategory(data.showCategory);
+            if (data.showSerialNo !== undefined) setShowSerialNo(data.showSerialNo);
+        });
+
         return () => {
             newSocket.close();
         };
@@ -136,6 +148,14 @@ function PublicLive() {
                 ]);
                 setPlayers(playersData);
                 setTeams(teamsData);
+
+                getPublicBroadcastConfig().then(cfg => {
+                    if (cfg && cfg.uiToggles) {
+                        if (cfg.uiToggles.showAge !== undefined) setShowAge(cfg.uiToggles.showAge);
+                        if (cfg.uiToggles.showCategory !== undefined) setShowCategory(cfg.uiToggles.showCategory);
+                        if (cfg.uiToggles.showSerialNo !== undefined) setShowSerialNo(cfg.uiToggles.showSerialNo);
+                    }
+                }).catch(() => {});
 
                 // Preload player images (both thumbnail and full) into browser cache
                 if (Array.isArray(playersData)) {
@@ -278,13 +298,13 @@ function PublicLive() {
                                         <div className="flex justify-between items-start">
                                             <div>
                                                 <span className="px-3 py-1 bg-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider rounded-md border border-blue-500/30">{currentPlayer.role}</span>
-                                                {currentPlayer.category && (
+                                                {showCategory && currentPlayer.category && (
                                                   <span className="ml-2 px-3 py-1 bg-purple-500/20 text-purple-300 text-xs font-bold uppercase tracking-wider rounded-md border border-purple-500/30">{currentPlayer.category}</span>
                                                 )}
                                                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-white mt-4 uppercase tracking-tight">{currentPlayer.name}</h1>
                                             </div>
                                             <div className="text-right">
-                                                {currentPlayer.serial_number && (
+                                                {showSerialNo && currentPlayer.serial_number && (
                                                     <span className="text-2xl font-bold text-gray-400">#{currentPlayer.serial_number}</span>
                                                 )}
                                                 <div className="text-gray-400 font-medium mt-1 uppercase">{currentPlayer.country || 'N/A'}</div>
@@ -296,7 +316,7 @@ function PublicLive() {
                                                 <p className="text-gray-500 text-sm uppercase tracking-wider mb-1">Base Price</p>
                                                 <p className="text-2xl font-bold text-gray-300">₹{formatIndianNumber(currentPlayer.base_price)}</p>
                                             </div>
-                                            {(currentPlayer.age) && (
+                                            {showAge && currentPlayer.age && (
                                               <div>
                                                   <p className="text-gray-500 text-sm uppercase tracking-wider mb-1">Age</p>
                                                   <p className="text-2xl font-bold text-gray-300">{currentPlayer.age} Yrs</p>

@@ -43,6 +43,11 @@ function OwnerDashboard({ user }) {
   const [showAvailableModal, setShowAvailableModal] = useState(false);
   const [showUnsoldModal, setShowUnsoldModal] = useState(false);
   const [showTeamBrowserModal, setShowTeamBrowserModal] = useState(false);
+
+  // Global display toggles synced from Admin
+  const [showAge, setShowAge] = useState(true);
+  const [showCategory, setShowCategory] = useState(true);
+  const [showSerialNo, setShowSerialNo] = useState(true);
   const [soldPlayers, setSoldPlayers] = useState([]);
   const [availablePlayers, setAvailablePlayers] = useState([]);
   const [unsoldPlayers, setUnsoldPlayers] = useState([]);
@@ -95,12 +100,14 @@ function OwnerDashboard({ user }) {
     newSocket.on('connect', () => {
       setConnectionError(false);
       loadCurrentInfo();
+      newSocket.emit('request-info');
     });
 
     newSocket.on('reconnect', () => {
       console.log('[Socket:Owner] Reconnected — re-syncing state');
       setConnectionError(false);
       loadCurrentInfo();
+      newSocket.emit('request-info');
     });
 
     newSocket.on('disconnect', () => {
@@ -114,6 +121,14 @@ function OwnerDashboard({ user }) {
 
     newSocket.on('error', (error) => {
       console.error('[Socket:Owner] Error:', error);
+    });
+
+    // Display toggle sync from server
+    newSocket.on('ui-toggles-updated', (data) => {
+      if (!data) return;
+      if (data.showAge !== undefined) setShowAge(data.showAge);
+      if (data.showCategory !== undefined) setShowCategory(data.showCategory);
+      if (data.showSerialNo !== undefined) setShowSerialNo(data.showSerialNo);
     });
 
     // Load initial data
@@ -497,7 +512,7 @@ function OwnerDashboard({ user }) {
                         }}
                       />
                     </div>
-                    {currentPlayer.serial_number && (
+                    {showSerialNo && currentPlayer.serial_number && (
                       <div className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-yellow-400 text-blue-900 font-bold text-sm sm:text-xl px-2 sm:px-4 py-0.5 sm:py-1 rounded-full shadow-lg">
                         {currentPlayer.serial_number}
                       </div>
@@ -515,7 +530,9 @@ function OwnerDashboard({ user }) {
                         {currentPlayer.role}
                       </div>
                       <div className="bg-yellow-400 text-blue-900 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-bold text-sm sm:text-lg shadow-lg">
-                        {currentPlayer.base_price ? `Base: ₹${formatIndianNumber(currentPlayer.base_price)}` : 'Base Price'} | Age: {currentPlayer.age || 'N/A'}
+                        {currentPlayer.base_price ? `Base: ₹${formatIndianNumber(currentPlayer.base_price)}` : 'Base Price'}
+                        {showAge && currentPlayer.age ? ` | Age: ${currentPlayer.age}` : ''}
+                        {showCategory && currentPlayer.category ? ` | ${currentPlayer.category}` : ''}
                       </div>
                     </div>
 

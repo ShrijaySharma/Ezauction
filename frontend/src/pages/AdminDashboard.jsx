@@ -131,6 +131,11 @@ function AdminDashboard({ user }) {
     return map;
   }, [players]);
 
+  // ── Display Settings (A/C/S toggles — server-side, global across all portals) ────────────
+  const [showAge, setShowAge] = useState(true);
+  const [showCategory, setShowCategory] = useState(true);
+  const [showSerialNo, setShowSerialNo] = useState(true);
+
   // ── Broadcast Control State ────────────────────────────────────────────
   const [showBroadcastControl, setShowBroadcastControl] = useState(false);
   const [broadcastTheme, setBroadcastTheme] = useState(DEFAULT_THEME);
@@ -199,6 +204,7 @@ function AdminDashboard({ user }) {
       setConnectionError(false);
       loadData(); // loads auction state, current bid, all bids, players, category queue
       loadTeams();
+      newSocket.emit('request-info');
     });
 
     newSocket.on('reconnect', () => {
@@ -206,6 +212,7 @@ function AdminDashboard({ user }) {
       setConnectionError(false);
       loadData();
       loadTeams();
+      newSocket.emit('request-info');
     });
 
     newSocket.on('disconnect', () => {
@@ -221,9 +228,24 @@ function AdminDashboard({ user }) {
       console.error('[Socket:Admin] Error:', error);
     });
 
+    // Sync display toggle state from server (persisted in broadcast_config.ui_toggles)
+    newSocket.on('ui-toggles-updated', (data) => {
+      if (!data) return;
+      if (data.showAge !== undefined) setShowAge(data.showAge);
+      if (data.showCategory !== undefined) setShowCategory(data.showCategory);
+      if (data.showSerialNo !== undefined) setShowSerialNo(data.showSerialNo);
+    });
+
     // Load initial data
     loadData();
     loadTeams();
+    adminService.getBroadcastConfig().then(cfg => {
+      if (cfg && cfg.uiToggles) {
+        if (cfg.uiToggles.showAge !== undefined) setShowAge(cfg.uiToggles.showAge);
+        if (cfg.uiToggles.showCategory !== undefined) setShowCategory(cfg.uiToggles.showCategory);
+        if (cfg.uiToggles.showSerialNo !== undefined) setShowSerialNo(cfg.uiToggles.showSerialNo);
+      }
+    }).catch(() => {});
 
     // Socket event listeners
     newSocket.on('player-loaded', (data) => {
@@ -646,6 +668,12 @@ function AdminDashboard({ user }) {
     } catch (error) {
       alert('Error updating sequential mode: ' + (error.response?.data?.error || error.message));
     }
+  };
+
+  // ── Display Settings toggle — emits via socket → server persists → all clients updated ──
+  const handleUiToggle = (key, value) => {
+    socket?.emit('ui-toggles-changed', { [key]: value });
+    // State update is handled by the 'ui-toggles-updated' socket listener (server echoes back to all)
   };
 
   const handleDeleteAllPlayers = async () => {
@@ -1250,10 +1278,10 @@ function AdminDashboard({ user }) {
         {showSidebar && (
           <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowSidebar(false)}>
             <div
-              className="fixed left-0 top-0 h-full w-80 bg-gray-800 border-r border-gray-700 shadow-xl overflow-y-auto"
+              className="fixed left-0 top-0 h-full w-80 bg-gray-800 border-r border-gray-700 shadow-xl flex flex-col justify-between"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+              <div className="p-4 border-b border-gray-700 flex justify-between items-center shrink-0">
                 <h2 className="text-xl font-bold text-white">Menu</h2>
                 <button
                   onClick={() => setShowSidebar(false)}
@@ -1262,7 +1290,7 @@ function AdminDashboard({ user }) {
                   ×
                 </button>
               </div>
-              <div className="p-4 space-y-2">
+              <div className="p-4 space-y-2 flex-1 overflow-y-auto">
                 <button
                   onClick={() => {
                     setShowTeamManagement(true);
@@ -1376,16 +1404,6 @@ function AdminDashboard({ user }) {
                   <div className="text-sm text-amber-100">Trade sold players between teams</div>
                 </button>
 
-                <div className="pt-4 border-t border-gray-700 mt-4">
-                  <button
-                    onClick={handleDeleteAllPlayers}
-                    className="w-full px-4 py-3 bg-red-900/50 hover:bg-red-800 text-red-200 rounded-lg transition-colors text-left border border-red-700"
-                  >
-                    <div className="font-semibold text-red-100">Delete All Data</div>
-                    <div className="text-sm text-red-400">Permanently delete all players & bids</div>
-                  </button>
-                </div>
-
                 {/* ── Broadcast Control ── */}
                 <div className="pt-4 border-t border-gray-700 mt-2">
                   <button
@@ -1396,6 +1414,11 @@ function AdminDashboard({ user }) {
                         if (cfg && cfg.theme) setBroadcastTheme(cfg.theme);
                         if (cfg && cfg.hostDisplayMode) setBroadcastDisplayMode(cfg.hostDisplayMode);
                         if (cfg && cfg.topPlayersCount) setBroadcastTopCount(cfg.topPlayersCount);
+                        if (cfg && cfg.uiToggles) {
+                          if (cfg.uiToggles.showAge !== undefined) setShowAge(cfg.uiToggles.showAge);
+                          if (cfg.uiToggles.showCategory !== undefined) setShowCategory(cfg.uiToggles.showCategory);
+                          if (cfg.uiToggles.showSerialNo !== undefined) setShowSerialNo(cfg.uiToggles.showSerialNo);
+                        }
                       }).catch(() => {});
                     }}
                     className="w-full px-4 py-3 bg-gradient-to-r from-violet-700 to-purple-700 hover:from-violet-600 hover:to-purple-600 text-white rounded-lg transition-colors text-left shadow-lg border border-violet-500"
@@ -1403,9 +1426,23 @@ function AdminDashboard({ user }) {
                     <div className="font-bold flex items-center gap-2">
                       <span>🎨</span> Broadcast Control
                     </div>
-                    <div className="text-sm text-violet-200">Theme & host screen display</div>
+                    <div className="text-sm text-violet-200">Theme, display mode &amp; screen toggles</div>
                   </button>
                 </div>
+              </div>
+
+              {/* Discrete Footer with Small Delete All Data */}
+              <div className="p-3 border-t border-gray-700/80 bg-gray-900/70 shrink-0">
+                <button
+                  onClick={() => {
+                    setShowSidebar(false);
+                    handleDeleteAllPlayers();
+                  }}
+                  className="w-full py-2 px-3 bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 border border-red-900/50 hover:border-red-700"
+                >
+                  <span className="text-xs">⚠️</span>
+                  <span>Delete All Data</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1475,7 +1512,7 @@ function AdminDashboard({ user }) {
                         }}
                       />
                     </div>
-                    {currentPlayer.serial_number && (
+                    {showSerialNo && currentPlayer.serial_number && (
                       <div className="absolute -top-3 -right-3 bg-gradient-to-br from-yellow-400 to-yellow-500 text-blue-900 font-bold text-3xl px-6 py-2 rounded-full shadow-xl ring-4 ring-blue-900/50">
                         {currentPlayer.serial_number}
                       </div>
@@ -1484,11 +1521,13 @@ function AdminDashboard({ user }) {
                   <div className="flex-1">
                     <h2 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-blue-400 to-green-400 bg-clip-text text-transparent">{currentPlayer.name}</h2>
                     <div className="space-y-3 mb-4">
-                      {currentPlayer.category && (
+                      {showCategory && currentPlayer.category && (
                         <p className="text-gray-200 text-lg"><span className="font-semibold text-purple-400">Category:</span> <span className="px-2 py-0.5 bg-purple-600/25 text-purple-300 rounded text-sm font-bold border border-purple-500/30">{currentPlayer.category}</span></p>
                       )}
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">🏏 Role:</span> {currentPlayer.role}</p>
-                      <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">👤 Age:</span> {currentPlayer.age || 'N/A'}</p>
+                      {showAge && (
+                        <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">👤 Age:</span> {currentPlayer.age || 'N/A'}</p>
+                      )}
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">🌍 Country:</span> {currentPlayer.country || 'N/A'}</p>
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">💰 Base Price:</span> ₹{currentPlayer.base_price?.toLocaleString('en-IN')}</p>
                       <p className="text-gray-200 text-lg"><span className="font-semibold text-blue-400">📊 Status:</span> <span className="px-2 py-1 bg-blue-600/30 rounded">{currentPlayer.status}</span></p>
@@ -3745,7 +3784,47 @@ function AdminDashboard({ user }) {
                 )}
               </div>
 
-              {/* ── Section C: Export Team PDF ── */}
+              {/* ── Section C: Player Card Details (A / C / S) ── */}
+              <div className="pt-4 border-t border-white/10">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-white/50 text-xs font-black uppercase tracking-[0.3em]">Player Card Details</p>
+                  <span className="text-[10px] font-bold text-violet-400 uppercase tracking-widest bg-violet-500/10 px-2.5 py-0.5 rounded-full border border-violet-500/30">
+                    Global Sync
+                  </span>
+                </div>
+                <p className="text-white/40 text-xs mb-3">Controls what attributes are visible on Host (all themes), Overlay, Live &amp; Owner screens</p>
+                <div className="grid grid-cols-3 gap-2.5">
+                  {[
+                    { key: 'showAge', letter: 'A', label: 'Age', icon: '🎂', value: showAge },
+                    { key: 'showCategory', letter: 'C', label: 'Category', icon: '🏷️', value: showCategory },
+                    { key: 'showSerialNo', letter: 'S', label: 'Serial No', icon: '#️⃣', value: showSerialNo },
+                  ].map(({ key, letter, label, icon, value }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleUiToggle(key, !value)}
+                      className={`relative flex flex-col items-center justify-between p-3.5 rounded-xl border-2 transition-all ${
+                        value
+                          ? 'border-yellow-400 bg-yellow-400/15 text-white shadow-[0_0_15px_rgba(250,204,21,0.2)]'
+                          : 'border-white/10 bg-white/5 text-white/40 hover:border-white/25 hover:bg-white/8'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="text-base">{icon}</span>
+                        <span className={`text-[11px] font-black px-1.5 py-0.5 rounded font-mono ${value ? 'bg-yellow-400 text-black font-extrabold' : 'bg-white/10 text-white/50'}`}>
+                          {letter}
+                        </span>
+                      </div>
+                      <span className="text-xs font-bold truncate mb-2.5">{label}</span>
+                      <div className={`w-11 h-6 rounded-full relative transition-colors duration-200 ${value ? 'bg-yellow-400' : 'bg-white/20'}`}>
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${value ? 'left-[22px]' : 'left-0.5'}`} />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Section D: Export Team PDF ── */}
               <div className="pt-4 border-t border-white/10">
                 <p className="text-white/50 text-xs font-black uppercase tracking-[0.3em] mb-3">Export</p>
                 <button
