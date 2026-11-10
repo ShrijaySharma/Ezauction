@@ -223,10 +223,16 @@ function OwnerDashboard({ user }) {
     });
 
     newSocket.on('team-budget-updated', (data) => {
-      if (data.teamId === user.teamId && data.newBudget !== undefined) {
+      if (data && String(data.teamId) === String(user?.teamId) && data.newBudget !== undefined) {
         setTotalBudget(data.newBudget);
         setWalletBalance(data.newBudget);
         setCommittedAmount(0);
+      }
+    });
+
+    newSocket.on('player-removed-from-team', (data) => {
+      if (data && String(data.teamId) === String(user?.teamId)) {
+        loadCurrentInfo();
       }
     });
 

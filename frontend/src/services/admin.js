@@ -47,7 +47,7 @@ export const updateBidIncrements = async (increment1, increment2) => {
 };
 
 export const markPlayer = async (playerId, status, soldPrice, soldToTeam) => {
-  const response = await api.post('/admin/mark-player', { playerId, status, soldPrice, soldToTeam });
+  const response = await api.post('/admin/mark-player', { playerId, status, soldPrice, soldToTeam }, { timeout: 20000 });
   return response.data;
 };
 

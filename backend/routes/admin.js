@@ -918,17 +918,22 @@ router.post('/mark-player', async (req, res) => {
   }
   markPlayerLocks.add(auctionId);
 
-  try {
-    const state = getAuctionState(auctionId);
-    if (!state?.current_player_id || Number(state.current_player_id) !== Number(playerId)) {
-      return res.status(400).json({ error: 'Only the currently loaded player can be marked sold or unsold' });
-    }
+  let lockTransferredToAsync = false;
 
-    // Fetch the current player upfront — needed for serial_number baseline in sequential mode
-    // and for SOLD path validation. Fetching full record here avoids a second query below.
+  // ── PHASE 1: Validate synchronously (use in-memory cache, avoid extra DB call) ──
+  const state = getAuctionState(auctionId);
+  if (!state?.current_player_id || Number(state.current_player_id) !== Number(playerId)) {
+    markPlayerLocks.delete(auctionId);
+    return res.status(400).json({ error: 'Only the currently loaded player can be marked sold or unsold' });
+  }
+
+  try {
+    // ── PHASE 2: Resolve final sold price / team (validation checks only) ──────────
+    // We need the current player row for serial_number baseline (sequential mode).
+    // Fetch it leanly — only needed fields.
     const { data: currentPlayer, error: currentPlayerError } = await supabase
       .from('players')
-      .select('*')
+      .select('id, name, serial_number, category, was_unsold, status, sold_price, sold_to_team, base_price, age')
       .eq('id', playerId)
       .eq('auction_id', auctionId)
       .single();
@@ -936,27 +941,28 @@ router.post('/mark-player', async (req, res) => {
     if (currentPlayerError) throw currentPlayerError;
     if (!currentPlayer) return res.status(404).json({ error: 'Player not found' });
 
-    if (status === 'SOLD') {
-      // ─── Optimistic Bidding: soldPrice + soldToTeam are sent directly by the
-      // admin frontend (since bids are no longer written to DB on every click).
-      // Fall back to the DB highest bid only if the caller didn't supply them
-      // (supports legacy callers and the case where admin refreshed mid-auction).
-      let finalSoldPrice = soldPrice || 0;
-      let finalSoldToTeam = soldToTeam || null;
+    let finalSoldPrice = 0;
+    let finalSoldToTeam = null;
+    let teamName = null;
+    let teamLogo = null;
+    let newBudget = null;
 
+    if (status === 'SOLD') {
+      finalSoldPrice = soldPrice || 0;
+      finalSoldToTeam = soldToTeam || null;
+
+      // Optimistic bidding fallback chain (only if caller didn't send price/team)
       if (!finalSoldPrice || !finalSoldToTeam) {
-        // Optimistic Bidding Recovery: Check in-memory virtual highest bid first
         const vBid = getVirtualHighestBid(auctionId);
         if (vBid && Number(vBid.player_id) === Number(playerId)) {
           finalSoldPrice = finalSoldPrice || vBid.amount;
           finalSoldToTeam = finalSoldToTeam || vBid.team_id;
         }
 
-        // Fallback: look up highest bid from DB (legacy or reconnect recovery path)
         if (!finalSoldPrice || !finalSoldToTeam) {
           const { data: highestBid, error: bidError } = await supabase
             .from('bids')
-            .select('*')
+            .select('amount, team_id')
             .eq('player_id', playerId)
             .eq('auction_id', auctionId)
             .order('amount', { ascending: false })
@@ -964,13 +970,9 @@ router.post('/mark-player', async (req, res) => {
             .maybeSingle();
 
           if (bidError) throw bidError;
-
           if (!highestBid && !finalSoldPrice) {
-            return res.status(400).json({
-              error: 'No bids found for this player. Cannot mark as SOLD without a bid.'
-            });
+            return res.status(400).json({ error: 'No bids found for this player. Cannot mark as SOLD without a bid.' });
           }
-
           finalSoldPrice = finalSoldPrice || (highestBid ? highestBid.amount : 0);
           finalSoldToTeam = finalSoldToTeam || (highestBid ? highestBid.team_id : null);
         }
@@ -980,7 +982,7 @@ router.post('/mark-player', async (req, res) => {
         return res.status(400).json({ error: 'No team selected for sale' });
       }
 
-      // 3. Fetch team (budget validation + socket payload)
+      // Fetch team for budget validation
       const { data: team, error: teamError } = await supabase
         .from('teams')
         .select('budget, name, logo')
@@ -994,205 +996,191 @@ router.post('/mark-player', async (req, res) => {
         return res.status(400).json({ error: 'Team does not have enough budget' });
       }
 
-      // 4 + 5. Update team budget, player status, and persist winning bid in parallel (independent writes)
-      const newBudget = team.budget - finalSoldPrice;
-      const [{ error: updateBudgetError }, { error: updatePlayerError }, { error: insertBidError }] = await Promise.all([
-        supabase.from('teams').update({ budget: newBudget }).eq('id', finalSoldToTeam).eq('auction_id', auctionId),
-        supabase.from('players').update({
-          status: 'SOLD',
-          sold_price: finalSoldPrice,
-          sold_to_team: finalSoldToTeam,
-          was_unsold: 0 // Reset flag
-        }).eq('id', playerId).eq('auction_id', auctionId),
-        supabase.from('bids').insert([{
-          auction_id: auctionId,
-          player_id: playerId,
-          team_id: finalSoldToTeam,
-          amount: finalSoldPrice,
-          timestamp: new Date()
-        }])
-      ]);
+      newBudget = team.budget - finalSoldPrice;
+      teamName = team.name;
+      teamLogo = team.logo;
+    }
 
-      if (updateBudgetError) throw updateBudgetError;
-      if (updatePlayerError) throw updatePlayerError;
-      if (insertBidError) console.warn('[Admin] Non-fatal: winning bid insertion warning:', insertBidError);
+    // ── PHASE 3: Emit socket events IMMEDIATELY (UI feels instant) ───────────────
+    clearVirtualBids(auctionId);
 
-      clearVirtualBids(auctionId);
-
-      io.emit('player-marked', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam, soldToTeamName: team.name, soldToTeamLogo: team.logo });
+    if (status === 'SOLD') {
+      io.emit('player-marked', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam, soldToTeamName: teamName, soldToTeamLogo: teamLogo });
       io.emit('team-budget-updated', { teamId: finalSoldToTeam, newBudget });
-      io.emit('player-sold', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam, soldToTeamName: team.name, soldToTeamLogo: team.logo });
-
+      io.emit('player-sold', { playerId, status, soldPrice: finalSoldPrice, soldToTeam: finalSoldToTeam, soldToTeamName: teamName, soldToTeamLogo: teamLogo });
     } else {
-      // Mark as UNSOLD
-      clearVirtualBids(auctionId);
-      const { error: updatePlayerError } = await supabase
-        .from('players')
-        .update({
-          status: 'UNSOLD',
-          sold_price: null,
-          sold_to_team: null,
-          was_unsold: 1 // Set flag
-        })
-        .eq('id', playerId)
-        .eq('auction_id', auctionId);
-
-      if (updatePlayerError) throw updatePlayerError;
-
       io.emit('player-marked', { playerId, status, soldPrice: null, soldToTeam: null });
     }
 
-    // 6. Auto-load next player (Shared logic)
-    let pendingQ = supabase
+    // ── PHASE 4: Initiate DB writes (asynchronous, non-blocking on HTTP response) ──
+    const dbWrites = status === 'SOLD'
+      ? Promise.all([
+          supabase.from('teams').update({ budget: newBudget }).eq('id', finalSoldToTeam).eq('auction_id', auctionId),
+          supabase.from('players').update({
+            status: 'SOLD',
+            sold_price: finalSoldPrice,
+            sold_to_team: finalSoldToTeam,
+            was_unsold: 0
+          }).eq('id', playerId).eq('auction_id', auctionId),
+          supabase.from('bids').insert([{
+            auction_id: auctionId,
+            player_id: playerId,
+            team_id: finalSoldToTeam,
+            amount: finalSoldPrice,
+            timestamp: new Date()
+          }])
+        ]).then(([{ error: e1 }, { error: e2 }, { error: e3 }]) => {
+          if (e1) console.error('[mark-player] budget update error:', e1);
+          if (e2) console.error('[mark-player] player status update error:', e2);
+          if (e3) console.warn('[mark-player] bid insert warning:', e3);
+        })
+      : supabase.from('players').update({
+          status: 'UNSOLD',
+          sold_price: null,
+          sold_to_team: null,
+          was_unsold: 1
+        }).eq('id', playerId).eq('auction_id', auctionId)
+        .then(({ error }) => { if (error) console.error('[mark-player] unsold update error:', error); });
+
+    // ── PHASE 5: Resolve next player selection (fast single query) ───────────────
+    const { data: allPendingPlayers, error: pendingError } = await supabase
       .from('players')
-      .select('*')
+      .select('id, name, serial_number, category, was_unsold, status, base_price, age, logo, sold_price, sold_to_team')
       .in('status', ['AVAILABLE', 'UNSOLD'])
       .neq('id', playerId)
+      .eq('auction_id', auctionId)
       .order('was_unsold', { ascending: true });
-    pendingQ = pendingQ.eq('auction_id', auctionId);
-
-    const { data: allPendingPlayers, error: pendingError } = await pendingQ;
 
     if (pendingError) {
-      console.error('Error finding next player:', pendingError);
-      return res.json({ success: true });
+      console.error('[mark-player] pending players query error:', pendingError);
     }
 
-    if (allPendingPlayers && allPendingPlayers.length > 0) {
-      const currentState = getAuctionState(auctionId);
-      const sequentialBaseline = (currentState && currentState.sequential_mode === 1)
-        ? { ...currentState, sequential_last_serial: currentPlayer.serial_number ?? currentState.sequential_last_serial }
-        : currentState;
+    const pendingList = allPendingPlayers || [];
 
-      // ── Category Queue logic ──────────────────────────────────────────────
-      let categoryFilter = null;
-      let activeCategory = null;
-      let activeSlotIndex = 0;
-      let slotServed = 0;
-      const categoryQueue = currentState?.category_queue;
+    // ── PHASE 6: Category Queue + pick next player ───────────────────────────────
+    const currentState = getAuctionState(auctionId);
+    const sequentialBaseline = (currentState && currentState.sequential_mode === 1)
+      ? { ...currentState, sequential_last_serial: currentPlayer.serial_number ?? currentState.sequential_last_serial }
+      : currentState;
 
-      if (categoryQueue && Array.isArray(categoryQueue) && categoryQueue.length > 0) {
-        activeSlotIndex = currentState?.category_slot_index ?? 0;
-        slotServed = currentState?.category_slot_served ?? 0;
-        let slotAdvanced = false;
+    let categoryFilter = null;
+    let activeCategory = null;
+    let activeSlotIndex = 0;
+    let slotServed = 0;
+    const categoryQueue = currentState?.category_queue;
 
-        while (activeSlotIndex < categoryQueue.length) {
-          const slot = categoryQueue[activeSlotIndex];
-          if (!slot || !slot.category) {
-            activeSlotIndex++;
-            slotServed = 0;
-            slotAdvanced = true;
-            continue;
-          }
+    if (categoryQueue && Array.isArray(categoryQueue) && categoryQueue.length > 0) {
+      activeSlotIndex = currentState?.category_slot_index ?? 0;
+      slotServed = currentState?.category_slot_served ?? 0;
+      let slotAdvanced = false;
 
-          const slotCount = parseInt(slot.count) || 0;
-          if (slotCount > 0 && slotServed >= slotCount) {
-            activeSlotIndex++;
-            slotServed = 0;
-            slotAdvanced = true;
-            continue;
-          }
+      while (activeSlotIndex < categoryQueue.length) {
+        const slot = categoryQueue[activeSlotIndex];
+        if (!slot || !slot.category) { activeSlotIndex++; slotServed = 0; slotAdvanced = true; continue; }
 
-          // Check if any players remain in this category (AVAILABLE or UNSOLD)
-          const targetCat = slot.category.trim().toLowerCase();
-          const hasRemaining = allPendingPlayers.some(p =>
-            p.category && p.category.trim().toLowerCase() === targetCat
-          );
+        const slotCount = parseInt(slot.count) || 0;
+        if (slotCount > 0 && slotServed >= slotCount) { activeSlotIndex++; slotServed = 0; slotAdvanced = true; continue; }
 
-          if (!hasRemaining) {
-            activeSlotIndex++;
-            slotServed = 0;
-            slotAdvanced = true;
-            continue;
-          }
+        const targetCat = slot.category.trim().toLowerCase();
+        const hasRemaining = pendingList.some(p => p.category && p.category.trim().toLowerCase() === targetCat);
+        if (!hasRemaining) { activeSlotIndex++; slotServed = 0; slotAdvanced = true; continue; }
 
-          // Found active valid category
-          categoryFilter = { category: slot.category };
-          activeCategory = slot.category;
-          break;
-        }
-
-        if (slotAdvanced || activeSlotIndex !== (currentState?.category_slot_index ?? 0)) {
-          await updateCategoryQueueData(auctionId, { slotIndex: activeSlotIndex, slotServed });
-          io.emit('category-slot-changed', {
-            slotIndex: activeSlotIndex,
-            category: activeCategory,
-            slotServed
-          });
-        }
-      }
-      // ─────────────────────────────────────────────────────────────────────
-
-      let nextPlayer = pickNextPlayer(allPendingPlayers, sequentialBaseline, categoryFilter);
-      // Guarantee next player fallback so screen never gets stuck if pending players remain
-      if (!nextPlayer && allPendingPlayers.length > 0) {
-        nextPlayer = allPendingPlayers[0];
+        categoryFilter = { category: slot.category };
+        activeCategory = slot.category;
+        break;
       }
 
-      if (nextPlayer) {
-        const nextStateUpdate = {
-          current_player_id: nextPlayer.id,
-          status: 'LIVE',
-          updated_at: new Date()
-        };
-        if (currentState && currentState.sequential_mode === 1 && nextPlayer.serial_number != null) {
-          nextStateUpdate.sequential_last_serial = nextPlayer.serial_number;
-        }
-
-        await supabase
-          .from('auction_state')
-          .update(nextStateUpdate)
-          .eq('auction_id', auctionId);
-
-        await refreshAuctionState(auctionId);
-
-        // If category mode is active, increment served counter
-        if (categoryFilter) {
-          const newServed = slotServed + 1;
-          await updateCategoryQueueData(auctionId, {
-            slotIndex: activeSlotIndex,
-            slotServed: newServed
-          });
-          io.emit('category-slot-changed', {
-            slotIndex: activeSlotIndex,
-            category: activeCategory,
-            slotServed: newServed
-          });
-        }
-
-        await supabase
-          .from('bids')
-          .delete()
-          .eq('player_id', nextPlayer.id)
-          .eq('auction_id', auctionId);
-
-        clearAdminAnonymousBid(auctionId);
-
-        console.log('Auto-loaded next player:', nextPlayer.name);
-        io.emit('player-loaded', { player: nextPlayer });
-        return res.json({ success: true, nextPlayerLoaded: true, nextPlayer });
+      if (slotAdvanced || activeSlotIndex !== (currentState?.category_slot_index ?? 0)) {
+        updateCategoryQueueData(auctionId, { slotIndex: activeSlotIndex, slotServed }).catch(e =>
+          console.error('[mark-player] category slot update error:', e)
+        );
+        io.emit('category-slot-changed', { slotIndex: activeSlotIndex, category: activeCategory, slotServed });
       }
     }
 
-    // No more players in this auction
-    await supabase
-      .from('auction_state')
-      .update({
-        current_player_id: null,
-        status: 'STOPPED',
+    let nextPlayer = pendingList.length > 0 ? pickNextPlayer(pendingList, sequentialBaseline, categoryFilter) : null;
+    if (!nextPlayer && pendingList.length > 0) nextPlayer = pendingList[0];
+
+    if (nextPlayer) {
+      // ── PHASE 7: Respond immediately — auto-load next player async ────────────
+      const nextStateUpdate = {
+        current_player_id: nextPlayer.id,
+        status: 'LIVE',
         updated_at: new Date()
-      })
-      .eq('auction_id', auctionId);
+      };
+      if (currentState && currentState.sequential_mode === 1 && nextPlayer.serial_number != null) {
+        nextStateUpdate.sequential_last_serial = nextPlayer.serial_number;
+      }
 
-    await refreshAuctionState(auctionId);
-    io.emit('player-loaded', { player: null });
+      lockTransferredToAsync = true;
+      res.json({ success: true, nextPlayerLoaded: true, nextPlayer });
+
+      // Continue async: complete DB writes, update auction_state, clean bids, refresh cache, emit player-loaded
+      setImmediate(async () => {
+        try {
+          await Promise.all([
+            dbWrites,
+            supabase.from('auction_state').update(nextStateUpdate).eq('auction_id', auctionId),
+            supabase.from('bids').delete().eq('player_id', nextPlayer.id).eq('auction_id', auctionId)
+          ]);
+
+          clearAdminAnonymousBid(auctionId);
+          refreshAuctionState(auctionId).catch(e => console.error('[mark-player] refreshAuctionState error:', e));
+
+          if (categoryFilter) {
+            const newServed = slotServed + 1;
+            updateCategoryQueueData(auctionId, { slotIndex: activeSlotIndex, slotServed: newServed }).catch(e =>
+              console.error('[mark-player] category served update error:', e)
+            );
+            io.emit('category-slot-changed', { slotIndex: activeSlotIndex, category: activeCategory, slotServed: newServed });
+          }
+
+          console.log('[mark-player] Auto-loaded next player:', nextPlayer.name);
+          io.emit('player-loaded', { player: nextPlayer });
+        } catch (asyncErr) {
+          console.error('[mark-player] async next-player load error:', asyncErr);
+          io.emit('player-loaded', { player: nextPlayer }); // still emit so UI doesn't freeze
+        } finally {
+          markPlayerLocks.delete(auctionId);
+        }
+      });
+
+      return; // Response already sent above
+    }
+
+    // ── No more players — stop the auction ───────────────────────────────────────
+    lockTransferredToAsync = true;
     res.json({ success: true, nextPlayerLoaded: false, message: 'No more available players' });
+
+    setImmediate(async () => {
+      try {
+        await Promise.all([
+          dbWrites,
+          supabase.from('auction_state').update({
+            current_player_id: null,
+            status: 'STOPPED',
+            updated_at: new Date()
+          }).eq('auction_id', auctionId)
+        ]);
+
+        refreshAuctionState(auctionId).catch(e => console.error('[mark-player] refreshAuctionState error:', e));
+        io.emit('player-loaded', { player: null });
+      } catch (asyncErr) {
+        console.error('[mark-player] async stop auction error:', asyncErr);
+      } finally {
+        markPlayerLocks.delete(auctionId);
+      }
+    });
 
   } catch (err) {
     console.error('Error in mark-player:', err);
-    res.status(500).json({ error: 'Database error' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Database error' });
+    }
   } finally {
-    markPlayerLocks.delete(auctionId);
+    if (!lockTransferredToAsync) {
+      markPlayerLocks.delete(auctionId);
+    }
   }
 });
 
@@ -2482,21 +2470,32 @@ router.post('/remove-player-from-team/:playerId', async (req, res) => {
     const newBudget = (team.budget || 0) + soldPrice;
     await supabase.from('teams').update({ budget: newBudget }).eq('id', teamId).eq('auction_id', auctionId);
 
-    // Update player
-    const { data: updatedPlayer, error: updateError } = await supabase
-      .from('players')
-      .update({
-        status: 'AVAILABLE',
-        sold_price: null,
-        sold_to_team: null,
-        was_unsold: 1
-      })
-      .eq('id', playerId)
-      .eq('auction_id', auctionId)
-      .select()
-      .single();
+    // Update player + delete stale bids in parallel
+    const [{ data: updatedPlayer, error: updateError }] = await Promise.all([
+      supabase
+        .from('players')
+        .update({
+          status: 'AVAILABLE',
+          sold_price: null,
+          sold_to_team: null,
+          was_unsold: 1
+        })
+        .eq('id', playerId)
+        .eq('auction_id', auctionId)
+        .select()
+        .single(),
+      // Delete stale bids so they don't linger until next load
+      supabase.from('bids').delete().eq('player_id', playerId).eq('auction_id', auctionId)
+    ]);
 
     if (updateError) throw updateError;
+
+    // If this player is currently loaded, clear in-memory virtual bids too
+    const liveState = getAuctionState(auctionId);
+    if (liveState && Number(liveState.current_player_id) === Number(playerId)) {
+      clearVirtualBids(auctionId);
+      clearAdminAnonymousBid(auctionId);
+    }
 
     io.emit('player-removed-from-team', {
       playerId: parseInt(playerId),
@@ -2840,7 +2839,7 @@ router.post('/trading-window/execute', async (req, res) => {
     const [updateFromResult, updateToResult, updatePlayerResult] = await Promise.all([
       supabase.from('teams').update({ budget: newFromBudget }).eq('id', fromTeamId).eq('auction_id', auctionId),
       supabase.from('teams').update({ budget: newToBudget }).eq('id', toTeamId).eq('auction_id', auctionId),
-      supabase.from('players').update({ sold_to_team: toTeamId }).eq('id', playerId).eq('auction_id', auctionId)
+      supabase.from('players').update({ sold_to_team: toTeamId, sold_price: tradeAmount }).eq('id', playerId).eq('auction_id', auctionId)
     ]);
 
     if (updateFromResult.error) throw updateFromResult.error;

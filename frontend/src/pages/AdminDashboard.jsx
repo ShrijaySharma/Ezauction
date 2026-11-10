@@ -342,9 +342,9 @@ function AdminDashboard({ user }) {
 
     newSocket.on('team-budget-updated', (data) => {
       // Update team budget in-place from payload
-      if (data.teamId && data.newBudget !== undefined) {
+      if (data && data.teamId != null && data.newBudget !== undefined) {
         setTeams(prev => prev.map(t =>
-          t.id === data.teamId ? { ...t, budget: data.newBudget } : t
+          (String(t.id) === String(data.teamId) || t.name === data.teamId) ? { ...t, budget: data.newBudget } : t
         ));
       } else {
         loadTeams(); // Fallback if no payload data
@@ -352,9 +352,9 @@ function AdminDashboard({ user }) {
     });
 
     newSocket.on('team-bidding-locked', (data) => {
-      if (data.teamId !== undefined && data.locked !== undefined) {
+      if (data && data.teamId != null && data.locked !== undefined) {
         setTeams(prev => prev.map(t =>
-          t.id === data.teamId ? { ...t, bidding_locked: data.locked ? 1 : 0 } : t
+          (String(t.id) === String(data.teamId) || t.name === data.teamId) ? { ...t, bidding_locked: data.locked ? 1 : 0 } : t
         ));
       } else {
         loadTeams();

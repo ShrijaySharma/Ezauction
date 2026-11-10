@@ -603,7 +603,7 @@ function Overlay() {
 
         newSocket.on('team-budget-updated', (data) => {
             if (data && data.teamId != null) {
-                setTeamPurses(prev => prev.map(t => (t.id === data.teamId || t.name === data.teamId) ? { ...t, budget: data.newBudget } : t));
+                setTeamPurses(prev => prev.map(t => (String(t.id) === String(data.teamId) || t.name === data.teamId) ? { ...t, budget: data.newBudget } : t));
             }
             refreshTeamPurses();
             setTimeout(() => refreshTeamPurses(), 350);

@@ -122,6 +122,28 @@ function PublicLive() {
             }));
         });
 
+        newSocket.on('team-budget-updated', (data) => {
+            if (data && data.teamId != null && data.newBudget !== undefined) {
+                setTeams(prev => prev.map(t => (String(t.id) === String(data.teamId) || t.name === data.teamId) ? { ...t, budget: data.newBudget } : t));
+            }
+        });
+
+        newSocket.on('player-removed-from-team', (data) => {
+            if (data && data.playerId) {
+                setPlayers(prev => prev.map(p => {
+                    if (p.id === data.playerId) {
+                        return {
+                            ...p,
+                            status: 'AVAILABLE',
+                            sold_price: null,
+                            sold_to_team: null,
+                        };
+                    }
+                    return p;
+                }));
+            }
+        });
+
         newSocket.on('auction-status-changed', (data) => {
             setAuctionStatus(data.status);
         });
