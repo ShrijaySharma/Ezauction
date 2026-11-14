@@ -933,7 +933,7 @@ router.post('/mark-player', async (req, res) => {
     // Fetch it leanly — only needed fields.
     const { data: currentPlayer, error: currentPlayerError } = await supabase
       .from('players')
-      .select('id, name, serial_number, category, was_unsold, status, sold_price, sold_to_team, base_price, age')
+      .select('id, name, serial_number, category, was_unsold, status, sold_price, sold_to_team, base_price, age, image, thumb_url, role, country')
       .eq('id', playerId)
       .eq('auction_id', auctionId)
       .single();
@@ -1042,10 +1042,13 @@ router.post('/mark-player', async (req, res) => {
         }).eq('id', playerId).eq('auction_id', auctionId)
         .then(({ error }) => { if (error) console.error('[mark-player] unsold update error:', error); });
 
-    // ── PHASE 5: Resolve next player selection (fast single query) ───────────────
+    // ── PHASE 5: Resolve next player selection ────────────────────────────────────
+    // Select all player fields so the nextPlayer object returned to the client
+    // is complete (image, thumb_url, role, country, etc. all required by the UI).
+    // NOTE: players table has no 'logo' column — that's on teams. Use image/thumb_url.
     const { data: allPendingPlayers, error: pendingError } = await supabase
       .from('players')
-      .select('id, name, serial_number, category, was_unsold, status, base_price, age, logo, sold_price, sold_to_team')
+      .select('*')
       .in('status', ['AVAILABLE', 'UNSOLD'])
       .neq('id', playerId)
       .eq('auction_id', auctionId)
@@ -1053,6 +1056,14 @@ router.post('/mark-player', async (req, res) => {
 
     if (pendingError) {
       console.error('[mark-player] pending players query error:', pendingError);
+      // On query failure, still respond so client isn't frozen
+      res.json({ success: true, nextPlayerLoaded: false });
+      setImmediate(async () => {
+        try { await dbWrites; } catch (e) { console.error('[mark-player] dbWrites error on pending fail:', e); }
+        finally { markPlayerLocks.delete(auctionId); }
+      });
+      lockTransferredToAsync = true;
+      return;
     }
 
     const pendingList = allPendingPlayers || [];
