@@ -252,7 +252,11 @@ function AdminDashboard({ user }) {
       setCurrentPlayer(data.player);
       setHighestBid(null);
       setAllBids([]);
-      loadCurrentBid();
+      if (data.player) {
+        setSelectedPlayerId(data.player.id.toString());
+      } else {
+        setSelectedPlayerId('');
+      }
       loadPlayers(); // Refresh player list to show updated statuses
       if (showTeamSquads) {
         loadTeamSquads(); // Refresh team squads if modal is open
@@ -512,7 +516,13 @@ function AdminDashboard({ user }) {
     try {
       const data = await adminService.getCurrentBid();
       setHighestBid(data.highestBid);
-      setCurrentPlayer(data.player);
+      // Guard: Only update currentPlayer if null (initial load / reconnect)
+      // or if data.player matches the active player. Never revert to an older/stale player.
+      setCurrentPlayer(prev => {
+        if (!prev) return data.player || null;
+        if (data.player && data.player.id === prev.id) return data.player;
+        return prev;
+      });
     } catch (error) {
       console.error('Error loading current bid:', error);
     }

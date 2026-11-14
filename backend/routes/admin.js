@@ -941,6 +941,11 @@ router.post('/mark-player', async (req, res) => {
     if (currentPlayerError) throw currentPlayerError;
     if (!currentPlayer) return res.status(404).json({ error: 'Player not found' });
 
+    // Guard against double-deduction: never allow selling a player that is already SOLD
+    if (status === 'SOLD' && currentPlayer.status === 'SOLD') {
+      return res.status(400).json({ error: 'This player has already been sold' });
+    }
+
     let finalSoldPrice = 0;
     let finalSoldToTeam = null;
     let teamName = null;
@@ -1113,7 +1118,15 @@ router.post('/mark-player', async (req, res) => {
     if (!nextPlayer && pendingList.length > 0) nextPlayer = pendingList[0];
 
     if (nextPlayer) {
-      // ── PHASE 7: Respond immediately — auto-load next player async ────────────
+      // ── PHASE 7: Update in-memory state IMMEDIATELY (prevents any concurrent request from seeing stale player) ──
+      if (currentState) {
+        currentState.current_player_id = nextPlayer.id;
+        currentState.status = 'LIVE';
+        if (currentState.sequential_mode === 1 && nextPlayer.serial_number != null) {
+          currentState.sequential_last_serial = nextPlayer.serial_number;
+        }
+      }
+
       const nextStateUpdate = {
         current_player_id: nextPlayer.id,
         status: 'LIVE',
@@ -1160,6 +1173,10 @@ router.post('/mark-player', async (req, res) => {
     }
 
     // ── No more players — stop the auction ───────────────────────────────────────
+    if (currentState) {
+      currentState.current_player_id = null;
+      currentState.status = 'STOPPED';
+    }
     lockTransferredToAsync = true;
     res.json({ success: true, nextPlayerLoaded: false, message: 'No more available players' });
 
@@ -2447,6 +2464,9 @@ router.get('/team-squads', async (req, res) => {
   }
 });
 
+// Serialize team budget mutations to prevent concurrent read-modify-write races
+const teamBudgetLocks = new Map();
+
 // Remove player from team and return to auction
 router.post('/remove-player-from-team/:playerId', async (req, res) => {
   const { playerId } = req.params;
@@ -2470,36 +2490,60 @@ router.post('/remove-player-from-team/:playerId', async (req, res) => {
     }
 
     const teamId = player.sold_to_team;
-    const soldPrice = player.sold_price || 0;
+    const soldPrice = parseFloat(player.sold_price) || 0;
 
-    // Refund budget
-    // Get current budget
-    const { data: team, error: teamError } = await supabase.from('teams').select('budget').eq('id', teamId).eq('auction_id', auctionId).single();
-    if (teamError) throw teamError;
+    // Acquire lock for this team to prevent concurrent refund read-modify-write races
+    const lockKey = `${auctionId}_team_${teamId}`;
+    let releaseLock;
+    const nextLock = new Promise(resolve => { releaseLock = resolve; });
+    const previousLock = teamBudgetLocks.get(lockKey) || Promise.resolve();
+    teamBudgetLocks.set(lockKey, nextLock);
 
-    // Update budget
-    const newBudget = (team.budget || 0) + soldPrice;
-    await supabase.from('teams').update({ budget: newBudget }).eq('id', teamId).eq('auction_id', auctionId);
+    let newBudget;
+    let updatedPlayer;
 
-    // Update player + delete stale bids in parallel
-    const [{ data: updatedPlayer, error: updateError }] = await Promise.all([
-      supabase
-        .from('players')
-        .update({
-          status: 'AVAILABLE',
-          sold_price: null,
-          sold_to_team: null,
-          was_unsold: 1
-        })
-        .eq('id', playerId)
+    try {
+      await previousLock;
+
+      // Refund budget atomically from fresh DB value
+      const { data: team, error: teamError } = await supabase
+        .from('teams')
+        .select('budget')
+        .eq('id', teamId)
         .eq('auction_id', auctionId)
-        .select()
-        .single(),
-      // Delete stale bids so they don't linger until next load
-      supabase.from('bids').delete().eq('player_id', playerId).eq('auction_id', auctionId)
-    ]);
+        .single();
+      if (teamError) throw teamError;
 
-    if (updateError) throw updateError;
+      const currentBudget = parseFloat(team.budget) || 0;
+      newBudget = currentBudget + soldPrice;
+
+      // Update budget and player + delete stale bids
+      const [updateBudgetRes, updatePlayerRes] = await Promise.all([
+        supabase.from('teams').update({ budget: newBudget }).eq('id', teamId).eq('auction_id', auctionId),
+        supabase
+          .from('players')
+          .update({
+            status: 'AVAILABLE',
+            sold_price: null,
+            sold_to_team: null,
+            was_unsold: 1
+          })
+          .eq('id', playerId)
+          .eq('auction_id', auctionId)
+          .select()
+          .single(),
+        supabase.from('bids').delete().eq('player_id', playerId).eq('auction_id', auctionId)
+      ]);
+
+      if (updateBudgetRes.error) throw updateBudgetRes.error;
+      if (updatePlayerRes.error) throw updatePlayerRes.error;
+      updatedPlayer = updatePlayerRes.data;
+    } finally {
+      releaseLock();
+      if (teamBudgetLocks.get(lockKey) === nextLock) {
+        teamBudgetLocks.delete(lockKey);
+      }
+    }
 
     // If this player is currently loaded, clear in-memory virtual bids too
     const liveState = getAuctionState(auctionId);
