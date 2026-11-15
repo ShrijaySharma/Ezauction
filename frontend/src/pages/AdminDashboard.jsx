@@ -742,11 +742,17 @@ function AdminDashboard({ user }) {
         setHighestBid(null);
         setAllBids([]);
         setSelectedPlayerId(markRes.nextPlayer.id.toString());
-      } else {
+      } else if (markRes && markRes.nextPlayerLoaded === false && !markRes.nextPlayer) {
+        // No more players — auction ended
         setCurrentPlayer(null);
         setHighestBid(null);
         setAllBids([]);
         setSelectedPlayerId('');
+      } else {
+        // nextPlayer is null but nextPlayerLoaded=true — backend is loading next player
+        // asynchronously. Clear bids but keep current player visible until player-loaded fires.
+        setHighestBid(null);
+        setAllBids([]);
       }
 
       if (status === 'SOLD') {

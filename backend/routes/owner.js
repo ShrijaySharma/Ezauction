@@ -177,6 +177,12 @@ router.post('/bid', async (req, res) => {
         return res.status(400).json({ error: 'Invalid bid amount' });
     }
 
+    // Rapid-bid guard: reject immediately if the previous bid is still being processed.
+    // This prevents queuing multiple DB operations which causes timeouts under rapid clicking.
+    if (currentBidLocks.has(auctionId)) {
+      return res.status(429).json({ error: 'Please wait — a bid is already being processed.' });
+    }
+
     // Acquire lock to serialize concurrent bids
     let release;
     const nextLock = new Promise(resolve => { release = resolve; });
