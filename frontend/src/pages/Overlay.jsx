@@ -393,51 +393,110 @@ function PurseTicker({ data, themeKey }) {
     const totalBudget = remaining + spent;
     const pct = totalBudget > 0 ? Math.max(0, Math.min(100, (remaining / totalBudget) * 100)) : 100;
     const barColor = pct > 50 ? '#22C55E' : pct > 20 ? '#F59E0B' : '#EF4444';
+    const barGlow  = pct > 50 ? '0 0 12px #22C55E80' : pct > 20 ? '0 0 12px #F59E0B80' : '0 0 12px #EF444480';
+
     return (
         <div
-            className="absolute bottom-36 right-6 z-40 pointer-events-none"
-            style={{ animation: 'purseTickIn 0.4s cubic-bezier(0.34,1.56,0.64,1)' }}
+            className="absolute bottom-32 right-0 z-40 pointer-events-none"
+            style={{ animation: 'purseTickIn 0.45s cubic-bezier(0.34,1.4,0.64,1)' }}
         >
+            {/* Accent left border stripe */}
+            <div style={{
+                position: 'absolute', left: 0, top: '12px', bottom: '12px',
+                width: '4px', borderRadius: '0 2px 2px 0',
+                background: `linear-gradient(180deg, ${tk.accent}, ${tk.accent}44)`,
+                boxShadow: `0 0 12px ${tk.accent}`,
+            }} />
+
             <div
-                className="rounded-2xl px-5 py-4 flex flex-col gap-2 shadow-[0_10px_40px_rgba(0,0,0,0.85)] min-w-[220px] max-w-[260px]"
                 style={{
-                    background: 'rgba(6,6,10,0.92)',
-                    border: `1.5px solid ${tk.accent}50`,
-                    backdropFilter: 'blur(16px)',
+                    marginLeft: '4px',
+                    minWidth: '340px',
+                    maxWidth: '380px',
+                    background: tk.barBg,
+                    border: `1.5px solid ${tk.accent}55`,
+                    borderRight: 'none',
+                    borderRadius: '16px 0 0 16px',
+                    backdropFilter: 'blur(24px)',
+                    boxShadow: `0 16px 60px rgba(0,0,0,0.9), 0 0 0 1px ${tk.accent}15`,
+                    padding: '20px 24px 20px 20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '14px',
                 }}
             >
-                {/* Header */}
-                <div className="flex items-center justify-between mb-1">
-                    <span className="text-[9px] font-black uppercase tracking-[0.3em]" style={{ color: tk.accent }}>
-                        Team Purse
+                {/* Header row */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: tk.accent, boxShadow: `0 0 8px ${tk.accent}` }} />
+                        <span style={{ color: tk.accent, fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em' }}>
+                            Live Purse
+                        </span>
+                    </div>
+                    <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', fontWeight: 700 }}>
+                        {index} / {total}
                     </span>
-                    <span className="text-[9px] font-bold text-white/40">{index}/{total}</span>
                 </div>
-                {/* Team */}
-                <div className="flex items-center gap-2">
+
+                {/* Team identity row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                     {team.logo ? (
-                        <img src={getImageUrl(team.logo)} alt={team.name} className="w-9 h-9 rounded-lg object-cover shrink-0" style={{ border: `1px solid ${tk.accent}50` }} onError={e => { e.target.style.display = 'none'; }} />
+                        <img
+                            src={getImageUrl(team.logo)} alt={team.name}
+                            style={{ width: '56px', height: '56px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0, border: `2px solid ${tk.accent}70`, boxShadow: `0 0 20px ${tk.accent}40` }}
+                            onError={e => { e.target.style.display = 'none'; }}
+                        />
                     ) : (
-                        <div className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center font-black text-sm" style={{ background: `${tk.accent}20`, color: tk.accent }}>
+                        <div style={{ width: '56px', height: '56px', borderRadius: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 900, background: `${tk.accent}22`, border: `2px solid ${tk.accent}60`, color: tk.accent }}>
                             {(team.name || 'T').charAt(0)}
                         </div>
                     )}
-                    <div className="min-w-0">
-                        <div className="font-black text-white text-sm uppercase truncate leading-tight">{team.name}</div>
-                        <div className="text-[10px] text-white/50 font-bold">{team.playersBought || 0} players</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: '#fff', fontWeight: 900, fontSize: '18px', textTransform: 'uppercase', letterSpacing: '-0.01em', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {team.name}
+                        </div>
+                        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', fontWeight: 700, marginTop: '3px' }}>
+                            {team.playersBought || 0} player{(team.playersBought || 0) !== 1 ? 's' : ''} bought
+                        </div>
                     </div>
                 </div>
-                {/* Budget */}
-                <div className="font-black font-mono text-2xl text-white leading-none">₹{Number(remaining).toLocaleString('en-IN')}</div>
-                {/* Bar */}
-                <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: barColor }} />
+
+                {/* Divider */}
+                <div style={{ height: '1px', background: `linear-gradient(90deg, ${tk.accent}40, transparent)` }} />
+
+                {/* Budget display */}
+                <div>
+                    <div style={{ color: tk.accent, fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', marginBottom: '4px' }}>
+                        Remaining Purse
+                    </div>
+                    <div style={{ color: '#fff', fontSize: '36px', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '-0.02em', lineHeight: 1, textShadow: `0 0 24px ${tk.accent}60` }}>
+                        ₹{Number(remaining).toLocaleString('en-IN')}
+                    </div>
+                    {spent > 0 && (
+                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 700, marginTop: '4px' }}>
+                            Spent: ₹{Number(spent).toLocaleString('en-IN')}
+                        </div>
+                    )}
+                </div>
+
+                {/* Progress bar */}
+                <div>
+                    <div style={{ width: '100%', height: '8px', borderRadius: '99px', background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, borderRadius: '99px', background: barColor, boxShadow: barGlow, transition: 'width 0.7s ease' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
+                        <span style={{ color: barColor, fontSize: '10px', fontWeight: 800 }}>{pct.toFixed(0)}% remaining</span>
+                        {totalBudget > 0 && (
+                            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '10px', fontWeight: 700 }}>of ₹{Number(totalBudget).toLocaleString('en-IN')}</span>
+                        )}
+                    </div>
                 </div>
             </div>
+
             <style>{`
                 @keyframes purseTickIn {
-                    from { opacity: 0; transform: translateX(30px) scale(0.95); }
-                    to   { opacity: 1; transform: translateX(0) scale(1); }
+                    from { opacity: 0; transform: translateX(60px); }
+                    to   { opacity: 1; transform: translateX(0); }
                 }
             `}</style>
         </div>
