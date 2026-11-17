@@ -675,7 +675,13 @@ function Overlay() {
 
     // startPurseCycle: cycles through teams one by one
     const startPurseCycle = (purses) => {
-        if (!purses || purses.length === 0) return;
+        if (!purses || purses.length === 0) {
+            // If teams not loaded yet, retry in 15 seconds
+            if (!purseTickerAuctionRef.current) {
+                purseTickerRef.current = setTimeout(() => startPurseCycle(purseTickerLivePursesRef.current), 15 * 1000);
+            }
+            return;
+        }
         if (purseTickerAuctionRef.current) return; // already running
         purseTickerAuctionRef.current = true;
         let idx = 0;
