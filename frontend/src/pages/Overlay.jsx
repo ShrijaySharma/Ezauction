@@ -235,11 +235,11 @@ function OverlayLowerThird({
 
             {/* Main lower-third bar: slim height (88px) with 3-column grid to center the player image */}
             <div
-                className="relative grid grid-cols-[1fr_auto_1fr] items-center px-4 md:px-6 py-1.5 md:py-2"
+                className="relative grid grid-cols-[1fr_auto_1fr] items-center px-6 md:px-10 py-2 md:py-3"
                 style={{
                     background: theme.overlayBarBg,
                     borderTop: `2px solid ${theme.overlayBarBorder}`,
-                    minHeight: '88px',
+                    minHeight: '120px',
                 }}
             >
                 {/* Left Column: Chevron + Player Info Section */}
@@ -248,7 +248,7 @@ function OverlayLowerThird({
 
                     <div className="flex-1 flex flex-col justify-center gap-0.5 min-w-0">
                         <span
-                            className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] truncate"
+                            className="text-xs md:text-sm font-black uppercase tracking-[0.2em] truncate"
                             style={{ color: theme.overlayRoleText }}
                         >
                             {currentPlayer.role}
@@ -261,7 +261,7 @@ function OverlayLowerThird({
                         <div className="flex items-center gap-2 min-w-0">
                             {showSerialNo && currentPlayer.serial_number && (
                                 <span
-                                    className="px-2 py-0.5 rounded text-[11px] md:text-xs font-black uppercase tracking-wider shrink-0 shadow-md"
+                                    className="px-2 py-0.5 rounded text-sm md:text-sm font-black uppercase tracking-wider shrink-0 shadow-md"
                                     style={{
                                         background: theme.overlayBarBorder || '#EAB308',
                                         color: '#000',
@@ -271,7 +271,7 @@ function OverlayLowerThird({
                                 </span>
                             )}
                             <h2
-                                className="text-lg md:text-2xl lg:text-3xl font-black uppercase leading-none tracking-tight truncate"
+                                className="text-2xl md:text-3xl lg:text-4xl font-black uppercase leading-none tracking-tight truncate"
                                 style={{ color: theme.overlayPlayerText }}
                             >
                                 {currentPlayer.name}
@@ -279,7 +279,7 @@ function OverlayLowerThird({
                         </div>
 
                         <span
-                            className="text-[11px] md:text-xs font-bold"
+                            className="text-xs md:text-sm font-bold"
                             style={{ color: theme.overlayRoleText, opacity: 0.9 }}
                         >
                             Base: ₹{formatIndianNumber(currentPlayer.base_price)}
@@ -288,9 +288,9 @@ function OverlayLowerThird({
                 </div>
 
                 {/* Center Column: ENLARGED Player Image Box popping out of the slim bar */}
-                <div className="relative self-stretch flex items-center justify-center z-30 w-32 sm:w-36 md:w-42 px-1">
+                <div className="relative self-stretch flex items-center justify-center z-30 w-40 sm:w-48 md:w-52 px-2">
                     <div
-                        className="w-32 h-38 sm:w-36 sm:h-44 md:w-42 md:h-50 rounded-2xl overflow-hidden border-2 flex items-center justify-center shadow-[0_12px_35px_rgba(0,0,0,0.85)] absolute bottom-1.5 md:bottom-2"
+                        className="w-40 h-52 sm:w-48 sm:h-60 md:w-52 md:h-64 rounded-2xl overflow-hidden border-2 flex items-center justify-center shadow-[0_12px_35px_rgba(0,0,0,0.85)] absolute bottom-2 md:bottom-3"
                         style={{
                             background: 'rgba(10, 10, 15, 0.94)',
                             borderColor: theme.overlayBarBorder,
@@ -320,27 +320,27 @@ function OverlayLowerThird({
                 {/* Right Column: Bid Section + Chevron (Right Aligned) */}
                 <div className="flex items-center justify-end gap-3 md:gap-4 min-w-0 pl-2 md:pl-4">
                     <div
-                        className={`flex flex-col items-center justify-center px-4 md:px-5 py-1 md:py-1.5 transition-all duration-300 min-w-[160px] md:min-w-[200px] max-w-[250px] rounded-xl ${bidFlash ? 'scale-105' : ''}`}
+                        className={`flex flex-col items-center justify-center px-4 md:px-5 py-1 md:py-1.5 transition-all duration-300 min-w-[200px] md:min-w-[260px] max-w-[320px] rounded-xl ${bidFlash ? 'scale-105' : ''}`}
                         style={{
                             background: theme.overlayBidBg,
                             border: `1px solid ${theme.overlayBarBorder}35`,
                         }}
                     >
                         <span
-                            className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.25em] mb-0.5 text-center leading-none"
+                            className="text-xs md:text-sm font-black uppercase tracking-[0.25em] mb-0.5 text-center leading-none"
                             style={{ color: theme.overlayRoleText }}
                         >
                             Current Bid
                         </span>
                         <span
-                            className={`text-2xl md:text-3xl lg:text-4xl font-black font-mono tracking-tighter leading-tight transition-all duration-300 ${bidFlash ? 'scale-110' : ''}`}
+                            className={`text-3xl md:text-4xl lg:text-5xl font-black font-mono tracking-tighter leading-tight transition-all duration-300 ${bidFlash ? 'scale-110' : ''}`}
                             style={{ color: bidFlash ? theme.overlayBarBorder : theme.overlayBidText }}
                         >
                             ₹{formatIndianNumber(currentBid)}
                         </span>
                         {leadingTeam ? (
                             <span
-                                className="text-[11px] md:text-xs font-black text-center leading-tight break-words max-w-[210px] uppercase line-clamp-2 mt-0.5"
+                                className="text-sm md:text-base font-black text-center leading-tight break-words max-w-[210px] uppercase line-clamp-2 mt-0.5"
                                 style={{ color: theme.overlayLeadText }}
                             >
                                 {leadingTeam}
@@ -366,7 +366,7 @@ function OverlayLowerThird({
 function ChevronAccent({ color, side }) {
     const isLeft = side === 'left';
     return (
-        <div className="relative flex-shrink-0 flex items-center" style={{ width: '48px' }}>
+        <div className="relative flex-shrink-0 flex items-center" style={{ width: '60px' }}>
             <svg viewBox="0 0 48 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
                 {isLeft ? (
                     <polygon points="0,0 48,0 30,50 48,100 0,100" fill={color} fillOpacity="0.15" />
@@ -379,6 +379,126 @@ function ChevronAccent({ color, side }) {
                     <polyline points="0,0 18,50 0,100" fill="none" stroke={color} strokeWidth="2" strokeOpacity="0.8" />
                 )}
             </svg>
+        </div>
+    );
+}
+
+// ── PurseTicker: bottom-right corner widget cycling team purses ───────────────
+function PurseTicker({ data, themeKey }) {
+    const tk = getOverlayTokens(themeKey);
+    if (!data) return null;
+    const { team, index, total } = data;
+    const remaining = team.budget || 0;
+    const spent = team.totalSpent || 0;
+    const totalBudget = remaining + spent;
+    const pct = totalBudget > 0 ? Math.max(0, Math.min(100, (remaining / totalBudget) * 100)) : 100;
+    const barColor = pct > 50 ? '#22C55E' : pct > 20 ? '#F59E0B' : '#EF4444';
+    return (
+        <div
+            className="absolute bottom-36 right-6 z-40 pointer-events-none"
+            style={{ animation: 'purseTickIn 0.4s cubic-bezier(0.34,1.56,0.64,1)' }}
+        >
+            <div
+                className="rounded-2xl px-5 py-4 flex flex-col gap-2 shadow-[0_10px_40px_rgba(0,0,0,0.85)] min-w-[220px] max-w-[260px]"
+                style={{
+                    background: 'rgba(6,6,10,0.92)',
+                    border: `1.5px solid ${tk.accent}50`,
+                    backdropFilter: 'blur(16px)',
+                }}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between mb-1">
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em]" style={{ color: tk.accent }}>
+                        Team Purse
+                    </span>
+                    <span className="text-[9px] font-bold text-white/40">{index}/{total}</span>
+                </div>
+                {/* Team */}
+                <div className="flex items-center gap-2">
+                    {team.logo ? (
+                        <img src={getImageUrl(team.logo)} alt={team.name} className="w-9 h-9 rounded-lg object-cover shrink-0" style={{ border: `1px solid ${tk.accent}50` }} onError={e => { e.target.style.display = 'none'; }} />
+                    ) : (
+                        <div className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center font-black text-sm" style={{ background: `${tk.accent}20`, color: tk.accent }}>
+                            {(team.name || 'T').charAt(0)}
+                        </div>
+                    )}
+                    <div className="min-w-0">
+                        <div className="font-black text-white text-sm uppercase truncate leading-tight">{team.name}</div>
+                        <div className="text-[10px] text-white/50 font-bold">{team.playersBought || 0} players</div>
+                    </div>
+                </div>
+                {/* Budget */}
+                <div className="font-black font-mono text-2xl text-white leading-none">₹{Number(remaining).toLocaleString('en-IN')}</div>
+                {/* Bar */}
+                <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: barColor }} />
+                </div>
+            </div>
+            <style>{`
+                @keyframes purseTickIn {
+                    from { opacity: 0; transform: translateX(30px) scale(0.95); }
+                    to   { opacity: 1; transform: translateX(0) scale(1); }
+                }
+            `}</style>
+        </div>
+    );
+}
+
+// ── OverlaySoldBanner: full-screen sold animation ─────────────────────────────
+function OverlaySoldBanner({ anim, themeKey }) {
+    const tk = getOverlayTokens(themeKey);
+    if (!anim) return null;
+    return (
+        <div
+            className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none"
+            style={{ animation: 'overlaySoldFadeIn 0.35s ease-out' }}
+        >
+            {/* Semi-transparent dark veil */}
+            <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(3px)' }} />
+            {/* Card */}
+            <div
+                className="relative flex flex-col items-center gap-4 px-16 py-10 rounded-3xl shadow-[0_20px_80px_rgba(0,0,0,0.9)]"
+                style={{
+                    background: 'rgba(8,8,12,0.95)',
+                    border: `2px solid ${tk.accent}`,
+                    boxShadow: `0 0 60px ${tk.accent}40`,
+                }}
+            >
+                {/* SOLD badge */}
+                <div
+                    className="text-xs font-black uppercase tracking-[0.5em] px-6 py-1.5 rounded-full"
+                    style={{ background: tk.accent, color: '#000' }}
+                >
+                    ✦ SOLD ✦
+                </div>
+                {/* Player name */}
+                <div className="text-white font-black text-5xl uppercase tracking-tight text-center drop-shadow-2xl">
+                    {anim.playerName}
+                </div>
+                {/* Divider */}
+                <div className="w-24 h-[2px] rounded-full" style={{ background: `${tk.accent}60` }} />
+                {/* Team */}
+                <div className="flex items-center gap-4">
+                    {anim.teamLogo && (
+                        <img src={getImageUrl(anim.teamLogo)} alt="" className="w-14 h-14 rounded-full object-cover shadow-lg" style={{ border: `2px solid ${tk.accent}` }} onError={e => { e.target.style.display = 'none'; }} />
+                    )}
+                    <span className="font-black uppercase text-3xl tracking-wide" style={{ color: tk.accent }}>
+                        {anim.teamName || 'A TEAM'}
+                    </span>
+                </div>
+                {/* Price */}
+                {anim.price > 0 && (
+                    <div className="font-black font-mono text-4xl text-white/90">
+                        ₹{Number(anim.price).toLocaleString('en-IN')}
+                    </div>
+                )}
+            </div>
+            <style>{`
+                @keyframes overlaySoldFadeIn {
+                    from { opacity: 0; transform: scale(0.92); }
+                    to   { opacity: 1; transform: scale(1); }
+                }
+            `}</style>
         </div>
     );
 }
@@ -399,6 +519,15 @@ function Overlay() {
     const [themeKey, setThemeKey] = useState(DEFAULT_THEME);
     const [displayMode, setDisplayMode] = useState('main'); // main | purse | teams
     const [teamPurses, setTeamPurses] = useState([]);
+
+    // Sold animation state
+    const [overlaySoldAnim, setOverlaySoldAnim] = useState(null); // { playerName, teamName, teamLogo, price }
+
+    // Purse ticker state
+    const [purseTicker, setPurseTicker] = useState(null); // { team, index, total }
+    const purseTickerRef = useRef(null);
+    const purseTickerAuctionRef = useRef(false); // true while cycling
+    const purseTickerLivePursesRef = useRef([]);
     const theme = getTheme(themeKey);
 
     // UI display toggles — initialized to true (server sends correct state via ui-toggles-updated on connect)
@@ -407,6 +536,43 @@ function Overlay() {
     const [showSerialNo, setShowSerialNo] = useState(true);
 
     const currentPlayerRef = useRef(null);
+
+    // Keep purseTickerLivePursesRef in sync with teamPurses
+    useEffect(() => {
+        purseTickerLivePursesRef.current = teamPurses;
+    }, [teamPurses]);
+
+    // startPurseCycle: cycles through teams one by one
+    const startPurseCycle = (purses) => {
+        if (!purses || purses.length === 0) return;
+        if (purseTickerAuctionRef.current) return; // already running
+        purseTickerAuctionRef.current = true;
+        let idx = 0;
+        const showNext = () => {
+            if (idx >= purses.length) {
+                // Cycle done — wait 5 mins then restart
+                purseTickerAuctionRef.current = false;
+                setPurseTicker(null);
+                purseTickerRef.current = setTimeout(() => startPurseCycle(purseTickerLivePursesRef.current), 5 * 60 * 1000);
+                return;
+            }
+            setPurseTicker({ team: purses[idx], index: idx + 1, total: purses.length });
+            idx++;
+            purseTickerRef.current = setTimeout(showNext, 3000); // 3 sec per team
+        };
+        showNext();
+    };
+
+    // Start the purse cycle 5 mins after mount
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            startPurseCycle(purseTickerLivePursesRef.current);
+        }, 5 * 60 * 1000);
+        return () => {
+            clearTimeout(timer);
+            if (purseTickerRef.current) clearTimeout(purseTickerRef.current);
+        };
+    }, []);
 
     // ── Preload all player images ─────────────────────────────────────────────
     useEffect(() => {
@@ -589,7 +755,18 @@ function Overlay() {
             setTimeout(() => refreshTeamPurses(), 800);
         };
 
-        newSocket.on('player-sold', handlePlayerSoldUpdate);
+        newSocket.on('player-sold', (data) => {
+            handlePlayerSoldUpdate(data);
+            if (data && data.soldPrice > 0) {
+                setOverlaySoldAnim({
+                    playerName: currentPlayerRef.current?.name || 'Player',
+                    teamName: data.soldToTeamName || '',
+                    teamLogo: data.soldToTeamLogo || null,
+                    price: data.soldPrice || 0,
+                });
+                setTimeout(() => setOverlaySoldAnim(null), 3500);
+            }
+        });
 
         newSocket.on('player-marked', (data) => {
             console.log('[Socket:Overlay] player-marked', data);
@@ -684,6 +861,8 @@ function Overlay() {
                 </div>
             )}
 
+            {displayMode === 'main' && <PurseTicker data={purseTicker} themeKey={themeKey} />}
+            <OverlaySoldBanner anim={overlaySoldAnim} themeKey={themeKey} />
 
         </div>
     );
