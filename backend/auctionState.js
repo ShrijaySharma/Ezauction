@@ -4,6 +4,20 @@ import { supabase } from './supabaseClient.js';
 const auctionStateCaches = new Map();        // auctionId → auction_state row
 const tradingWindowStates = new Map();       // auctionId → { isOpen, trades[] }
 const adminAnonymousBids = new Map();        // auctionId → { amount, playerId }
+const currentPlayerCaches = new Map();       // auctionId → current player object (full row)
+const teamBudgetCaches = new Map();          // auctionId → Map(teamId → { budget, name, logo })
+
+// Internal: warm team budget cache (fire-and-forget, non-blocking)
+async function warmTeamCache(auctionId) {
+    try {
+        const { data: teams } = await supabase.from('teams').select('id, budget, name, logo').eq('auction_id', auctionId);
+        if (teams && teams.length > 0) {
+            if (!teamBudgetCaches.has(auctionId)) teamBudgetCaches.set(auctionId, new Map());
+            const map = teamBudgetCaches.get(auctionId);
+            teams.forEach(t => map.set(String(t.id), { budget: t.budget, name: t.name, logo: t.logo }));
+        }
+    } catch (e) { /* non-critical — mark-player falls back to DB */ }
+}
 
 function defaultAuctionState(auctionId) {
     return {
@@ -63,6 +77,8 @@ export async function refreshAuctionState(auctionId) {
                 category_slot_served: slotServed,
                 broadcast_config: bCfg
             });
+            // Warm team budget cache in background — non-blocking, no await
+            if (!teamBudgetCaches.has(auctionId)) warmTeamCache(auctionId);
         } else {
             // Create it if missing
             console.warn(`[Cache:${auctionId}] Auction state not found. Initializing...`);
@@ -186,5 +202,36 @@ export function getVirtualHighestBid(auctionId) {
 
 export function clearVirtualBids(auctionId) {
     auctionBidStacks.delete(auctionId);
+}
+
+// ─── Current Player Cache (per auction, full player row) ──────────────────────
+export function setCachedCurrentPlayer(auctionId, player) {
+    currentPlayerCaches.set(auctionId, player || null);
+}
+export function getCachedCurrentPlayer(auctionId) {
+    return currentPlayerCaches.get(auctionId) ?? null;
+}
+export function clearCachedCurrentPlayer(auctionId) {
+    currentPlayerCaches.delete(auctionId);
+}
+
+// ─── Team Budget Cache (per auction) ─────────────────────────────────────────
+// Stores Map(teamId → { budget, name, logo }) for instant budget lookups
+export function setCachedTeamBudget(auctionId, teamId, teamData) {
+    if (!teamBudgetCaches.has(auctionId)) teamBudgetCaches.set(auctionId, new Map());
+    teamBudgetCaches.get(auctionId).set(String(teamId), teamData);
+}
+export function getCachedTeam(auctionId, teamId) {
+    return teamBudgetCaches.get(auctionId)?.get(String(teamId)) ?? null;
+}
+export function updateCachedTeamBudget(auctionId, teamId, newBudget) {
+    const map = teamBudgetCaches.get(auctionId);
+    if (map) {
+        const existing = map.get(String(teamId));
+        if (existing) map.set(String(teamId), { ...existing, budget: newBudget });
+    }
+}
+export function clearTeamBudgetCache(auctionId) {
+    teamBudgetCaches.delete(auctionId);
 }
 

@@ -13,7 +13,7 @@ import AdmZip from 'adm-zip';
 import multer from 'multer';
 import SQLite3 from 'sqlite3';
 import * as XLSX from 'xlsx';
-import { refreshAuctionState, getAuctionState, hasAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState, getAdminAnonymousBid, setAdminAnonymousBid, clearAdminAnonymousBid, popVirtualBid, getVirtualHighestBid, clearVirtualBids } from '../auctionState.js';
+import { refreshAuctionState, getAuctionState, hasAuctionState, getTradingWindowState, setTradingWindowState, addTradeToWindow, resetTradingWindowState, getAdminAnonymousBid, setAdminAnonymousBid, clearAdminAnonymousBid, popVirtualBid, getVirtualHighestBid, clearVirtualBids, setCachedCurrentPlayer, getCachedCurrentPlayer, clearCachedCurrentPlayer, setCachedTeamBudget, getCachedTeam, updateCachedTeamBudget, clearTeamBudgetCache } from '../auctionState.js';
 
 const router = express.Router({ mergeParams: true });
 
@@ -542,6 +542,9 @@ router.post('/load-player', async (req, res) => {
     clearAdminAnonymousBid(auctionId);
     clearVirtualBids(auctionId);
 
+    // ── Populate in-memory cache for instant mark-player ──────────────────────
+    setCachedCurrentPlayer(auctionId, player);
+
     io.emit('player-loaded', { player });
     res.json({ success: true, player });
 
@@ -928,32 +931,38 @@ router.post('/mark-player', async (req, res) => {
   }
 
   try {
-    // ── PHASE 2: Resolve final sold price / team ──────────────────────────────────
-    // Determine team ID first (needed to decide what to fetch in parallel).
+    // ── PHASE 2: Resolve player + team from IN-MEMORY CACHE (zero DB calls) ──────
+    // Cache is populated by load-player and team budget updates.
+    // DB fallback only fires when cache misses (first request after restart).
     let preTeamId = soldToTeam || null;
     if (!preTeamId) {
       const vBid = getVirtualHighestBid(auctionId);
       if (vBid && Number(vBid.player_id) === Number(playerId)) preTeamId = vBid.team_id;
     }
 
-    // Kick off player fetch and (if SOLD + team known) team fetch IN PARALLEL.
-    const playerFetch = supabase
-      .from('players')
-      .select('id, name, serial_number, category, was_unsold, status, sold_price, sold_to_team, base_price, age, image, thumb_url, role, country')
-      .eq('id', playerId)
-      .eq('auction_id', auctionId)
-      .single();
+    // Try cache first
+    let currentPlayer = getCachedCurrentPlayer(auctionId);
+    // Validate cache is for the right player
+    if (currentPlayer && Number(currentPlayer.id) !== Number(playerId)) currentPlayer = null;
 
-    const teamFetch = (status === 'SOLD' && preTeamId)
-      ? supabase.from('teams').select('budget, name, logo').eq('id', preTeamId).eq('auction_id', auctionId).single()
-      : Promise.resolve({ data: null, error: null });
+    let cachedTeam = (status === 'SOLD' && preTeamId) ? getCachedTeam(auctionId, preTeamId) : null;
 
-    const [
-      { data: currentPlayer, error: currentPlayerError },
-      { data: preTeamData, error: preTeamError }
-    ] = await Promise.all([playerFetch, teamFetch]);
+    // DB fallback only if cache missed
+    if (!currentPlayer || (status === 'SOLD' && preTeamId && !cachedTeam)) {
+      const playerFetch = !currentPlayer
+        ? supabase.from('players').select('id, name, serial_number, category, was_unsold, status, sold_price, sold_to_team, base_price, age, image, thumb_url, role, country').eq('id', playerId).eq('auction_id', auctionId).single()
+        : Promise.resolve({ data: currentPlayer, error: null });
 
-    if (currentPlayerError) throw currentPlayerError;
+      const teamFetch = (status === 'SOLD' && preTeamId && !cachedTeam)
+        ? supabase.from('teams').select('budget, name, logo').eq('id', preTeamId).eq('auction_id', auctionId).single()
+        : Promise.resolve({ data: cachedTeam, error: null });
+
+      const [{ data: fetchedPlayer, error: playerErr }, { data: fetchedTeam }] = await Promise.all([playerFetch, teamFetch]);
+      if (playerErr) throw playerErr;
+      currentPlayer = fetchedPlayer;
+      if (fetchedTeam) cachedTeam = fetchedTeam;
+    }
+
     if (!currentPlayer) return res.status(404).json({ error: 'Player not found' });
 
     // Guard against double-deduction: never allow selling a player that is already SOLD
@@ -971,7 +980,7 @@ router.post('/mark-player', async (req, res) => {
       finalSoldPrice = soldPrice || 0;
       finalSoldToTeam = preTeamId;
 
-      // Fallback: if we still don't have price/team, check virtual bids then DB
+      // Fallback: virtual bid stack then DB
       if (!finalSoldPrice || !finalSoldToTeam) {
         const vBid = getVirtualHighestBid(auctionId);
         if (vBid && Number(vBid.player_id) === Number(playerId)) {
@@ -981,14 +990,8 @@ router.post('/mark-player', async (req, res) => {
 
         if (!finalSoldPrice || !finalSoldToTeam) {
           const { data: highestBid, error: bidError } = await supabase
-            .from('bids')
-            .select('amount, team_id')
-            .eq('player_id', playerId)
-            .eq('auction_id', auctionId)
-            .order('amount', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
+            .from('bids').select('amount, team_id').eq('player_id', playerId).eq('auction_id', auctionId)
+            .order('amount', { ascending: false }).limit(1).maybeSingle();
           if (bidError) throw bidError;
           if (!highestBid && !finalSoldPrice) {
             return res.status(400).json({ error: 'No bids found for this player. Cannot mark as SOLD without a bid.' });
@@ -1002,25 +1005,35 @@ router.post('/mark-player', async (req, res) => {
         return res.status(400).json({ error: 'No team selected for sale' });
       }
 
-      // Use pre-fetched team if it matches; otherwise fetch now (team changed mid-flow)
-      let team = (preTeamData && String(preTeamId) === String(finalSoldToTeam)) ? preTeamData : null;
+      // Resolve team: use cache if it matches, else fetch
+      let team = (cachedTeam && String(preTeamId) === String(finalSoldToTeam)) ? cachedTeam : null;
       if (!team) {
-        if (preTeamError) throw preTeamError;
+        // Try cache for the final team (may differ from preTeamId if fallback chain changed it)
+        team = getCachedTeam(auctionId, finalSoldToTeam);
+      }
+      if (!team) {
         const { data: fetchedTeam, error: fetchTeamErr } = await supabase
           .from('teams').select('budget, name, logo').eq('id', finalSoldToTeam).eq('auction_id', auctionId).single();
         if (fetchTeamErr) throw fetchTeamErr;
         team = fetchedTeam;
+        if (team) setCachedTeamBudget(auctionId, finalSoldToTeam, team);
       }
 
       if (!team) return res.status(400).json({ error: 'Team not found' });
-      if (team.budget < finalSoldPrice) {
+      if (parseFloat(team.budget) < parseFloat(finalSoldPrice)) {
         return res.status(400).json({ error: 'Team does not have enough budget' });
       }
 
       newBudget = parseFloat(team.budget) - parseFloat(finalSoldPrice);
       teamName = team.name;
       teamLogo = team.logo;
+
+      // Update in-memory team budget cache immediately
+      updateCachedTeamBudget(auctionId, finalSoldToTeam, newBudget);
     }
+
+    // Clear current player cache — it's being marked, next player cache set after load
+    clearCachedCurrentPlayer(auctionId);
 
     // ── PHASE 3: Emit socket events IMMEDIATELY (UI feels instant) ───────────────
     clearVirtualBids(auctionId);
@@ -1178,6 +1191,7 @@ router.post('/mark-player', async (req, res) => {
           }
 
           console.log('[mark-player] Auto-loaded next player:', nextPlayer.name);
+          setCachedCurrentPlayer(auctionId, nextPlayer);
           io.emit('player-loaded', { player: nextPlayer });
         } else {
           // No more players — stop the auction
@@ -2278,6 +2292,9 @@ router.put('/teams/:id/budget', async (req, res) => {
     const { error } = await supabase.from('teams').update({ budget }).eq('id', id).eq('auction_id', auctionId);
     if (error) throw error;
 
+    // Keep in-memory team budget cache in sync
+    updateCachedTeamBudget(auctionId, id, parseFloat(budget));
+
     io.emit('team-budget-updated', { teamId: parseInt(id), newBudget: parseFloat(budget) });
     res.json({ success: true, budget });
   } catch (err) {
@@ -2560,6 +2577,8 @@ router.post('/remove-player-from-team/:playerId', async (req, res) => {
       teamId: teamId,
       player: updatedPlayer
     });
+    // Keep in-memory team budget cache in sync after refund
+    updateCachedTeamBudget(auctionId, teamId, newBudget);
     io.emit('team-budget-updated', { teamId: teamId, newBudget: newBudget });
     io.emit('player-updated', { player: updatedPlayer });
 
@@ -2903,6 +2922,10 @@ router.post('/trading-window/execute', async (req, res) => {
     if (updateFromResult.error) throw updateFromResult.error;
     if (updateToResult.error) throw updateToResult.error;
     if (updatePlayerResult.error) throw updatePlayerResult.error;
+
+    // Keep in-memory team budget cache in sync after trade
+    updateCachedTeamBudget(auctionId, fromTeamId, newFromBudget);
+    updateCachedTeamBudget(auctionId, toTeamId, newToBudget);
 
     // 7. Insert trade record
     const tradeRecord = {
