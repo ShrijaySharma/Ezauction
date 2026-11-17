@@ -221,9 +221,14 @@ function OverlayTeams({ teamPurses, theme, themeKey }) {
 // ── Main bid lower-third with Centered Player Image & Serial on left ─────────
 function OverlayLowerThird({
     theme, currentPlayer, currentBid, leadingTeam, bidFlash, formatIndianNumber,
-    showAge = true, showCategory = true, showSerialNo = true
+    showAge = true, showCategory = true, showSerialNo = true, teamPurses = []
 }) {
     const imageUrl = currentPlayer?.image ? getImageUrl(currentPlayer.image) : null;
+    const leadingTeamObj = teamPurses?.find(t =>
+        (t.name && leadingTeam && t.name.trim().toLowerCase() === leadingTeam.trim().toLowerCase()) ||
+        (t.teamName && leadingTeam && t.teamName.trim().toLowerCase() === leadingTeam.trim().toLowerCase())
+    );
+    const leadingTeamLogo = leadingTeamObj?.logo || null;
 
     return (
         <div className="absolute bottom-0 left-0 right-0 z-20">
@@ -233,7 +238,7 @@ function OverlayLowerThird({
                 style={{ background: `linear-gradient(to top, ${theme.overlayGlow}, transparent)` }}
             />
 
-            {/* Main lower-third bar: slim height (88px) with 3-column grid to center the player image */}
+            {/* Main lower-third bar: slim height with 3-column grid to center the player image */}
             <div
                 className="relative grid grid-cols-[1fr_auto_1fr] items-center px-6 md:px-10 py-2 md:py-3"
                 style={{
@@ -287,7 +292,7 @@ function OverlayLowerThird({
                     </div>
                 </div>
 
-                {/* Center Column: ENLARGED Player Image Box popping out of the slim bar */}
+                {/* Center Column: Player Image popping out of the bar */}
                 <div className="relative self-stretch flex items-center justify-center z-30 w-40 sm:w-48 md:w-52 px-2">
                     <div
                         className="w-40 h-52 sm:w-48 sm:h-60 md:w-52 md:h-64 rounded-2xl overflow-hidden border-2 flex items-center justify-center shadow-[0_12px_35px_rgba(0,0,0,0.85)] absolute bottom-2 md:bottom-3"
@@ -317,42 +322,111 @@ function OverlayLowerThird({
                     </div>
                 </div>
 
-                {/* Right Column: Bid Section + Chevron (Right Aligned) */}
+                {/* Right Column: Highest Bidder Card (filling space between image & bid) + Current Bid + Chevron */}
                 <div className="flex items-center justify-end gap-3 md:gap-4 min-w-0 pl-2 md:pl-4">
+                    {/* Highest Bidder Showcase in the gap between image and bid display */}
+                    {leadingTeam ? (
+                        <div
+                            className={`flex items-center gap-3 px-3.5 md:px-4 py-1.5 md:py-2 rounded-xl transition-all duration-300 min-w-0 max-w-[280px] md:max-w-[340px] ${bidFlash ? 'scale-105' : ''}`}
+                            style={{
+                                background: `linear-gradient(135deg, ${theme.overlayBidBg || 'rgba(10,12,20,0.95)'}, rgba(18,22,34,0.92))`,
+                                border: `1.5px solid ${theme.overlayBarBorder}70`,
+                                boxShadow: `0 6px 24px rgba(0,0,0,0.7), 0 0 16px ${theme.overlayGlow}35`,
+                            }}
+                        >
+                            {/* Team Logo or Initial Badge */}
+                            {leadingTeamLogo ? (
+                                <img
+                                    src={getImageUrl(leadingTeamLogo)}
+                                    alt={leadingTeam}
+                                    className="w-10 h-10 md:w-12 md:h-12 rounded-lg object-cover flex-shrink-0 border-2"
+                                    style={{
+                                        borderColor: theme.overlayBarBorder,
+                                        boxShadow: `0 0 12px ${theme.overlayBarBorder}60`,
+                                    }}
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                />
+                            ) : (
+                                <div
+                                    className="w-10 h-10 md:w-12 md:h-12 rounded-lg flex items-center justify-center font-black text-lg md:text-xl flex-shrink-0 border-2"
+                                    style={{
+                                        background: `${theme.overlayBarBorder}22`,
+                                        borderColor: theme.overlayBarBorder,
+                                        color: theme.overlayBarBorder,
+                                        boxShadow: `0 0 12px ${theme.overlayBarBorder}40`,
+                                    }}
+                                >
+                                    {(leadingTeam || 'T').charAt(0)}
+                                </div>
+                            )}
+
+                            {/* Leading Team Name & Highlighting */}
+                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                <div className="flex items-center gap-1.5">
+                                    <span
+                                        className="w-2 h-2 rounded-full animate-ping shrink-0"
+                                        style={{ background: theme.overlayBarBorder }}
+                                    />
+                                    <span
+                                        className="text-[9px] md:text-[11px] font-black uppercase tracking-[0.22em] leading-none"
+                                        style={{ color: theme.overlayBarBorder }}
+                                    >
+                                        Highest Bidder
+                                    </span>
+                                </div>
+                                <div
+                                    className="text-base md:text-xl font-black uppercase tracking-tight truncate leading-tight mt-0.5"
+                                    style={{
+                                        color: '#FFFFFF',
+                                        textShadow: `0 0 18px ${theme.overlayBarBorder}90, 0 2px 6px rgba(0,0,0,0.9)`,
+                                    }}
+                                >
+                                    {leadingTeam}
+                                </div>
+                                <div
+                                    className="text-[11px] md:text-xs font-bold font-mono mt-0.5"
+                                    style={{ color: theme.overlayRoleText, opacity: 0.95 }}
+                                >
+                                    Holding: <span style={{ color: theme.overlayBarBorder, fontWeight: 900 }}>₹{formatIndianNumber(currentBid)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div
+                            className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed opacity-45 max-w-[220px]"
+                            style={{
+                                borderColor: `${theme.overlayBarBorder}60`,
+                                background: 'rgba(255,255,255,0.02)',
+                            }}
+                        >
+                            <div className="w-2 h-2 rounded-full shrink-0" style={{ background: theme.overlayRoleText }} />
+                            <span className="text-[11px] md:text-xs font-bold uppercase tracking-wider truncate" style={{ color: theme.overlayRoleText }}>
+                                Awaiting First Bid...
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Current Bid Display Box */}
                     <div
-                        className={`flex flex-col items-center justify-center px-4 md:px-5 py-1 md:py-1.5 transition-all duration-300 min-w-[200px] md:min-w-[260px] max-w-[320px] rounded-xl ${bidFlash ? 'scale-105' : ''}`}
+                        className={`flex flex-col items-center justify-center px-4 md:px-6 py-1.5 md:py-2 transition-all duration-300 min-w-[150px] md:min-w-[190px] rounded-xl shrink-0 ${bidFlash ? 'scale-105' : ''}`}
                         style={{
                             background: theme.overlayBidBg,
-                            border: `1px solid ${theme.overlayBarBorder}35`,
+                            border: `1.5px solid ${theme.overlayBarBorder}50`,
+                            boxShadow: `0 4px 20px rgba(0,0,0,0.6)`,
                         }}
                     >
                         <span
-                            className="text-xs md:text-sm font-black uppercase tracking-[0.25em] mb-0.5 text-center leading-none"
+                            className="text-[10px] md:text-xs font-black uppercase tracking-[0.25em] mb-0.5 text-center leading-none"
                             style={{ color: theme.overlayRoleText }}
                         >
                             Current Bid
                         </span>
                         <span
-                            className={`text-3xl md:text-4xl lg:text-5xl font-black font-mono tracking-tighter leading-tight transition-all duration-300 ${bidFlash ? 'scale-110' : ''}`}
+                            className={`text-2xl md:text-3xl lg:text-4xl font-black font-mono tracking-tighter leading-tight transition-all duration-300 ${bidFlash ? 'scale-110' : ''}`}
                             style={{ color: bidFlash ? theme.overlayBarBorder : theme.overlayBidText }}
                         >
                             ₹{formatIndianNumber(currentBid)}
                         </span>
-                        {leadingTeam ? (
-                            <span
-                                className="text-sm md:text-base font-black text-center leading-tight break-words max-w-[210px] uppercase line-clamp-2 mt-0.5"
-                                style={{ color: theme.overlayLeadText }}
-                            >
-                                {leadingTeam}
-                            </span>
-                        ) : (
-                            <span
-                                className="text-[11px] italic text-center mt-0.5"
-                                style={{ color: theme.overlayRoleText, opacity: 0.6 }}
-                            >
-                                Awaiting bid...
-                            </span>
-                        )}
                     </div>
 
                     <ChevronAccent color={theme.overlayAccentRight} side="right" />
@@ -397,97 +471,95 @@ function PurseTicker({ data, themeKey }) {
 
     return (
         <div
-            className="absolute bottom-32 right-0 z-40 pointer-events-none"
-            style={{ animation: 'purseTickIn 0.45s cubic-bezier(0.34,1.4,0.64,1)' }}
+            className="absolute right-0 z-40 pointer-events-none"
+            style={{
+                bottom: '165px', /* sits comfortably ~45px above the 120px lower-third bar — zero overlap with bids and amount */
+                animation: 'purseTickIn 0.45s cubic-bezier(0.34,1.4,0.64,1)',
+            }}
         >
             {/* Accent left border stripe */}
             <div style={{
-                position: 'absolute', left: 0, top: '12px', bottom: '12px',
+                position: 'absolute', left: 0, top: '8px', bottom: '8px',
                 width: '4px', borderRadius: '0 2px 2px 0',
                 background: `linear-gradient(180deg, ${tk.accent}, ${tk.accent}44)`,
-                boxShadow: `0 0 12px ${tk.accent}`,
+                boxShadow: `0 0 14px ${tk.accent}`,
             }} />
 
             <div
                 style={{
                     marginLeft: '4px',
-                    minWidth: '340px',
-                    maxWidth: '380px',
+                    width: '520px',       /* wide rectangular ticker ribbon (ratio ~7.5:1) */
                     background: tk.barBg,
                     border: `1.5px solid ${tk.accent}55`,
                     borderRight: 'none',
-                    borderRadius: '16px 0 0 16px',
-                    backdropFilter: 'blur(24px)',
-                    boxShadow: `0 16px 60px rgba(0,0,0,0.9), 0 0 0 1px ${tk.accent}15`,
-                    padding: '20px 24px 20px 20px',
+                    borderRadius: '14px 0 0 14px',
+                    backdropFilter: 'blur(28px)',
+                    boxShadow: `0 12px 50px rgba(0,0,0,0.92), 0 0 0 1px ${tk.accent}12`,
+                    padding: '12px 20px 12px 16px',
                     display: 'flex',
-                    flexDirection: 'column',
+                    flexDirection: 'row',   /* horizontal rectangle */
+                    alignItems: 'center',
                     gap: '14px',
                 }}
             >
-                {/* Header row */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: tk.accent, boxShadow: `0 0 8px ${tk.accent}` }} />
-                        <span style={{ color: tk.accent, fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em' }}>
-                            Live Purse
-                        </span>
+                {/* Left: team logo */}
+                {team.logo ? (
+                    <img
+                        src={getImageUrl(team.logo)} alt={team.name}
+                        style={{ width: '48px', height: '48px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: `2px solid ${tk.accent}80`, boxShadow: `0 0 16px ${tk.accent}50` }}
+                        onError={e => { e.target.style.display = 'none'; }}
+                    />
+                ) : (
+                    <div style={{ width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 900, background: `${tk.accent}22`, border: `2px solid ${tk.accent}60`, color: tk.accent }}>
+                        {(team.name || 'T').charAt(0)}
                     </div>
-                    <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '11px', fontWeight: 700 }}>
-                        {index} / {total}
-                    </span>
-                </div>
+                )}
 
-                {/* Team identity row */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    {team.logo ? (
-                        <img
-                            src={getImageUrl(team.logo)} alt={team.name}
-                            style={{ width: '56px', height: '56px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0, border: `2px solid ${tk.accent}70`, boxShadow: `0 0 20px ${tk.accent}40` }}
-                            onError={e => { e.target.style.display = 'none'; }}
-                        />
-                    ) : (
-                        <div style={{ width: '56px', height: '56px', borderRadius: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 900, background: `${tk.accent}22`, border: `2px solid ${tk.accent}60`, color: tk.accent }}>
-                            {(team.name || 'T').charAt(0)}
-                        </div>
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ color: '#fff', fontWeight: 900, fontSize: '18px', textTransform: 'uppercase', letterSpacing: '-0.01em', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {team.name}
-                        </div>
-                        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '11px', fontWeight: 700, marginTop: '3px' }}>
-                            {team.playersBought || 0} player{(team.playersBought || 0) !== 1 ? 's' : ''} bought
-                        </div>
+                {/* Middle: team name + players bought */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: tk.accent, boxShadow: `0 0 7px ${tk.accent}` }} />
+                        <span style={{ color: tk.accent, fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em' }}>Live Purse · {index}/{total}</span>
+                    </div>
+                    {/* Team name — big, highlighted */}
+                    <div style={{
+                        color: '#fff',
+                        fontWeight: 900,
+                        fontSize: '19px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.02em',
+                        lineHeight: 1.1,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        textShadow: `0 0 18px ${tk.accent}90, 0 2px 6px rgba(0,0,0,0.95)`,
+                    }}>
+                        {team.name}
+                    </div>
+                    <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '10px', fontWeight: 700, marginTop: '2px' }}>
+                        {team.playersBought || 0} player{(team.playersBought || 0) !== 1 ? 's' : ''} bought
                     </div>
                 </div>
 
                 {/* Divider */}
-                <div style={{ height: '1px', background: `linear-gradient(90deg, ${tk.accent}40, transparent)` }} />
+                <div style={{ width: '1px', height: '42px', background: `linear-gradient(180deg, transparent, ${tk.accent}50, transparent)` }} />
 
-                {/* Budget display */}
-                <div>
-                    <div style={{ color: tk.accent, fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', marginBottom: '4px' }}>
+                {/* Right: budget + bar */}
+                <div style={{ flexShrink: 0, minWidth: '150px' }}>
+                    <div style={{ color: tk.accent, fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', marginBottom: '2px' }}>
                         Remaining Purse
                     </div>
-                    <div style={{ color: '#fff', fontSize: '36px', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '-0.02em', lineHeight: 1, textShadow: `0 0 24px ${tk.accent}60` }}>
+                    <div style={{ color: '#fff', fontSize: '24px', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '-0.02em', lineHeight: 1, textShadow: `0 0 18px ${tk.accent}70` }}>
                         ₹{Number(remaining).toLocaleString('en-IN')}
                     </div>
-                    {spent > 0 && (
-                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', fontWeight: 700, marginTop: '4px' }}>
-                            Spent: ₹{Number(spent).toLocaleString('en-IN')}
-                        </div>
-                    )}
-                </div>
-
-                {/* Progress bar */}
-                <div>
-                    <div style={{ width: '100%', height: '8px', borderRadius: '99px', background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                    {/* Progress bar */}
+                    <div style={{ marginTop: '5px', width: '100%', height: '5px', borderRadius: '99px', background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${pct}%`, borderRadius: '99px', background: barColor, boxShadow: barGlow, transition: 'width 0.7s ease' }} />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '5px' }}>
-                        <span style={{ color: barColor, fontSize: '10px', fontWeight: 800 }}>{pct.toFixed(0)}% remaining</span>
-                        {totalBudget > 0 && (
-                            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '10px', fontWeight: 700 }}>of ₹{Number(totalBudget).toLocaleString('en-IN')}</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
+                        <span style={{ color: barColor, fontSize: '9px', fontWeight: 800 }}>{pct.toFixed(0)}% left</span>
+                        {spent > 0 && (
+                            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '9px', fontWeight: 700 }}>Spent ₹{Number(spent).toLocaleString('en-IN')}</span>
                         )}
                     </div>
                 </div>
@@ -495,7 +567,7 @@ function PurseTicker({ data, themeKey }) {
 
             <style>{`
                 @keyframes purseTickIn {
-                    from { opacity: 0; transform: translateX(60px); }
+                    from { opacity: 0; transform: translateX(80px); }
                     to   { opacity: 1; transform: translateX(0); }
                 }
             `}</style>
@@ -908,6 +980,7 @@ function Overlay() {
                     showAge={showAge}
                     showCategory={showCategory}
                     showSerialNo={showSerialNo}
+                    teamPurses={teamPurses}
                 />
             )}
 
