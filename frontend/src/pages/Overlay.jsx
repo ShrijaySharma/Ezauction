@@ -467,7 +467,7 @@ function PurseTicker({ data, themeKey }) {
     const totalBudget = remaining + spent;
     const pct = totalBudget > 0 ? Math.max(0, Math.min(100, (remaining / totalBudget) * 100)) : 100;
     const barColor = pct > 50 ? '#22C55E' : pct > 20 ? '#F59E0B' : '#EF4444';
-    const barGlow  = pct > 50 ? '0 0 12px #22C55E80' : pct > 20 ? '0 0 12px #F59E0B80' : '0 0 12px #EF444480';
+    const barGlow  = pct > 50 ? '0 0 14px #22C55E90' : pct > 20 ? '0 0 14px #F59E0B90' : '0 0 14px #EF444490';
 
     return (
         <div
@@ -480,86 +480,86 @@ function PurseTicker({ data, themeKey }) {
             {/* Accent left border stripe */}
             <div style={{
                 position: 'absolute', left: 0, top: '8px', bottom: '8px',
-                width: '4px', borderRadius: '0 2px 2px 0',
+                width: '5px', borderRadius: '0 3px 3px 0',
                 background: `linear-gradient(180deg, ${tk.accent}, ${tk.accent}44)`,
-                boxShadow: `0 0 14px ${tk.accent}`,
+                boxShadow: `0 0 18px ${tk.accent}`,
             }} />
 
             <div
                 style={{
-                    marginLeft: '4px',
-                    width: '520px',       /* wide rectangular ticker ribbon (ratio ~7.5:1) */
+                    marginLeft: '5px',
+                    width: '620px',       /* wide rectangular ticker ribbon */
                     background: tk.barBg,
-                    border: `1.5px solid ${tk.accent}55`,
+                    border: `1.5px solid ${tk.accent}60`,
                     borderRight: 'none',
-                    borderRadius: '14px 0 0 14px',
-                    backdropFilter: 'blur(28px)',
-                    boxShadow: `0 12px 50px rgba(0,0,0,0.92), 0 0 0 1px ${tk.accent}12`,
-                    padding: '12px 20px 12px 16px',
+                    borderRadius: '16px 0 0 16px',
+                    backdropFilter: 'blur(30px)',
+                    boxShadow: `0 16px 60px rgba(0,0,0,0.95), 0 0 0 1px ${tk.accent}15`,
+                    padding: '16px 24px 16px 20px',
                     display: 'flex',
                     flexDirection: 'row',   /* horizontal rectangle */
                     alignItems: 'center',
-                    gap: '14px',
+                    gap: '18px',
                 }}
             >
-                {/* Left: team logo */}
+                {/* Left: team logo (enlarged) */}
                 {team.logo ? (
                     <img
                         src={getImageUrl(team.logo)} alt={team.name}
-                        style={{ width: '48px', height: '48px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0, border: `2px solid ${tk.accent}80`, boxShadow: `0 0 16px ${tk.accent}50` }}
+                        style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0, border: `2.5px solid ${tk.accent}90`, boxShadow: `0 0 20px ${tk.accent}55` }}
                         onError={e => { e.target.style.display = 'none'; }}
                     />
                 ) : (
-                    <div style={{ width: '48px', height: '48px', borderRadius: '10px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 900, background: `${tk.accent}22`, border: `2px solid ${tk.accent}60`, color: tk.accent }}>
+                    <div style={{ width: '64px', height: '64px', borderRadius: '12px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', fontWeight: 900, background: `${tk.accent}25`, border: `2.5px solid ${tk.accent}70`, color: tk.accent }}>
                         {(team.name || 'T').charAt(0)}
                     </div>
                 )}
 
-                {/* Middle: team name + players bought */}
+                {/* Middle: team name + players bought (enlarged & highlighted) */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: tk.accent, boxShadow: `0 0 7px ${tk.accent}` }} />
-                        <span style={{ color: tk.accent, fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em' }}>Live Purse · {index}/{total}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: tk.accent, boxShadow: `0 0 8px ${tk.accent}` }} />
+                        <span style={{ color: tk.accent, fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.35em' }}>Live Purse · {index}/{total}</span>
                     </div>
                     {/* Team name — big, highlighted */}
                     <div style={{
                         color: '#fff',
                         fontWeight: 900,
-                        fontSize: '19px',
+                        fontSize: '22px',
                         textTransform: 'uppercase',
                         letterSpacing: '0.02em',
-                        lineHeight: 1.1,
+                        lineHeight: 1.15,
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        textShadow: `0 0 18px ${tk.accent}90, 0 2px 6px rgba(0,0,0,0.95)`,
+                        textShadow: `0 0 20px ${tk.accent}95, 0 2px 6px rgba(0,0,0,0.95)`,
                     }}>
                         {team.name}
                     </div>
-                    <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '10px', fontWeight: 700, marginTop: '2px' }}>
-                        {team.playersBought || 0} player{(team.playersBought || 0) !== 1 ? 's' : ''} bought
+                    <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: 800, marginTop: '4px' }}>
+                        <span style={{ color: tk.accent, fontWeight: 900 }}>{team.playersBought || 0}</span> player{(team.playersBought || 0) !== 1 ? 's' : ''} bought
                     </div>
                 </div>
 
                 {/* Divider */}
-                <div style={{ width: '1px', height: '42px', background: `linear-gradient(180deg, transparent, ${tk.accent}50, transparent)` }} />
+                <div style={{ width: '1.5px', height: '56px', background: `linear-gradient(180deg, transparent, ${tk.accent}60, transparent)` }} />
 
-                {/* Right: budget + bar */}
-                <div style={{ flexShrink: 0, minWidth: '150px' }}>
-                    <div style={{ color: tk.accent, fontSize: '9px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', marginBottom: '2px' }}>
+                {/* Right: budget + bar (enlarged amount) */}
+                <div style={{ flexShrink: 0, minWidth: '180px' }}>
+                    <div style={{ color: tk.accent, fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', marginBottom: '3px' }}>
                         Remaining Purse
                     </div>
-                    <div style={{ color: '#fff', fontSize: '24px', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '-0.02em', lineHeight: 1, textShadow: `0 0 18px ${tk.accent}70` }}>
+                    <div style={{ color: '#fff', fontSize: '32px', fontWeight: 900, fontFamily: 'monospace', letterSpacing: '-0.02em', lineHeight: 1, textShadow: `0 0 22px ${tk.accent}80` }}>
                         ₹{Number(remaining).toLocaleString('en-IN')}
                     </div>
                     {/* Progress bar */}
-                    <div style={{ marginTop: '5px', width: '100%', height: '5px', borderRadius: '99px', background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+                    <div style={{ marginTop: '7px', width: '100%', height: '7px', borderRadius: '99px', background: 'rgba(255,255,255,0.12)', overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${pct}%`, borderRadius: '99px', background: barColor, boxShadow: barGlow, transition: 'width 0.7s ease' }} />
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
-                        <span style={{ color: barColor, fontSize: '9px', fontWeight: 800 }}>{pct.toFixed(0)}% left</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px' }}>
+                        <span style={{ color: barColor, fontSize: '10px', fontWeight: 800 }}>{pct.toFixed(0)}% remaining</span>
                         {spent > 0 && (
-                            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '9px', fontWeight: 700 }}>Spent ₹{Number(spent).toLocaleString('en-IN')}</span>
+                            <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '10px', fontWeight: 700 }}>Spent ₹{Number(spent).toLocaleString('en-IN')}</span>
                         )}
                     </div>
                 </div>
@@ -681,24 +681,24 @@ function Overlay() {
         let idx = 0;
         const showNext = () => {
             if (idx >= purses.length) {
-                // Cycle done — wait 5 mins then restart
+                // Cycle done — wait 3 mins then restart
                 purseTickerAuctionRef.current = false;
                 setPurseTicker(null);
-                purseTickerRef.current = setTimeout(() => startPurseCycle(purseTickerLivePursesRef.current), 5 * 60 * 1000);
+                purseTickerRef.current = setTimeout(() => startPurseCycle(purseTickerLivePursesRef.current), 3 * 60 * 1000);
                 return;
             }
             setPurseTicker({ team: purses[idx], index: idx + 1, total: purses.length });
             idx++;
-            purseTickerRef.current = setTimeout(showNext, 3000); // 3 sec per team
+            purseTickerRef.current = setTimeout(showNext, 5000); // 5 sec per team
         };
         showNext();
     };
 
-    // Start the purse cycle 5 mins after mount
+    // Start the purse cycle 3 mins after mount
     useEffect(() => {
         const timer = setTimeout(() => {
             startPurseCycle(purseTickerLivePursesRef.current);
-        }, 5 * 60 * 1000);
+        }, 3 * 60 * 1000);
         return () => {
             clearTimeout(timer);
             if (purseTickerRef.current) clearTimeout(purseTickerRef.current);
