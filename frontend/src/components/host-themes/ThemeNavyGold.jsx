@@ -163,11 +163,13 @@ export default function ThemeNavyGold({
 
       {/* ── SPONSOR BAR (only if user has set sponsor) ── */}
       {(sponsorName || sponsorLogo) && (
-        <div className="relative z-20 shrink-0 h-14 sm:h-16 md:h-20 lg:h-24 w-full bg-[#030B1A] border-t-2 border-[#C9A84C]/50 flex items-center justify-center gap-3 sm:gap-4 md:gap-6 px-4 sm:px-6 lg:px-8">
-          <span className="text-[#ECC867] text-xs sm:text-sm md:text-base font-black uppercase tracking-[0.25em] sm:tracking-[0.3em]">SPONSOR</span>
-          <div className="w-px h-5 sm:h-6 md:h-8 bg-[#ECC867]/40" />
-          {sponsorLogo && <img src={sponsorLogo} alt={sponsorName || 'Sponsor'} className="max-h-8 sm:max-h-10 md:max-h-12 lg:max-h-14 object-contain" />}
-          {sponsorName && <span className="text-white font-black text-sm sm:text-base md:text-xl lg:text-2xl tracking-wider sm:tracking-[0.15em] uppercase">{sponsorName}</span>}
+        <div className="relative z-20 shrink-0 h-14 sm:h-16 md:h-20 lg:h-24 w-full bg-[#030B1A] border-t-2 border-[#C9A84C]/50 flex items-center px-4 sm:px-6 lg:px-8">
+          <span className="text-[#ECC867] text-xs sm:text-sm md:text-base font-black uppercase tracking-[0.25em] sm:tracking-[0.3em] mr-3 sm:mr-4 md:mr-6 shrink-0">SPONSOR</span>
+          <div className="w-px h-5 sm:h-6 md:h-8 bg-[#ECC867]/40 shrink-0 mr-3 sm:mr-4 md:mr-6" />
+          <div className="flex-1 flex items-center justify-center gap-3 sm:gap-4 md:gap-5 min-w-0">
+            {sponsorLogo && <img src={sponsorLogo} alt={sponsorName || 'Sponsor'} className="max-h-9 sm:max-h-11 md:max-h-14 lg:max-h-16 object-contain shrink-0" />}
+            {sponsorName && <span className="text-white font-black text-base sm:text-lg md:text-2xl lg:text-3xl tracking-wider sm:tracking-[0.15em] uppercase truncate">{sponsorName}</span>}
+          </div>
         </div>
       )}
     </div>
