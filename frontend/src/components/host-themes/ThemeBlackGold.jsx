@@ -168,7 +168,7 @@ export default function ThemeBlackGold({
           </div>
           <div className="flex items-center justify-center gap-3 sm:gap-4 md:gap-5 min-w-0">
             {sponsorLogo && <img src={sponsorLogo} alt={sponsorName || 'Sponsor'} className="max-h-9 sm:max-h-11 md:max-h-14 lg:max-h-16 object-contain shrink-0" />}
-            {sponsorName && <span className="text-white font-black text-base sm:text-lg md:text-2xl lg:text-3xl truncate" style={{fontFamily:"'Noto Sans', 'Noto Sans Devanagari', sans-serif", letterSpacing:'0.03em'}}>{sponsorName}</span>}
+            {sponsorName && <span className="text-white font-black text-base sm:text-lg md:text-2xl lg:text-3xl leading-tight text-center whitespace-normal" style={{fontFamily:"'Noto Sans', 'Noto Sans Devanagari', sans-serif", letterSpacing:'0.03em'}}>{sponsorName}</span>}
           </div>
           <div />
         </div>
