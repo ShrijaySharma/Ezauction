@@ -170,13 +170,15 @@ export default function ThemeBlueBrush({
 
       {/* ── SPONSOR BAR (only if user has set sponsor) ── */}
       {(sponsorName || sponsorLogo) && (
-        <div className="relative z-20 shrink-0 h-14 sm:h-16 md:h-20 lg:h-24 w-full bg-[#0047CC] flex items-center px-4 sm:px-6 lg:px-8 shadow-lg">
-          <span className="text-white/80 text-xs sm:text-sm md:text-base font-black uppercase tracking-[0.25em] sm:tracking-[0.3em] mr-3 sm:mr-4 md:mr-6 shrink-0">SPONSOR</span>
-          <div className="w-px h-5 sm:h-6 md:h-8 bg-white/40 shrink-0 mr-3 sm:mr-4 md:mr-6" />
-          <div className="flex-1 flex items-center justify-center gap-3 sm:gap-4 md:gap-5 min-w-0">
-            {sponsorLogo && <img src={sponsorLogo} alt={sponsorName || 'Sponsor'} className="max-h-9 sm:max-h-11 md:max-h-14 lg:max-h-16 object-contain shrink-0" />}
-            {sponsorName && <span className="text-white font-black text-base sm:text-lg md:text-2xl lg:text-3xl tracking-wider sm:tracking-[0.15em] uppercase truncate">{sponsorName}</span>}
+        <div className="relative z-20 shrink-0 h-14 sm:h-16 md:h-20 lg:h-24 w-full bg-[#0047CC] grid grid-cols-3 items-center px-4 sm:px-6 lg:px-8 shadow-lg">
+          <div className="flex items-center justify-center">
+            <span className="text-white/80 text-xs sm:text-sm md:text-base font-black uppercase tracking-[0.25em] sm:tracking-[0.3em]">SPONSOR</span>
           </div>
+          <div className="flex items-center justify-center gap-3 sm:gap-4 md:gap-5 min-w-0">
+            {sponsorLogo && <img src={sponsorLogo} alt={sponsorName || 'Sponsor'} className="max-h-9 sm:max-h-11 md:max-h-14 lg:max-h-16 object-contain shrink-0" />}
+            {sponsorName && <span className="text-white font-black text-base sm:text-lg md:text-2xl lg:text-3xl truncate" style={{fontFamily:"'Noto Sans', 'Noto Sans Devanagari', sans-serif", letterSpacing:'0.03em'}}>{sponsorName}</span>}
+          </div>
+          <div />
         </div>
       )}
     </div>
