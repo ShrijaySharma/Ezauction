@@ -750,7 +750,10 @@ function OwnerDashboard({ user }) {
                     />
                     <h3 className="text-white font-bold text-lg">{player.name}</h3>
                     <p className="text-gray-400 text-sm">{player.role}</p>
-                    <p className="text-yellow-400 font-semibold mt-2">₹{formatIndianNumber(player.sold_price || 0)}</p>
+                    {player.is_owner_pick
+                      ? <p className="text-purple-400 font-bold mt-2">Owner Pick</p>
+                      : <p className="text-yellow-400 font-semibold mt-2">₹{formatIndianNumber(player.sold_price || 0)}</p>
+                    }
                     {player.team_name && (
                       <p className="text-green-400 text-sm mt-1">→ {player.team_name}</p>
                     )}
@@ -946,7 +949,7 @@ function OwnerDashboard({ user }) {
                         )}
                         <h3 className="text-white font-bold text-lg">{player.name}</h3>
                       </div>
-                      <p className="text-green-400 font-semibold text-lg">₹{formatIndianNumber(player.sold_price || 0)}</p>
+                      <p className="text-green-400 font-semibold text-lg">{player.is_owner_pick ? <span className="text-purple-400 font-bold">Owner Pick</span> : `₹${formatIndianNumber(player.sold_price || 0)}`}</p>
                     </div>
                   ))}
                 {teamPlayers.length === 0 && (

@@ -1229,6 +1229,190 @@ router.post('/mark-player', async (req, res) => {
   }
 });
 
+// ─── Sell as Owner (zero cost, no budget deduction) ──────────────────────────
+router.post('/sell-as-owner', async (req, res) => {
+  const { playerId, teamId } = req.body;
+  const io = getAuctionIo(req);
+  const auctionId = getAuctionId(req);
+
+  if (!playerId || !teamId) {
+    return res.status(400).json({ error: 'playerId and teamId are required' });
+  }
+
+  if (markPlayerLocks.has(auctionId)) {
+    return res.status(429).json({ error: 'Player mark operation already in progress' });
+  }
+
+  const state = getAuctionState(auctionId);
+  if (!state?.current_player_id || Number(state.current_player_id) !== Number(playerId)) {
+    return res.status(400).json({ error: 'Only the currently loaded player can be sold as owner' });
+  }
+
+  markPlayerLocks.add(auctionId);
+  let lockTransferredToAsync = false;
+
+  try {
+    // Resolve player from cache or DB
+    let currentPlayer = getCachedCurrentPlayer(auctionId);
+    if (currentPlayer && Number(currentPlayer.id) !== Number(playerId)) currentPlayer = null;
+
+    if (!currentPlayer) {
+      const { data: fetchedPlayer, error: playerErr } = await supabase
+        .from('players')
+        .select('id, name, serial_number, category, was_unsold, status, sold_price, sold_to_team, base_price, age, image, thumb_url, role, country')
+        .eq('id', playerId).eq('auction_id', auctionId).single();
+      if (playerErr) throw playerErr;
+      currentPlayer = fetchedPlayer;
+    }
+
+    if (!currentPlayer) return res.status(404).json({ error: 'Player not found' });
+    if (currentPlayer.status === 'SOLD') return res.status(400).json({ error: 'This player has already been sold' });
+
+    // Resolve team (name + logo only — no budget deduction)
+    let team = getCachedTeam(auctionId, teamId);
+    if (!team) {
+      const { data: fetchedTeam, error: teamErr } = await supabase
+        .from('teams').select('budget, name, logo').eq('id', teamId).eq('auction_id', auctionId).single();
+      if (teamErr) throw teamErr;
+      team = fetchedTeam;
+    }
+    if (!team) return res.status(404).json({ error: 'Team not found' });
+
+    const teamName = team.name;
+    const teamLogo = team.logo;
+    const currentBudget = parseFloat(team.budget) || 0;
+
+    // Clear caches — do NOT touch budget cache
+    clearCachedCurrentPlayer(auctionId);
+    clearVirtualBids(auctionId);
+
+    // Emit socket events immediately (UI feels instant)
+    io.emit('player-marked', { playerId, status: 'SOLD', soldPrice: null, soldToTeam: teamId, soldToTeamName: teamName, soldToTeamLogo: teamLogo, isOwnerPick: true });
+    io.emit('team-budget-updated', { teamId, newBudget: currentBudget }); // budget unchanged
+    io.emit('player-sold', { playerId, status: 'SOLD', soldPrice: null, soldToTeam: teamId, soldToTeamName: teamName, soldToTeamLogo: teamLogo, isOwnerPick: true });
+
+    // Non-blocking DB write
+    const dbWrite = Promise.all([
+      supabase.from('players').update({
+        status: 'SOLD',
+        sold_price: null,
+        sold_to_team: teamId,
+        is_owner_pick: true,
+        was_unsold: 0
+      }).eq('id', playerId).eq('auction_id', auctionId)
+    ]).then(([{ error: e1 }]) => {
+      if (e1) console.error('[sell-as-owner] player update error:', e1);
+    });
+
+    // Snapshot for async next-player work
+    const currentState = getAuctionState(auctionId);
+    const sequentialBaseline = (currentState && currentState.sequential_mode === 1)
+      ? { ...currentState, sequential_last_serial: currentPlayer.serial_number ?? currentState.sequential_last_serial }
+      : currentState;
+    const categoryQueueSnap = currentState?.category_queue ? [...currentState.category_queue] : null;
+    const slotIndexSnap = currentState?.category_slot_index ?? 0;
+    const slotServedSnap = currentState?.category_slot_served ?? 0;
+
+    lockTransferredToAsync = true;
+    res.json({ success: true, nextPlayerLoaded: true, nextPlayer: null });
+
+    // Async: load next player (identical to mark-player phase 6)
+    setImmediate(async () => {
+      try {
+        const [pendingResult] = await Promise.all([
+          supabase.from('players').select('*').in('status', ['AVAILABLE', 'UNSOLD'])
+            .neq('id', playerId).eq('auction_id', auctionId).order('was_unsold', { ascending: true }),
+          dbWrite
+        ]);
+
+        const { data: allPendingPlayers, error: pendingError } = pendingResult;
+        if (pendingError) {
+          console.error('[sell-as-owner] pending players query error:', pendingError);
+          io.emit('player-loaded', { player: null });
+          return;
+        }
+
+        const pendingList = allPendingPlayers || [];
+        let categoryFilter = null;
+        let activeCategory = null;
+        let activeSlotIndex = slotIndexSnap;
+        let slotServed = slotServedSnap;
+
+        if (categoryQueueSnap && Array.isArray(categoryQueueSnap) && categoryQueueSnap.length > 0) {
+          let slotAdvanced = false;
+          while (activeSlotIndex < categoryQueueSnap.length) {
+            const slot = categoryQueueSnap[activeSlotIndex];
+            if (!slot || !slot.category) { activeSlotIndex++; slotServed = 0; slotAdvanced = true; continue; }
+            const slotCount = parseInt(slot.count) || 0;
+            if (slotCount > 0 && slotServed >= slotCount) { activeSlotIndex++; slotServed = 0; slotAdvanced = true; continue; }
+            const targetCat = slot.category.trim().toLowerCase();
+            const hasRemaining = pendingList.some(p => p.category && p.category.trim().toLowerCase() === targetCat);
+            if (!hasRemaining) { activeSlotIndex++; slotServed = 0; slotAdvanced = true; continue; }
+            categoryFilter = { category: slot.category };
+            activeCategory = slot.category;
+            break;
+          }
+          if (slotAdvanced || activeSlotIndex !== slotIndexSnap) {
+            updateCategoryQueueData(auctionId, { slotIndex: activeSlotIndex, slotServed }).catch(e =>
+              console.error('[sell-as-owner] category slot update error:', e)
+            );
+            io.emit('category-slot-changed', { slotIndex: activeSlotIndex, category: activeCategory, slotServed });
+          }
+        }
+
+        let nextPlayer = pendingList.length > 0 ? pickNextPlayer(pendingList, sequentialBaseline, categoryFilter) : null;
+        if (!nextPlayer && pendingList.length > 0) nextPlayer = pendingList[0];
+
+        if (nextPlayer) {
+          if (currentState) {
+            currentState.current_player_id = nextPlayer.id;
+            currentState.status = 'LIVE';
+            if (currentState.sequential_mode === 1 && nextPlayer.serial_number != null) {
+              currentState.sequential_last_serial = nextPlayer.serial_number;
+            }
+          }
+          const nextStateUpdate = { current_player_id: nextPlayer.id, status: 'LIVE', updated_at: new Date() };
+          if (currentState && currentState.sequential_mode === 1 && nextPlayer.serial_number != null) {
+            nextStateUpdate.sequential_last_serial = nextPlayer.serial_number;
+          }
+          await Promise.all([
+            supabase.from('auction_state').update(nextStateUpdate).eq('auction_id', auctionId),
+            supabase.from('bids').delete().eq('player_id', nextPlayer.id).eq('auction_id', auctionId)
+          ]);
+          clearAdminAnonymousBid(auctionId);
+          refreshAuctionState(auctionId).catch(e => console.error('[sell-as-owner] refreshAuctionState error:', e));
+          if (categoryFilter) {
+            const newServed = slotServed + 1;
+            updateCategoryQueueData(auctionId, { slotIndex: activeSlotIndex, slotServed: newServed }).catch(e =>
+              console.error('[sell-as-owner] category served update error:', e)
+            );
+            io.emit('category-slot-changed', { slotIndex: activeSlotIndex, category: activeCategory, slotServed: newServed });
+          }
+          console.log('[sell-as-owner] Auto-loaded next player:', nextPlayer.name);
+          setCachedCurrentPlayer(auctionId, nextPlayer);
+          io.emit('player-loaded', { player: nextPlayer });
+        } else {
+          if (currentState) { currentState.current_player_id = null; currentState.status = 'STOPPED'; }
+          await supabase.from('auction_state').update({ current_player_id: null, status: 'STOPPED', updated_at: new Date() }).eq('auction_id', auctionId);
+          refreshAuctionState(auctionId).catch(e => console.error('[sell-as-owner] refreshAuctionState error:', e));
+          io.emit('player-loaded', { player: null });
+        }
+      } catch (asyncErr) {
+        console.error('[sell-as-owner] async next-player load error:', asyncErr);
+        io.emit('player-loaded', { player: null });
+      } finally {
+        markPlayerLocks.delete(auctionId);
+      }
+    });
+
+  } catch (err) {
+    console.error('Error in sell-as-owner:', err);
+    if (!res.headersSent) res.status(500).json({ error: 'Database error' });
+  } finally {
+    if (!lockTransferredToAsync) markPlayerLocks.delete(auctionId);
+  }
+});
+
 // Reset bidding for next player
 router.post('/reset-bidding', async (req, res) => {
   const io = getAuctionIo(req);
@@ -2510,7 +2694,7 @@ router.post('/remove-player-from-team/:playerId', async (req, res) => {
     }
 
     const teamId = player.sold_to_team;
-    const soldPrice = parseFloat(player.sold_price) || 0;
+    const soldPrice = player.is_owner_pick ? 0 : (parseFloat(player.sold_price) || 0);
 
     // Acquire lock for this team to prevent concurrent refund read-modify-write races
     const lockKey = `${auctionId}_team_${teamId}`;
@@ -2546,6 +2730,7 @@ router.post('/remove-player-from-team/:playerId', async (req, res) => {
             status: 'AVAILABLE',
             sold_price: null,
             sold_to_team: null,
+            is_owner_pick: false,
             was_unsold: 1
           })
           .eq('id', playerId)
@@ -2717,7 +2902,7 @@ router.get('/export-teams', async (req, res) => {
     const { data: teams, error: teamsError } = await teamsQuery;
     if (teamsError) throw teamsError;
 
-    let playersQuery = supabase.from('players').select('name, role, sold_price, serial_number, sold_to_team').eq('status', 'SOLD').order('serial_number');
+    let playersQuery = supabase.from('players').select('name, role, sold_price, is_owner_pick, serial_number, sold_to_team').eq('status', 'SOLD').order('serial_number');
     playersQuery = playersQuery.eq('auction_id', auctionId);
     const { data: players, error: playersError } = await playersQuery;
     if (playersError) throw playersError;
@@ -2781,7 +2966,7 @@ router.get('/export-teams', async (req, res) => {
           rowData.push(
             player.serial_number || '',
             player.name || '',
-            player.sold_price || ''
+            player.is_owner_pick ? 'Owner' : (player.sold_price || '')
           );
         } else {
           rowData.push('', '', '');
@@ -2881,13 +3066,14 @@ router.post('/trading-window/execute', async (req, res) => {
     // 3. Validate player belongs to fromTeam and is SOLD
     const { data: player, error: playerError } = await supabase
       .from('players')
-      .select('id, name, status, sold_to_team, sold_price')
+      .select('id, name, status, sold_to_team, sold_price, is_owner_pick')
       .eq('id', playerId)
       .eq('auction_id', auctionId)
       .single();
 
     if (playerError) throw playerError;
     if (!player) return res.status(404).json({ error: 'Player not found' });
+    if (player.is_owner_pick) return res.status(400).json({ error: 'Owner pick players cannot be traded' });
     if (player.status !== 'SOLD') return res.status(400).json({ error: 'Player is not sold. Only sold players can be traded.' });
     if (player.sold_to_team !== fromTeamId) return res.status(400).json({ error: 'Player does not belong to the specified source team' });
 

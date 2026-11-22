@@ -97,6 +97,7 @@ function AdminDashboard({ user }) {
   const [customBidIncrement2, setCustomBidIncrement2] = useState(2000);
   const [newBaseBidAmount, setNewBaseBidAmount] = useState(1000);
   const [adminBidTeamId, setAdminBidTeamId] = useState('');
+  const [showOwnerSellModal, setShowOwnerSellModal] = useState(false);
   const [isMarkingPlayer, setIsMarkingPlayer] = useState(false);
   const [saleToast, setSaleToast] = useState(null);
   const [loadPlayerSearch, setLoadPlayerSearch] = useState('');
@@ -1171,6 +1172,21 @@ function AdminDashboard({ user }) {
     }
   };
 
+  const handleSellAsOwner = async (teamId) => {
+    if (!currentPlayer) return;
+    const team = teams.find(t => String(t.id) === String(teamId));
+    if (!confirm(`Sell "${currentPlayer.name}" to "${team?.name}" as OWNER (₹0 — no budget deducted)?`)) return;
+    try {
+      setIsMarkingPlayer(true);
+      await adminService.sellAsOwner(currentPlayer.id, teamId);
+      setShowOwnerSellModal(false);
+    } catch (err) {
+      alert('Error: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setIsMarkingPlayer(false);
+    }
+  };
+
   const handleAdminAssignTeam = async () => {
     if (!adminBidTeamId) {
       alert('Please select a team first');
@@ -1682,8 +1698,51 @@ function AdminDashboard({ user }) {
                     >
                       Assign Team
                     </button>
+                    <button
+                      onClick={() => setShowOwnerSellModal(true)}
+                      disabled={isMarkingPlayer}
+                      className="px-4 py-2 rounded-lg bg-gradient-to-r from-purple-700 to-purple-900 hover:from-purple-800 hover:to-purple-950 text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Sell as Owner
+                    </button>
                   </div>
                 </div>
+
+                {/* Sell as Owner Modal */}
+                {showOwnerSellModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+                    <div className="bg-gray-900 border border-purple-600 rounded-xl p-6 w-full max-w-sm shadow-2xl">
+                      <h3 className="text-white font-bold text-lg mb-1">Sell as Owner</h3>
+                      <p className="text-gray-400 text-sm mb-4">
+                        Select a team to receive <span className="text-white font-semibold">{currentPlayer?.name}</span> as an owner pick — no budget deducted.
+                      </p>
+                      <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1">
+                        {teams.map(team => (
+                          <button
+                            key={team.id}
+                            onClick={() => handleSellAsOwner(team.id)}
+                            disabled={isMarkingPlayer}
+                            className="flex items-center gap-3 px-4 py-3 bg-gray-800 hover:bg-purple-900/50 border border-gray-700 hover:border-purple-500 rounded-lg text-left transition-all disabled:opacity-50"
+                          >
+                            {team.logo && (
+                              <img src={team.logo} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-white font-semibold text-sm truncate">{team.name}</div>
+                              <div className="text-gray-400 text-xs">₹{team.budget?.toLocaleString('en-IN') || '0'} remaining</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => setShowOwnerSellModal(false)}
+                        className="mt-4 w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm font-semibold transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2734,7 +2793,10 @@ function AdminDashboard({ user }) {
                                   <div className="text-gray-400 text-xs">{player.role}</div>
                                 </div>
                                 <div className="text-green-400 font-semibold text-sm">
-                                  ₹{player.sold_price?.toLocaleString('en-IN') || '0'}
+                                  {player.is_owner_pick
+                                    ? <span className="text-purple-400 font-bold text-xs">OWNER</span>
+                                    : `₹${player.sold_price?.toLocaleString('en-IN') || '0'}`
+                                  }
                                 </div>
                                 <button
                                   onClick={() => handleRemovePlayerFromTeam(player.id, player.name)}

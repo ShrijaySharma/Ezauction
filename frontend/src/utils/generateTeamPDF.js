@@ -836,7 +836,7 @@ function buildTeamPage(tk, team, players, tournamentName, includeBidPrice, logoB
         color: ${tk.accent};
         line-height: 18px;
         box-sizing: border-box;
-      `, player.sold_price ? fmtINR(player.sold_price) : '—'));
+      `, player.is_owner_pick ? 'OWNER' : (player.sold_price ? fmtINR(player.sold_price) : '—')));
     }
 
     tableBody.appendChild(row);

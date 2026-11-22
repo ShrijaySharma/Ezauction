@@ -388,3 +388,10 @@ export const clearCategoryQueue = async () => {
   const response = await api.post('/admin/clear-category-queue');
   return response.data;
 };
+
+// ─── Sell as Owner ─────────────────────────────────────────────────────────────
+
+export const sellAsOwner = async (playerId, teamId) => {
+  const response = await api.post('/admin/sell-as-owner', { playerId, teamId });
+  return response.data;
+};
