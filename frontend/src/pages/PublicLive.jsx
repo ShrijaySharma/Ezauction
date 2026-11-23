@@ -28,7 +28,7 @@ function PublicLive() {
     const [filterRole, setFilterRole] = useState('All');
     const [filterStatus, setFilterStatus] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortBy, setSortBy] = useState('number'); // 'number' or 'name'
+    const [sortBy, setSortBy] = useState('name'); // 'name' or 'number'
     const [showSortMenu, setShowSortMenu] = useState(false);
     const sortMenuRef = useRef(null);
     const [loadingCatalog, setLoadingCatalog] = useState(true);
