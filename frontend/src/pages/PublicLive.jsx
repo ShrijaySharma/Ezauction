@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { getSocketUrl, setCurrentAuctionId, getCurrentAuctionId } from '../config';
@@ -28,8 +28,23 @@ function PublicLive() {
     const [filterRole, setFilterRole] = useState('All');
     const [filterStatus, setFilterStatus] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState('number'); // 'number' or 'name'
+    const [showSortMenu, setShowSortMenu] = useState(false);
+    const sortMenuRef = useRef(null);
     const [loadingCatalog, setLoadingCatalog] = useState(true);
     const [previewImage, setPreviewImage] = useState(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (sortMenuRef.current && !sortMenuRef.current.contains(event.target)) {
+                setShowSortMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     // Global display toggles synced from Admin
     const [showAge, setShowAge] = useState(true);
@@ -214,12 +229,34 @@ function PublicLive() {
     const roles = ['All', ...Array.from(new Set(players.map(p => p.role)))];
     const statuses = ['All', 'AVAILABLE', 'SOLD', 'UNSOLD'];
 
-    const filteredPlayers = players.filter(p => {
-        const matchesRole = filterRole === 'All' || p.role === filterRole;
-        const matchesStatus = filterStatus === 'All' || p.status === filterStatus;
-        const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesRole && matchesStatus && matchesSearch;
-    });
+    const filteredPlayers = players
+        .filter(p => {
+            const matchesRole = filterRole === 'All' || p.role === filterRole;
+            const matchesStatus = filterStatus === 'All' || p.status === filterStatus;
+            const matchesSearch = (p.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+            return matchesRole && matchesStatus && matchesSearch;
+        })
+        .sort((a, b) => {
+            if (sortBy === 'name') {
+                return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true });
+            }
+            // Sort by number (serial number wise, players with no number on last)
+            const getSerial = (p) => {
+                if (p.serial_number === null || p.serial_number === undefined || p.serial_number === '') return null;
+                const num = Number(p.serial_number);
+                return isNaN(num) ? null : num;
+            };
+            const numA = getSerial(a);
+            const numB = getSerial(b);
+
+            if (numA !== null && numB !== null) {
+                if (numA !== numB) return numA - numB;
+                return (a.name || '').localeCompare(b.name || '');
+            }
+            if (numA !== null && numB === null) return -1;
+            if (numA === null && numB !== null) return 1;
+            return (a.name || '').localeCompare(b.name || '');
+        });
 
     const getTeamName = (teamId) => {
         const team = teams.find(t => t.id === teamId);
@@ -372,8 +409,8 @@ function PublicLive() {
                 {/* 📋 CATALOG VIEW */}
                 {viewMode === 'catalog' && (
                     <div className="p-6 max-w-7xl mx-auto w-full h-full flex flex-col">
-                        {/* Filters */}
-                        <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-lg">
+                        {/* Filters & Sorting */}
+                        <div className="mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-gray-800 p-4 rounded-xl border border-gray-700 shadow-lg">
                             <div>
                                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Search Players</label>
                                 <input
@@ -403,6 +440,65 @@ function PublicLive() {
                                 >
                                     {statuses.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
+                            </div>
+                            <div className="relative" ref={sortMenuRef}>
+                                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Sort</label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowSortMenu(prev => !prev)}
+                                    className="w-full bg-gray-900 border border-gray-700 hover:border-indigo-500 rounded-lg px-4 py-2.5 text-white flex items-center justify-between transition-colors focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                                >
+                                    <span className="flex items-center gap-2 text-sm">
+                                        <svg className="w-4 h-4 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                                        </svg>
+                                        <span className="font-medium text-gray-200">
+                                            {sortBy === 'name' ? 'Sort by Name' : 'Sort by Number'}
+                                        </span>
+                                    </span>
+                                    <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${showSortMenu ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+
+                                {showSortMenu && (
+                                    <div className="absolute right-0 left-0 mt-2 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-30 py-1 overflow-hidden backdrop-blur-md">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setSortBy('number'); setShowSortMenu(false); }}
+                                            className={`w-full px-4 py-2.5 text-left text-sm flex items-center justify-between transition-colors ${
+                                                sortBy === 'number'
+                                                    ? 'bg-indigo-600/20 text-indigo-300 font-semibold border-l-2 border-indigo-500'
+                                                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                                            }`}
+                                        >
+                                            <div className="flex flex-col">
+                                                <span>Sort by Number</span>
+                                                <span className="text-xs text-gray-500 font-normal">Serial number wise</span>
+                                            </div>
+                                            {sortBy === 'number' && (
+                                                <span className="text-indigo-400 font-bold ml-2">✓</span>
+                                            )}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setSortBy('name'); setShowSortMenu(false); }}
+                                            className={`w-full px-4 py-2.5 text-left text-sm flex items-center justify-between transition-colors ${
+                                                sortBy === 'name'
+                                                    ? 'bg-indigo-600/20 text-indigo-300 font-semibold border-l-2 border-indigo-500'
+                                                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                                            }`}
+                                        >
+                                            <div className="flex flex-col">
+                                                <span>Sort by Name</span>
+                                                <span className="text-xs text-gray-500 font-normal">Alphabetically (A to Z)</span>
+                                            </div>
+                                            {sortBy === 'name' && (
+                                                <span className="text-indigo-400 font-bold ml-2">✓</span>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
