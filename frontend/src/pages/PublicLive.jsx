@@ -163,6 +163,36 @@ function PublicLive() {
             setAuctionStatus(data.status);
         });
 
+        // ── Catalog real-time sync ─────────────────────────────────────────
+        newSocket.on('player-added', (data) => {
+            if (data && data.player) {
+                // Single player added — append if not already present
+                setPlayers(prev => {
+                    if (prev.some(p => p.id === data.player.id)) return prev;
+                    return [...prev, data.player];
+                });
+            } else {
+                // Bulk add (count only) — refetch full list
+                getPublicPlayers().then(list => { if (Array.isArray(list)) setPlayers(list); }).catch(() => {});
+            }
+        });
+
+        newSocket.on('player-updated', (data) => {
+            if (data && data.player) {
+                setPlayers(prev => prev.map(p => p.id === data.player.id ? { ...p, ...data.player } : p));
+            }
+        });
+
+        newSocket.on('player-deleted', (data) => {
+            if (data && data.playerId != null) {
+                setPlayers(prev => prev.filter(p => p.id !== data.playerId));
+            }
+        });
+
+        newSocket.on('all-players-deleted', () => {
+            setPlayers([]);
+        });
+
         newSocket.on('ui-toggles-updated', (data) => {
             if (!data) return;
             if (data.showAge !== undefined) setShowAge(data.showAge);
@@ -229,34 +259,39 @@ function PublicLive() {
     const roles = ['All', ...Array.from(new Set(players.map(p => p.role)))];
     const statuses = ['All', 'AVAILABLE', 'SOLD', 'UNSOLD'];
 
-    const filteredPlayers = players
-        .filter(p => {
+    const sortPlayers = (arr) => {
+        return [...arr].sort((a, b) => {
+            const cleanNameA = (a.name || '').trim();
+            const cleanNameB = (b.name || '').trim();
+
+            if (sortBy === 'name') {
+                return cleanNameA.localeCompare(cleanNameB, undefined, { sensitivity: 'base' });
+            }
+            const toSerial = (p) => {
+                const v = p.serial_number;
+                if (v === null || v === undefined || v === '') return null;
+                const n = Number(v);
+                return isNaN(n) ? null : n;
+            };
+            const numA = toSerial(a);
+            const numB = toSerial(b);
+            if (numA !== null && numB !== null) {
+                return numA !== numB ? numA - numB : cleanNameA.localeCompare(cleanNameB, undefined, { sensitivity: 'base' });
+            }
+            if (numA !== null) return -1;
+            if (numB !== null) return 1;
+            return cleanNameA.localeCompare(cleanNameB, undefined, { sensitivity: 'base' });
+        });
+    };
+
+    const filteredPlayers = sortPlayers(
+        players.filter(p => {
             const matchesRole = filterRole === 'All' || p.role === filterRole;
             const matchesStatus = filterStatus === 'All' || p.status === filterStatus;
             const matchesSearch = (p.name || '').toLowerCase().includes(searchQuery.toLowerCase());
             return matchesRole && matchesStatus && matchesSearch;
         })
-        .sort((a, b) => {
-            if (sortBy === 'name') {
-                return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true });
-            }
-            // Sort by number (serial number wise, players with no number on last)
-            const getSerial = (p) => {
-                if (p.serial_number === null || p.serial_number === undefined || p.serial_number === '') return null;
-                const num = Number(p.serial_number);
-                return isNaN(num) ? null : num;
-            };
-            const numA = getSerial(a);
-            const numB = getSerial(b);
-
-            if (numA !== null && numB !== null) {
-                if (numA !== numB) return numA - numB;
-                return (a.name || '').localeCompare(b.name || '');
-            }
-            if (numA !== null && numB === null) return -1;
-            if (numA === null && numB !== null) return 1;
-            return (a.name || '').localeCompare(b.name || '');
-        });
+    );
 
     const getTeamName = (teamId) => {
         const team = teams.find(t => t.id === teamId);
