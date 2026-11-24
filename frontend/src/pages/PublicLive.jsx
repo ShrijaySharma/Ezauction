@@ -225,17 +225,24 @@ function PublicLive() {
                 }).catch(() => {});
 
                 // Preload player images (both thumbnail and full) into browser cache
+                // Throttled: load 5 images per batch, 150ms between batches.
+                // This prevents 100-300 simultaneous proxy requests flooding the
+                // Render backend and causing other API calls to time out.
+                // (HostDashboard preloading is intentionally unthrottled for instant display.)
                 if (Array.isArray(playersData)) {
+                    const BATCH_SIZE = 5;
+                    const BATCH_DELAY_MS = 150;
+                    const urls = [];
                     playersData.forEach(p => {
-                        if (p.thumb_url) {
-                            const img = new Image();
-                            img.src = getImageUrl(p.thumb_url);
-                        }
-                        if (p.image) {
-                            const img = new Image();
-                            img.src = getImageUrl(p.image);
-                        }
+                        if (p.thumb_url) urls.push(getImageUrl(p.thumb_url));
+                        if (p.image) urls.push(getImageUrl(p.image));
                     });
+                    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
+                        const batch = urls.slice(i, i + BATCH_SIZE);
+                        setTimeout(() => {
+                            batch.forEach(src => { const img = new Image(); img.src = src; });
+                        }, (i / BATCH_SIZE) * BATCH_DELAY_MS);
+                    }
                 }
             } catch (err) {
                 console.error("Failed to load catalog data", err);

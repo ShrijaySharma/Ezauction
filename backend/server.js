@@ -69,6 +69,90 @@ app.get('/', (req, res) => {
 // Trust proxy (required for Render/Heroku SSL)
 app.set('trust proxy', 1);
 
+// ── Image proxy (BEFORE session middleware) ───────────────────────────────────
+// Must be registered before app.use(session(...)) so proxy requests never
+// trigger a session DB touch, preventing 100-300 simultaneous DB writes when
+// the catalog loads. Images are streamed (not buffered) to avoid RAM spikes on
+// Render's shared 512MB instance. An in-memory LRU cache avoids re-fetching
+// the same image from Supabase on repeated requests.
+
+const PROXY_CACHE_MAX = 200;              // max cached images
+const PROXY_CACHE_TTL = 60 * 60 * 1000;  // 1 hour
+const proxyCache = new Map();             // urlKey → { buf, contentType, cachedAt }
+
+function proxyCacheGet(key) {
+  const entry = proxyCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.cachedAt > PROXY_CACHE_TTL) {
+    proxyCache.delete(key);
+    return null;
+  }
+  return entry;
+}
+
+function proxyCacheSet(key, buf, contentType) {
+  if (proxyCache.size >= PROXY_CACHE_MAX) {
+    // Evict oldest entry
+    proxyCache.delete(proxyCache.keys().next().value);
+  }
+  proxyCache.set(key, { buf, contentType, cachedAt: Date.now() });
+}
+
+app.get('/api/proxy-image', async (req, res) => {
+  const imageUrl = req.query.url;
+  if (!imageUrl) {
+    return res.status(400).send('URL query parameter is required');
+  }
+
+  // This endpoint is public, so never let it become a general-purpose server
+  // side request proxy. Player assets are stored only in this Supabase project.
+  let parsedImageUrl;
+  try {
+    parsedImageUrl = new URL(imageUrl);
+    const configuredHost = new URL(process.env.SUPABASE_URL).hostname;
+    if (parsedImageUrl.protocol !== 'https:' || parsedImageUrl.hostname !== configuredHost) {
+      return res.status(400).send('Only this project\'s Supabase image URLs are allowed');
+    }
+  } catch {
+    return res.status(400).send('Invalid image URL');
+  }
+
+  // Serve from in-memory cache if available (avoids re-fetching Supabase)
+  const cacheKey = parsedImageUrl.toString();
+  const cached = proxyCacheGet(cacheKey);
+  if (cached) {
+    res.setHeader('Content-Type', cached.contentType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.setHeader('X-Proxy-Cache', 'HIT');
+    return res.send(cached.buf);
+  }
+
+  try {
+    // Fetch image from Supabase via Render's backend (not blocked by Jio)
+    const response = await fetch(parsedImageUrl);
+
+    if (!response.ok) {
+      return res.status(response.status).send('Failed to fetch image from Supabase');
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/webp';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.setHeader('X-Proxy-Cache', 'MISS');
+
+    // Buffer once, cache it, then send — small images fit easily in RAM and
+    // the cache stops Supabase re-fetches for the same player across viewers.
+    const buffer = await response.arrayBuffer();
+    const buf = Buffer.from(buffer);
+    proxyCacheSet(cacheKey, buf, contentType);
+    res.send(buf);
+  } catch (error) {
+    console.error('Proxy Error:', error);
+    res.status(500).send('Internal Server Error while proxying image');
+  }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Session configuration
 // Secure cookie ONLY in actual production (Render HTTPS). Localhost uses standard Lax/insecure cookie so it persists across refreshes.
 
@@ -105,47 +189,6 @@ app.use('/api/owner', ownerRoutes);
 app.use('/api/host', hostRoutes);
 app.use('/api/app-owner', appOwnerRoutes);
 app.use('/api/public', publicRoutes);
-
-// Image proxy to bypass ISP DNS blocks in India (e.g. Reliance Jio blocking *.supabase.co)
-app.get('/api/proxy-image', async (req, res) => {
-  const imageUrl = req.query.url;
-  if (!imageUrl) {
-    return res.status(400).send('URL query parameter is required');
-  }
-
-  // This endpoint is public, so never let it become a general-purpose server
-  // side request proxy. Player assets are stored only in this Supabase project.
-  let parsedImageUrl;
-  try {
-    parsedImageUrl = new URL(imageUrl);
-    const configuredHost = new URL(process.env.SUPABASE_URL).hostname;
-    if (parsedImageUrl.protocol !== 'https:' || parsedImageUrl.hostname !== configuredHost) {
-      return res.status(400).send('Only this project\'s Supabase image URLs are allowed');
-    }
-  } catch {
-    return res.status(400).send('Invalid image URL');
-  }
-
-  try {
-    // We fetch the image from Supabase via Render's backend (which isn't blocked by Jio)
-    const response = await fetch(parsedImageUrl);
-
-    if (!response.ok) {
-      return res.status(response.status).send('Failed to fetch image from Supabase');
-    }
-
-    // Set exactly the same headers the image should have
-    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/webp');
-    res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year
-
-    // Stream the image directly to the client's browser using arrayBuffer
-    const buffer = await response.arrayBuffer();
-    res.send(Buffer.from(buffer));
-  } catch (error) {
-    console.error('Proxy Error:', error);
-    res.status(500).send('Internal Server Error while proxying image');
-  }
-});
 
 // Centralized error handler to ensure JSON responses on errors (Multer, body-parser, etc.)
 app.use((err, req, res, next) => {

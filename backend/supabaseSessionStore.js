@@ -30,6 +30,12 @@ function cacheSet(sid, data, expiresAt) {
 function cacheDelete(sid) {
   sessionCache.delete(sid);
 }
+
+// ── Touch throttle map ────────────────────────────────────────────────────────
+// Tracks last time we wrote an expires_at update to Supabase per session ID.
+// Prevents 300 simultaneous DB writes when a catalog page loads 300 images.
+const touchLastWritten = new Map(); // sid → timestamp (ms)
+// ─────────────────────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class SupabaseSessionStore extends session.Store {
@@ -104,6 +110,7 @@ export class SupabaseSessionStore extends session.Store {
 
   destroy(sid, callback = () => {}) {
     cacheDelete(sid);
+    touchLastWritten.delete(sid); // also clean up throttle map on logout
     supabase
       .from('app_sessions')
       .delete()
@@ -124,6 +131,17 @@ export class SupabaseSessionStore extends session.Store {
     // Update cache TTL without invalidating
     const cached = cacheGet(sid);
     if (cached !== null) cacheSet(sid, cached, this.expiresAt(sess));
+
+    // Throttle DB writes: only write to Supabase at most once every 15 minutes
+    // per session ID. Each HTTP request (including every image proxy request)
+    // triggers session touch — without this throttle, 300 simultaneous image
+    // loads = 300 simultaneous DB writes, exhausting Supabase connection pool.
+    const now = Date.now();
+    const TOUCH_THROTTLE_MS = 15 * 60 * 1000; // 15 minutes
+    if (touchLastWritten.has(sid) && now - touchLastWritten.get(sid) < TOUCH_THROTTLE_MS) {
+      return callback(null); // Skip DB write, in-memory TTL already updated above
+    }
+    touchLastWritten.set(sid, now);
 
     supabase
       .from('app_sessions')
